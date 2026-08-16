@@ -1,0 +1,49 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to /var/www/aiosnova
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 3m
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR=/var/www/aiosnova
+            REPO_URL=https://github.com/kunzzgroups/aiosnova.git
+
+            if ! command -v git >/dev/null 2>&1; then
+              sudo dnf install -y git
+            fi
+
+            sudo mkdir -p /var/www
+
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              sudo rm -rf "$DEPLOY_DIR"
+              sudo mkdir -p "$DEPLOY_DIR"
+              sudo chown "${USER}:${USER}" "$DEPLOY_DIR"
+              git clone --branch main "$REPO_URL" "$DEPLOY_DIR"
+            else
+              sudo chown -R "${USER}:${USER}" "$DEPLOY_DIR"
+              git -C "$DEPLOY_DIR" remote set-url origin "$REPO_URL"
+              git -C "$DEPLOY_DIR" fetch origin main
+              git -C "$DEPLOY_DIR" checkout -B main origin/main
+            fi
+
+            sudo systemctl reload nginx || true
+            echo "Deployed $(git -C "$DEPLOY_DIR" rev-parse --short HEAD)"
