@@ -1,0 +1,29 @@
+.ui-text-field {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ui-text-field:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgba(15, 61, 62, 0.12);
+}
+
+.ui-text-field--error {
+  border-color: var(--color-danger);
+}
+
+.ui-text-field--error:focus {
+  box-shadow: 0 0 0 3px rgba(155, 44, 44, 0.15);
+}
+
+.ui-text-field:disabled {
+  background: var(--color-bg-muted);
+  cursor: not-allowed;
+}

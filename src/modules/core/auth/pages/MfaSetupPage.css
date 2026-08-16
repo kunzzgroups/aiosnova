@@ -1,0 +1,32 @@
+.mfa-setup h1 {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-2);
+}
+
+.mfa-setup__subtitle {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-5);
+}
+
+.mfa-setup__done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mfa-setup__codes {
+  margin: 0;
+  padding: var(--space-4);
+  list-style: none;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.mfa-setup__codes li + li {
+  margin-top: var(--space-2);
+}
+
+.mfa-setup code {
+  word-break: break-all;
+}

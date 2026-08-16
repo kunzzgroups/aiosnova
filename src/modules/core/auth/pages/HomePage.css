@@ -1,0 +1,32 @@
+.home-page h1 {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-2);
+}
+
+.home-page > p {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-5);
+}
+
+.home-page__meta {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-5);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.home-page__meta dt {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.home-page__meta dd {
+  margin: var(--space-1) 0 0;
+  font-weight: 600;
+}

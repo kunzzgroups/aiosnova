@@ -1,0 +1,21 @@
+.ui-alert {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.ui-alert--error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.ui-alert--success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.ui-alert--info {
+  background: var(--color-accent-soft);
+  color: var(--color-brand);
+}
