@@ -31,16 +31,19 @@ jobs:
               sudo dnf install -y git
             fi
 
+            sudo mkdir -p /var/www
+
             if [ ! -d "$DEPLOY_DIR/.git" ]; then
-              sudo mkdir -p /var/www
               sudo rm -rf "$DEPLOY_DIR"
-              sudo git clone --branch main "$REPO_URL" "$DEPLOY_DIR"
+              sudo mkdir -p "$DEPLOY_DIR"
+              sudo chown "${USER}:${USER}" "$DEPLOY_DIR"
+              git clone --branch main "$REPO_URL" "$DEPLOY_DIR"
             else
-              sudo git -C "$DEPLOY_DIR" remote set-url origin "$REPO_URL"
-              sudo git -C "$DEPLOY_DIR" fetch origin main
-              sudo git -C "$DEPLOY_DIR" checkout -B main origin/main
+              sudo chown -R "${USER}:${USER}" "$DEPLOY_DIR"
+              git -C "$DEPLOY_DIR" remote set-url origin "$REPO_URL"
+              git -C "$DEPLOY_DIR" fetch origin main
+              git -C "$DEPLOY_DIR" checkout -B main origin/main
             fi
 
-            sudo chown -R "${USER}:${USER}" "$DEPLOY_DIR"
             sudo systemctl reload nginx || true
-            echo "Deployed $(sudo git -C "$DEPLOY_DIR" rev-parse --short HEAD)"
+            echo "Deployed $(git -C "$DEPLOY_DIR" rev-parse --short HEAD)"
