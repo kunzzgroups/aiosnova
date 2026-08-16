@@ -5,7 +5,8 @@ import { hydrateSession } from '@/modules/core/auth/services/authService'
 import '@/design-system/global.css'
 
 async function enableMocking() {
-  if (!import.meta.env.DEV) {
+  const shouldMock = import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCK === 'true'
+  if (!shouldMock) {
     return
   }
 
