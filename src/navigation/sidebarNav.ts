@@ -380,6 +380,8 @@ export const sidebarSections: SidebarSection[] = [
           'Users',
           'Companies',
           'Organization',
+          'Position',
+          'Membership',
           'Roles',
           'Permissions',
           'Multi-Tenant',

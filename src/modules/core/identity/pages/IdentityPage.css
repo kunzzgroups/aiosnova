@@ -1,0 +1,164 @@
+.identity-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 72rem;
+}
+
+.identity-page__header h1 {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-2);
+}
+
+.identity-page__header p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.identity-panel {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.identity-panel h2 {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-4);
+}
+
+.identity-form {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  align-items: end;
+}
+
+.identity-form .ui-form-field {
+  min-width: 0;
+}
+
+.identity-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.identity-table-wrap {
+  overflow-x: auto;
+}
+
+.identity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.identity-table th,
+.identity-table td {
+  padding: 0.7rem 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.identity-table th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.identity-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.identity-status--active {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.identity-status--disabled,
+.identity-status--inactive,
+.identity-status--ended {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.identity-status--invited {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.identity-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.identity-tree ul {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.identity-tree__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-sm);
+}
+
+.identity-tree__row:hover {
+  background: var(--color-bg-muted);
+}
+
+.identity-tree__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.identity-tree__meta strong {
+  font-size: var(--text-sm);
+}
+
+.identity-tree__meta span {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.identity-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.identity-empty {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-3) 0;
+}
+
+.identity-select,
+.identity-input {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+}
