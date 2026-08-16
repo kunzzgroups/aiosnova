@@ -1,3 +1,7 @@
+.home-page {
+  max-width: 44rem;
+}
+
 .home-page h1 {
   font-size: var(--text-2xl);
   margin-bottom: var(--space-2);

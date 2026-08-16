@@ -9,6 +9,7 @@ import { MfaChallengePage } from '@/modules/core/auth/pages/MfaChallengePage'
 import { MfaSetupPage } from '@/modules/core/auth/pages/MfaSetupPage'
 import { GoogleOAuthCallbackPage } from '@/modules/core/auth/pages/GoogleOAuthCallbackPage'
 import { HomePage } from '@/modules/core/auth/pages/HomePage'
+import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
 
 export function AppRouter() {
   return (
@@ -27,6 +28,7 @@ export function AppRouter() {
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/mfa/setup" element={<MfaSetupPage />} />
+          <Route path="*" element={<ModulePlaceholderPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

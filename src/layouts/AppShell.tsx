@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
+import { Sidebar } from '@/components/navigation/Sidebar'
 import { useAuthStore } from '@/stores/authStore'
 import { logout } from '@/modules/core/auth/services/authService'
 import './AppShell.css'
@@ -18,19 +19,20 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="app-shell">
-      <header className="app-shell__header">
-        <Link to="/" className="app-shell__brand">
-          AIOS
-        </Link>
-        <div className="app-shell__actions">
-          <span className="app-shell__user">{user?.email}</span>
-          <Link to="/mfa/setup">MFA setup</Link>
-          <Button variant="secondary" size="md" onClick={() => void handleLogout()}>
-            Log out
-          </Button>
-        </div>
-      </header>
-      <main className="app-shell__main">{children}</main>
+      <Sidebar />
+      <div className="app-shell__workspace">
+        <header className="app-shell__header">
+          <div className="app-shell__header-title">Workspace</div>
+          <div className="app-shell__actions">
+            <span className="app-shell__user">{user?.email}</span>
+            <Link to="/mfa/setup">MFA setup</Link>
+            <Button variant="secondary" size="md" onClick={() => void handleLogout()}>
+              Log out
+            </Button>
+          </div>
+        </header>
+        <main className="app-shell__main">{children}</main>
+      </div>
     </div>
   )
 }
