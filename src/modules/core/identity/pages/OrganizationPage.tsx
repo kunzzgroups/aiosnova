@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { AppShell } from '@/layouts/AppShell'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
@@ -145,8 +144,7 @@ export function OrganizationPage() {
   }
 
   return (
-    <AppShell>
-      <div className="identity-page">
+    <div className="identity-page">
         <header className="identity-page__header">
           <h1>Organization</h1>
           <p>Organization tree — divisions, departments, and teams (Layer 1 · 04).</p>
@@ -221,6 +219,5 @@ export function OrganizationPage() {
           <OrganizationBranch nodes={tree} onToggleStatus={(node) => void handleToggleStatus(node)} />
         </section>
       </div>
-    </AppShell>
   )
 }

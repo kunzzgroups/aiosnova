@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { GuestRoute } from '@/routes/GuestRoute'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
+import { AppShell } from '@/layouts/AppShell'
 import { LoginPage } from '@/modules/core/auth/pages/LoginPage'
 import { RegisterPage } from '@/modules/core/auth/pages/RegisterPage'
 import { ForgotPasswordPage } from '@/modules/core/auth/pages/ForgotPasswordPage'
@@ -30,13 +31,15 @@ export function AppRouter() {
         <Route path="/oauth/:provider/callback" element={<OAuthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/mfa/setup" element={<MfaSetupPage />} />
-          <Route path="/system/core/users" element={<UsersPage />} />
-          <Route path="/system/core/organization" element={<OrganizationPage />} />
-          <Route path="/system/core/position" element={<PositionsPage />} />
-          <Route path="/system/core/membership" element={<MembershipsPage />} />
-          <Route path="*" element={<ModulePlaceholderPage />} />
+          <Route element={<AppShell />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/mfa/setup" element={<MfaSetupPage />} />
+            <Route path="/system/core/users" element={<UsersPage />} />
+            <Route path="/system/core/organization" element={<OrganizationPage />} />
+            <Route path="/system/core/position" element={<PositionsPage />} />
+            <Route path="/system/core/membership" element={<MembershipsPage />} />
+            <Route path="*" element={<ModulePlaceholderPage />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

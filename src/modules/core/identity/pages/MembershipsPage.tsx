@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { AppShell } from '@/layouts/AppShell'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
@@ -122,8 +121,7 @@ export function MembershipsPage() {
   }
 
   return (
-    <AppShell>
-      <div className="identity-page">
+    <div className="identity-page">
         <header className="identity-page__header">
           <h1>Membership</h1>
           <p>
@@ -294,6 +292,5 @@ export function MembershipsPage() {
           ) : null}
         </section>
       </div>
-    </AppShell>
   )
 }

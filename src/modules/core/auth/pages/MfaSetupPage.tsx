@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
-import { AppShell } from '@/layouts/AppShell'
 import { MfaCodeInput } from '@/modules/core/auth/components/MfaCodeInput'
 import { ApiError } from '@/services/httpClient'
 import { confirmMfaSetup, startMfaSetup } from '@/modules/core/auth/services/authService'
@@ -66,8 +65,7 @@ export function MfaSetupPage() {
   }
 
   return (
-    <AppShell>
-      <div className="mfa-setup">
+    <div className="mfa-setup">
         <h1>Set up MFA</h1>
         <p className="mfa-setup__subtitle">
           Protect high-risk actions with an authenticator app. Current status:{' '}
@@ -112,6 +110,5 @@ export function MfaSetupPage() {
           </form>
         ) : null}
       </div>
-    </AppShell>
   )
 }

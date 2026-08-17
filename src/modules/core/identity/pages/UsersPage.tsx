@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { AppShell } from '@/layouts/AppShell'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
@@ -65,8 +64,7 @@ export function UsersPage() {
   }
 
   return (
-    <AppShell>
-      <div className="identity-page">
+    <div className="identity-page">
         <header className="identity-page__header">
           <h1>Users</h1>
           <p>Identity / User — platform accounts and profiles (Layer 1 · 03).</p>
@@ -151,6 +149,5 @@ export function UsersPage() {
           ) : null}
         </section>
       </div>
-    </AppShell>
   )
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Outlet } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Sidebar } from '@/components/navigation/Sidebar'
 import { useAuthStore } from '@/stores/authStore'
@@ -7,7 +7,7 @@ import { logout } from '@/modules/core/auth/services/authService'
 import './AppShell.css'
 
 type AppShellProps = {
-  children: ReactNode
+  children?: ReactNode
 }
 
 export function AppShell({ children }: AppShellProps) {
@@ -31,7 +31,7 @@ export function AppShell({ children }: AppShellProps) {
             </Button>
           </div>
         </header>
-        <main className="app-shell__main">{children}</main>
+        <main className="app-shell__main">{children ?? <Outlet />}</main>
       </div>
     </div>
   )

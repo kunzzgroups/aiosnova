@@ -1,0 +1,111 @@
+.sidebar-select {
+  position: relative;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.sidebar-select__label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sidebar-muted, #7a8a85);
+}
+
+.sidebar-select__trigger {
+  width: 100%;
+  min-height: 2.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--sidebar-line, #e6eeea);
+  border-radius: 0.8rem;
+  background: #fff;
+  color: var(--sidebar-ink, #1a2422);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 550;
+  padding: 0.4rem 0.65rem 0.4rem 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.sidebar-select__trigger:hover,
+.sidebar-select__trigger.is-open {
+  border-color: rgba(15, 61, 62, 0.22);
+  background: #fbfcfb;
+  box-shadow: 0 0 0 3px rgba(42, 107, 90, 0.08);
+}
+
+.sidebar-select__value {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.sidebar-select__chevron {
+  display: grid;
+  place-items: center;
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--sidebar-muted, #7a8a85);
+  transform: rotate(90deg);
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-select__chevron svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.sidebar-select__trigger.is-open .sidebar-select__chevron {
+  transform: rotate(-90deg);
+  color: var(--sidebar-active-ink, #0f3d3e);
+}
+
+.sidebar-select__menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  border: 1px solid var(--sidebar-line, #e6eeea);
+  border-radius: 0.9rem;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(15, 61, 62, 0.12);
+}
+
+.sidebar-select__option {
+  width: 100%;
+  display: block;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--sidebar-ink, #1a2422);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+}
+
+.sidebar-select__option:hover {
+  background: var(--sidebar-hover, #f2f6f4);
+}
+
+.sidebar-select__option.is-selected {
+  background: var(--sidebar-active, #e4f0eb);
+  color: var(--sidebar-active-ink, #0f3d3e);
+  font-weight: 650;
+}

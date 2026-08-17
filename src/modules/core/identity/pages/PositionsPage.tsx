@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { AppShell } from '@/layouts/AppShell'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
@@ -71,8 +70,7 @@ export function PositionsPage() {
   }
 
   return (
-    <AppShell>
-      <div className="identity-page">
+    <div className="identity-page">
         <header className="identity-page__header">
           <h1>Position</h1>
           <p>Job positions — reusable titles, not roles (Layer 1 · 05).</p>
@@ -161,6 +159,5 @@ export function PositionsPage() {
           ) : null}
         </section>
       </div>
-    </AppShell>
   )
 }
