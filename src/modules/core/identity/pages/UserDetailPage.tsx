@@ -60,6 +60,18 @@ export function UserDetailPage() {
     void loadUser()
   }, [loadUser])
 
+  useEffect(() => {
+    if (!message) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMessage(null)
+    }, 2000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [message])
+
   async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!user) {
