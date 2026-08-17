@@ -49,6 +49,46 @@ export const identityHandlers = [
     return HttpResponse.json({ items: identityUsers })
   }),
 
+  http.get('/api/identity/users/:id', ({ params }) => {
+    const user = identityUsers.find((item) => item.id === params.id)
+    if (!user) {
+      return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
+    }
+
+    const memberships = identityMemberships
+      .filter((item) => item.userId === user.id)
+      .map((item) => ({
+        ...item,
+        companyName:
+          identityCompanies.find((company) => company.id === item.companyId)?.name ?? null,
+        organizationName:
+          identityOrganizations.find((org) => org.id === item.organizationId)?.name ?? null,
+        positionName:
+          identityPositions.find((position) => position.id === item.positionId)?.name ?? null,
+      }))
+
+    return HttpResponse.json({ user, memberships })
+  }),
+
+  http.post('/api/identity/users/:id/password-reset', ({ params }) => {
+    const user = identityUsers.find((item) => item.id === params.id)
+    if (!user) {
+      return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
+    }
+
+    if (user.status === 'disabled') {
+      return HttpResponse.json(
+        { message: 'Cannot send a password reset for a disabled user.' },
+        { status: 400 },
+      )
+    }
+
+    return HttpResponse.json({
+      message: `Password reset email queued for ${user.email} (demo — no email sent).`,
+      demoHint: 'User should complete reset via Forgot password with their email.',
+    })
+  }),
+
   http.post('/api/identity/users', async ({ request }) => {
     const body = (await request.json()) as {
       email?: string

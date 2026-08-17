@@ -298,6 +298,48 @@ export const authHandlers = [
     return issueSession(user)
   }),
 
+  http.post('/api/auth/password/change', async ({ request }) => {
+    const authUser = getBearerUser(request)
+    if (!authUser) {
+      return HttpResponse.json({ message: 'Unauthenticated.' }, { status: 401 })
+    }
+
+    if (!requireCsrf(request)) {
+      return HttpResponse.json({ message: 'Invalid CSRF token.' }, { status: 403 })
+    }
+
+    const body = (await request.json()) as {
+      currentPassword?: string
+      newPassword?: string
+    }
+
+    const user = findUserById(authUser.id)
+    if (!user) {
+      return HttpResponse.json({ message: 'Unauthenticated.' }, { status: 401 })
+    }
+
+    if (!body.currentPassword || user.password !== body.currentPassword) {
+      return HttpResponse.json({ message: 'Current password is incorrect.' }, { status: 400 })
+    }
+
+    if (!body.newPassword || body.newPassword.length < 8) {
+      return HttpResponse.json(
+        { message: 'New password must be at least 8 characters.' },
+        { status: 400 },
+      )
+    }
+
+    if (body.newPassword === body.currentPassword) {
+      return HttpResponse.json(
+        { message: 'New password must be different from the current password.' },
+        { status: 400 },
+      )
+    }
+
+    user.password = body.newPassword
+    return HttpResponse.json({ message: 'Password updated.' })
+  }),
+
   http.post('/api/auth/password/forgot', async ({ request }) => {
     const body = (await request.json()) as ForgotPasswordRequest
     const user = findUserByEmail(body.email ?? '')

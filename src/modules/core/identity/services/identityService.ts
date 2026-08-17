@@ -13,8 +13,21 @@ export async function fetchIdentityMeta() {
   })
 }
 
+export type MembershipWithLabels = MembershipRecord & {
+  companyName: string | null
+  organizationName: string | null
+  positionName: string | null
+}
+
 export async function fetchUsers() {
   return apiRequest<{ items: IdentityUser[] }>('/api/identity/users', { auth: true })
+}
+
+export async function fetchUser(id: string) {
+  return apiRequest<{ user: IdentityUser; memberships: MembershipWithLabels[] }>(
+    `/api/identity/users/${id}`,
+    { auth: true },
+  )
 }
 
 export async function createUser(payload: {
@@ -36,6 +49,28 @@ export async function updateUser(
   return apiRequest<IdentityUser>(`/api/identity/users/${id}`, {
     method: 'PATCH',
     auth: true,
+    body: payload,
+  })
+}
+
+export async function sendUserPasswordReset(id: string) {
+  return apiRequest<{ message: string; demoHint?: string }>(
+    `/api/identity/users/${id}/password-reset`,
+    {
+      method: 'POST',
+      auth: true,
+    },
+  )
+}
+
+export async function changeOwnPassword(payload: {
+  currentPassword: string
+  newPassword: string
+}) {
+  return apiRequest<{ message: string }>('/api/auth/password/change', {
+    method: 'POST',
+    auth: true,
+    csrf: true,
     body: payload,
   })
 }
