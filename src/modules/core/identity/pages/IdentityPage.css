@@ -140,6 +140,15 @@
   align-items: end;
 }
 
+.identity-form--compact {
+  grid-template-columns: 24rem 24rem auto;
+  justify-content: start;
+}
+
+.identity-form--compact .ui-form-field {
+  width: 24rem;
+}
+
 .identity-form .ui-form-field {
   min-width: 0;
 }

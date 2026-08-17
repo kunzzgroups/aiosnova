@@ -94,7 +94,7 @@ export function UsersPage() {
 
       <section className="identity-panel">
         <h2>Invite user</h2>
-        <form className="identity-form" onSubmit={(event) => void handleCreate(event)}>
+        <form className="identity-form identity-form--compact" onSubmit={(event) => void handleCreate(event)}>
           <FormField label="Display name" htmlFor="user-name">
             <TextField
               id="user-name"
