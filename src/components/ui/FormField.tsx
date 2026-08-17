@@ -6,12 +6,13 @@ type FormFieldProps = {
   htmlFor: string
   error?: string
   hint?: string
+  className?: string
   children: ReactNode
 }
 
-export function FormField({ label, htmlFor, error, hint, children }: FormFieldProps) {
+export function FormField({ label, htmlFor, error, hint, className = '', children }: FormFieldProps) {
   return (
-    <div className="ui-form-field">
+    <div className={['ui-form-field', className].filter(Boolean).join(' ')}>
       <label className="ui-form-field__label" htmlFor={htmlFor}>
         {label}
       </label>

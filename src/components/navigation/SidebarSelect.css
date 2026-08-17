@@ -34,8 +34,13 @@
     background 0.15s ease;
 }
 
-.sidebar-select__trigger:hover,
-.sidebar-select__trigger.is-open {
+.sidebar-select__trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sidebar-select__trigger:hover:not(:disabled),
+.sidebar-select__trigger.is-open:not(:disabled) {
   border-color: rgba(15, 61, 62, 0.22);
   background: #fbfcfb;
   box-shadow: 0 0 0 3px rgba(42, 107, 90, 0.08);

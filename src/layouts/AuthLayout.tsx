@@ -7,9 +7,26 @@ type AuthLayoutProps = {
   subtitle?: string
   children: ReactNode
   footer?: ReactNode
+  wide?: boolean
+  compact?: boolean
 }
 
-export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProps) {
+export function AuthLayout({
+  title,
+  subtitle,
+  children,
+  footer,
+  wide = false,
+  compact = false,
+}: AuthLayoutProps) {
+  const panelClass = [
+    'auth-layout__panel',
+    wide ? 'auth-layout__panel--wide' : '',
+    compact ? 'auth-layout__panel--compact' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <div className="auth-layout">
       <div className="auth-layout__glow auth-layout__glow--one" aria-hidden />
@@ -27,14 +44,16 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
         <span>AIOS</span>
       </Link>
 
-      <div className="auth-layout__panel">
-        <div className="auth-layout__feature-icon" aria-hidden>
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M10 7H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" />
-            <path d="M14 7h3v3" />
-            <path d="M10 14 17 7" />
-          </svg>
-        </div>
+      <div className={panelClass}>
+        {compact ? null : (
+          <div className="auth-layout__feature-icon" aria-hidden>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M10 7H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" />
+              <path d="M14 7h3v3" />
+              <path d="M10 14 17 7" />
+            </svg>
+          </div>
+        )}
 
         <header className="auth-layout__header">
           <h1 className="auth-layout__title">{title}</h1>

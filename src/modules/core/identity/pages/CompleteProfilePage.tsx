@@ -13,9 +13,9 @@ import {
   PROFILE_TIMEZONES,
   isIdentityProfileComplete,
 } from '@/modules/core/identity/types/identity'
+import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { fetchUser, updateUser } from '@/modules/core/identity/services/identityService'
-import '@/modules/core/auth/pages/AuthForm.css'
-import './IdentityPage.css'
+import './CompleteProfilePage.css'
 
 export function CompleteProfilePage() {
   const navigate = useNavigate()
@@ -25,7 +25,6 @@ export function CompleteProfilePage() {
   const [displayName, setDisplayName] = useState(sessionUser?.name ?? '')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
   const [language, setLanguage] = useState('en')
   const [timezone, setTimezone] = useState('Asia/Kuala_Lumpur')
   const [error, setError] = useState<string | null>(null)
@@ -49,7 +48,6 @@ export function CompleteProfilePage() {
         setDisplayName(result.user.displayName)
         setFullName(result.user.fullName)
         setPhone(result.user.phone)
-        setAvatarUrl(result.user.avatarUrl)
         setLanguage(result.user.language || 'en')
         setTimezone(result.user.timezone || 'Asia/Kuala_Lumpur')
       } catch (err) {
@@ -81,7 +79,6 @@ export function CompleteProfilePage() {
         displayName,
         fullName,
         phone,
-        avatarUrl,
         language,
         timezone,
       })
@@ -100,6 +97,8 @@ export function CompleteProfilePage() {
 
   return (
     <AuthLayout
+      wide
+      compact
       title="Complete your profile"
       subtitle="Google only gives us an email. Add your name and phone so we know who you are."
       footer={
@@ -119,9 +118,20 @@ export function CompleteProfilePage() {
       {isLoading ? <p>Loading profile…</p> : null}
       {error ? <Alert variant="error">{error}</Alert> : null}
       {!isLoading ? (
-        <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
+        <form className="complete-profile-form" onSubmit={(event) => void handleSubmit(event)}>
           <FormField label="Email" htmlFor="complete-email">
             <TextField id="complete-email" value={sessionUser?.email ?? ''} disabled />
+          </FormField>
+          <FormField label="Phone" htmlFor="complete-phone">
+            <TextField
+              id="complete-phone"
+              type="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              required
+              disabled={isSaving}
+              autoComplete="tel"
+            />
           </FormField>
           <FormField label="Display name" htmlFor="complete-display">
             <TextField
@@ -142,58 +152,33 @@ export function CompleteProfilePage() {
               autoComplete="name"
             />
           </FormField>
-          <FormField label="Phone" htmlFor="complete-phone">
-            <TextField
-              id="complete-phone"
-              type="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              required
-              disabled={isSaving}
-              autoComplete="tel"
-            />
-          </FormField>
-          <FormField label="Avatar URL" htmlFor="complete-avatar" hint="Optional">
-            <TextField
-              id="complete-avatar"
-              value={avatarUrl}
-              onChange={(event) => setAvatarUrl(event.target.value)}
-              disabled={isSaving}
-            />
-          </FormField>
           <FormField label="Language" htmlFor="complete-language">
-            <select
+            <SidebarSelect
               id="complete-language"
-              className="identity-select"
+              label="Language"
+              hideLabel
               value={language}
-              onChange={(event) => setLanguage(event.target.value)}
+              options={[...PROFILE_LANGUAGES]}
+              onChange={setLanguage}
               disabled={isSaving}
-            >
-              {PROFILE_LANGUAGES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+            />
           </FormField>
           <FormField label="Timezone" htmlFor="complete-timezone">
-            <select
+            <SidebarSelect
               id="complete-timezone"
-              className="identity-select"
+              label="Timezone"
+              hideLabel
               value={timezone}
-              onChange={(event) => setTimezone(event.target.value)}
+              options={[...PROFILE_TIMEZONES]}
+              onChange={setTimezone}
               disabled={isSaving}
-            >
-              {PROFILE_TIMEZONES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+            />
           </FormField>
-          <Button type="submit" fullWidth size="lg" disabled={isSaving}>
-            {isSaving ? 'Saving…' : 'Continue'}
-          </Button>
+          <div className="complete-profile-form__full">
+            <Button type="submit" fullWidth size="lg" disabled={isSaving}>
+              {isSaving ? 'Saving…' : 'Continue'}
+            </Button>
+          </div>
         </form>
       ) : null}
     </AuthLayout>

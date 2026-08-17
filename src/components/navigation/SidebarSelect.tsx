@@ -2,17 +2,41 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import './SidebarSelect.css'
 
+export type SidebarSelectOption = string | { value: string; label: string }
+
 type SidebarSelectProps = {
   label: string
   value: string
-  options: string[]
+  options: SidebarSelectOption[]
   onChange: (value: string) => void
+  id?: string
+  disabled?: boolean
+  hideLabel?: boolean
+  className?: string
 }
 
-export function SidebarSelect({ label, value, options, onChange }: SidebarSelectProps) {
+function normalizeOptions(options: SidebarSelectOption[]) {
+  return options.map((option) =>
+    typeof option === 'string' ? { value: option, label: option } : option,
+  )
+}
+
+export function SidebarSelect({
+  label,
+  value,
+  options,
+  onChange,
+  id,
+  disabled = false,
+  hideLabel = false,
+  className = '',
+}: SidebarSelectProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-  const listId = useId()
+  const generatedId = useId()
+  const listId = id ? `${id}-list` : generatedId
+  const items = normalizeOptions(options)
+  const selectedLabel = items.find((item) => item.value === value)?.label ?? value
 
   useEffect(() => {
     if (!open) {
@@ -40,17 +64,23 @@ export function SidebarSelect({ label, value, options, onChange }: SidebarSelect
   }, [open])
 
   return (
-    <div className="sidebar-select" ref={rootRef}>
-      <span className="sidebar-select__label">{label}</span>
+    <div
+      className={['sidebar-select', className].filter(Boolean).join(' ')}
+      ref={rootRef}
+    >
+      {hideLabel ? null : <span className="sidebar-select__label">{label}</span>}
       <button
         type="button"
+        id={id}
         className={['sidebar-select__trigger', open ? 'is-open' : ''].filter(Boolean).join(' ')}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
+        aria-label={label}
+        disabled={disabled}
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="sidebar-select__value">{value}</span>
+        <span className="sidebar-select__value">{selectedLabel}</span>
         <span className="sidebar-select__chevron" aria-hidden>
           <IconChevron />
         </span>
@@ -58,10 +88,10 @@ export function SidebarSelect({ label, value, options, onChange }: SidebarSelect
 
       {open ? (
         <ul className="sidebar-select__menu" id={listId} role="listbox" aria-label={label}>
-          {options.map((option) => {
-            const selected = option === value
+          {items.map((option) => {
+            const selected = option.value === value
             return (
-              <li key={option} role="presentation">
+              <li key={option.value} role="presentation">
                 <button
                   type="button"
                   role="option"
@@ -70,11 +100,11 @@ export function SidebarSelect({ label, value, options, onChange }: SidebarSelect
                     .filter(Boolean)
                     .join(' ')}
                   onClick={() => {
-                    onChange(option)
+                    onChange(option.value)
                     setOpen(false)
                   }}
                 >
-                  {option}
+                  {option.label}
                 </button>
               </li>
             )

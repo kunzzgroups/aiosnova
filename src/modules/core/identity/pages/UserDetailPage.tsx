@@ -12,6 +12,7 @@ import {
   isIdentityProfileComplete,
   type IdentityUser,
 } from '@/modules/core/identity/types/identity'
+import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import {
   changeOwnPassword,
   fetchUser,
@@ -291,34 +292,26 @@ export function UserDetailPage() {
                   />
                 </FormField>
                 <FormField label="Language" htmlFor="detail-language">
-                  <select
+                  <SidebarSelect
                     id="detail-language"
-                    className="identity-select"
+                    label="Language"
+                    hideLabel
                     value={language}
-                    onChange={(event) => setLanguage(event.target.value)}
+                    options={[...PROFILE_LANGUAGES]}
+                    onChange={setLanguage}
                     disabled={isSaving}
-                  >
-                    {PROFILE_LANGUAGES.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </FormField>
                 <FormField label="Timezone" htmlFor="detail-timezone">
-                  <select
+                  <SidebarSelect
                     id="detail-timezone"
-                    className="identity-select"
+                    label="Timezone"
+                    hideLabel
                     value={timezone}
-                    onChange={(event) => setTimezone(event.target.value)}
+                    options={[...PROFILE_TIMEZONES]}
+                    onChange={setTimezone}
                     disabled={isSaving}
-                  >
-                    {PROFILE_TIMEZONES.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </FormField>
                 <div className="identity-form__actions">
                   <Button type="submit" disabled={isSaving}>
