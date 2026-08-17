@@ -22,6 +22,13 @@ export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 
   return user.fullName.trim().length > 0 && user.phone.trim().length > 0
 }
 
+export function formatStatusLabel(status: string) {
+  if (!status) {
+    return status
+  }
+  return `${status.charAt(0).toUpperCase()}${status.slice(1)}`
+}
+
 export const PROFILE_LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'zh-CN', label: '中文' },

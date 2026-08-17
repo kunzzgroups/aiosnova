@@ -6,7 +6,7 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/services/httpClient'
 import type { IdentityUser } from '@/modules/core/identity/types/identity'
-import { isIdentityProfileComplete } from '@/modules/core/identity/types/identity'
+import { formatStatusLabel, isIdentityProfileComplete } from '@/modules/core/identity/types/identity'
 import {
   createUser,
   fetchUsers,
@@ -155,7 +155,7 @@ export function UsersPage() {
                       <td>{user.email}</td>
                       <td>
                         <span className={`identity-status identity-status--${user.status}`}>
-                          {user.status}
+                          {formatStatusLabel(user.status)}
                         </span>
                       </td>
                       <td>{user.mfaEnabled ? 'On' : 'Off'}</td>

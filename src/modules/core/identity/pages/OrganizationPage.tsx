@@ -5,6 +5,7 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/services/httpClient'
 import type { OrganizationNode } from '@/modules/core/identity/types/identity'
+import { formatStatusLabel } from '@/modules/core/identity/types/identity'
 import {
   createOrganization,
   fetchOrganizations,
@@ -60,7 +61,9 @@ function OrganizationBranch({
             <div className="identity-tree__meta">
               <strong>
                 {node.name}{' '}
-                <span className={`identity-status identity-status--${node.status}`}>{node.status}</span>
+                <span className={`identity-status identity-status--${node.status}`}>
+                  {formatStatusLabel(node.status)}
+                </span>
               </strong>
               <span>
                 {node.code} · {node.type}

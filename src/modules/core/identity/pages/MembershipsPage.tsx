@@ -10,6 +10,7 @@ import type {
   OrganizationNode,
   PositionRecord,
 } from '@/modules/core/identity/types/identity'
+import { formatStatusLabel } from '@/modules/core/identity/types/identity'
 import {
   createMembership,
   fetchIdentityMeta,
@@ -259,7 +260,7 @@ export function MembershipsPage() {
                       <td>{membership.isPrimary ? 'Yes' : 'No'}</td>
                       <td>
                         <span className={`identity-status identity-status--${membership.status}`}>
-                          {membership.status}
+                          {formatStatusLabel(membership.status)}
                         </span>
                       </td>
                       <td>

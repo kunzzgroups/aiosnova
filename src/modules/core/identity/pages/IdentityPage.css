@@ -9,6 +9,11 @@
   margin-bottom: var(--space-2);
 }
 
+.identity-page__header .identity-breadcrumb h1 {
+  font-size: inherit;
+  margin-bottom: 0;
+}
+
 .identity-page__header p {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -17,15 +22,30 @@
 .identity-page__header--row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
 }
 
+.identity-page__header--toolbar {
+  margin-bottom: calc(var(--space-2) * -1);
+}
+
 .identity-breadcrumb {
-  margin-bottom: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+
+.identity-breadcrumb h1 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .identity-breadcrumb a {
@@ -49,7 +69,7 @@
 
 .identity-panel__title-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
@@ -57,6 +77,10 @@
 
 .identity-panel__title-row h2 {
   margin-bottom: 0;
+}
+
+.identity-panel__title-row .identity-inline-actions {
+  justify-content: flex-end;
 }
 
 .identity-form--stack {
@@ -94,30 +118,106 @@
   border-top: 1px solid var(--color-border);
 }
 
-.identity-dl {
-  display: grid;
-  gap: var(--space-3);
-  margin: 0;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-}
-
-.identity-dl div {
+.identity-profile-glance {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-4);
 }
 
-.identity-dl dt {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
+.identity-profile-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-lg);
+  background: #f6f7f7;
+  border: 1px solid var(--color-border);
+}
+
+.identity-profile-avatar {
+  width: 3.25rem;
+  height: 3.25rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 0.9rem;
+  background: var(--color-brand);
+  color: #f7fbfa;
+  font-size: 1.05rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
-.identity-dl dd {
+.identity-profile-hero__body {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.identity-profile-hero__name {
   margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.identity-profile-hero__contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  margin: 0.25rem 0 0;
+  color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+.identity-profile-hero__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.identity-profile-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.identity-profile-tile {
+  min-height: 4.4rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: #f6f7f7;
+  border: 1px solid var(--color-border);
+}
+
+.identity-profile-tile span {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.identity-profile-tile strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 960px) {
+  .identity-profile-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .identity-profile-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .identity-panel {
@@ -151,6 +251,14 @@
 
 .identity-form--profile .identity-form__actions {
   grid-column: 1 / -1;
+}
+
+.identity-form--profile .sidebar-select__trigger {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: inherit;
 }
 
 .identity-status--inline {

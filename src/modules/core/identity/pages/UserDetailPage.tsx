@@ -10,6 +10,7 @@ import {
   PROFILE_LANGUAGES,
   PROFILE_TIMEZONES,
   isIdentityProfileComplete,
+  formatStatusLabel,
   type IdentityUser,
 } from '@/modules/core/identity/types/identity'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
@@ -21,6 +22,22 @@ import {
   type MembershipWithLabels,
 } from '@/modules/core/identity/services/identityService'
 import './IdentityPage.css'
+
+function profileInitials(user: IdentityUser) {
+  const source = (user.fullName || user.displayName || user.email).trim()
+  const parts = source.split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
+  }
+  return source.slice(0, 2).toUpperCase()
+}
+
+function profileLabel(
+  items: readonly { value: string; label: string }[],
+  value: string,
+) {
+  return items.find((item) => item.value === value)?.label ?? value ?? '—'
+}
 
 export function UserDetailPage() {
   const { userId = '' } = useParams()
@@ -212,171 +229,30 @@ export function UserDetailPage() {
 
   return (
     <div className="identity-page">
-      <header className="identity-page__header identity-page__header--row">
-        <div>
-          <p className="identity-breadcrumb">
-            <Link to="/system/core/users">Users</Link>
-            <span aria-hidden="true"> / </span>
-            <span>{user.displayName}</span>
-          </p>
+      <header className="identity-page__header identity-page__header--row identity-page__header--toolbar">
+        <nav className="identity-breadcrumb" aria-label="Breadcrumb">
+          <Link to="/system/core/users">Users</Link>
+          <span aria-hidden="true"> / </span>
           <h1>{user.displayName}</h1>
-          <p>Identity / User detail — profile, security, and memberships.</p>
-        </div>
-        <div className="identity-inline-actions">
-          {!isEditing ? (
-            <Button variant="secondary" onClick={() => setIsEditing(true)}>
-              Edit profile
-            </Button>
-          ) : null}
-          <Button variant="secondary" onClick={() => void handleSendReset()}>
-            Send password reset
-          </Button>
-          <Button
-            variant={user.status === 'disabled' ? 'primary' : 'danger'}
-            onClick={() => void handleToggleStatus()}
-          >
-            {user.status === 'disabled' ? 'Activate' : 'Disable'}
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/system/core/users')}>
-            Back
-          </Button>
-        </div>
+        </nav>
+        <Button variant="ghost" onClick={() => navigate('/system/core/users')}>
+          Back
+        </Button>
       </header>
 
       {error ? <Alert variant="error">{error}</Alert> : null}
       {message ? <Alert variant="success">{message}</Alert> : null}
 
       <section className="identity-panel">
-        <h2>Profile</h2>
-        <div className="identity-profile-row">
-          <div className="identity-profile-row__main">
-            {isEditing ? (
-              <form className="identity-form identity-form--profile" onSubmit={(event) => void handleSaveProfile(event)}>
-                <FormField label="Display name" htmlFor="detail-name">
-                  <TextField
-                    id="detail-name"
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    required
-                    disabled={isSaving}
-                  />
-                </FormField>
-                <FormField label="Email" htmlFor="detail-email">
-                  <TextField id="detail-email" value={user.email} disabled />
-                </FormField>
-                <FormField label="Full name" htmlFor="detail-full">
-                  <TextField
-                    id="detail-full"
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    required
-                    disabled={isSaving}
-                  />
-                </FormField>
-                <FormField label="Phone" htmlFor="detail-phone">
-                  <TextField
-                    id="detail-phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    required
-                    disabled={isSaving}
-                  />
-                </FormField>
-                <FormField label="Avatar URL" htmlFor="detail-avatar">
-                  <TextField
-                    id="detail-avatar"
-                    value={avatarUrl}
-                    onChange={(event) => setAvatarUrl(event.target.value)}
-                    disabled={isSaving}
-                  />
-                </FormField>
-                <FormField label="Language" htmlFor="detail-language">
-                  <SidebarSelect
-                    id="detail-language"
-                    label="Language"
-                    hideLabel
-                    value={language}
-                    options={[...PROFILE_LANGUAGES]}
-                    onChange={setLanguage}
-                    disabled={isSaving}
-                  />
-                </FormField>
-                <FormField label="Timezone" htmlFor="detail-timezone">
-                  <SidebarSelect
-                    id="detail-timezone"
-                    label="Timezone"
-                    hideLabel
-                    value={timezone}
-                    options={[...PROFILE_TIMEZONES]}
-                    onChange={setTimezone}
-                    disabled={isSaving}
-                  />
-                </FormField>
-                <div className="identity-form__actions">
-                  <Button type="submit" disabled={isSaving}>
-                    {isSaving ? 'Saving…' : 'Save'}
-                  </Button>
-                  <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <dl className="identity-dl">
-                <div>
-                  <dt>Display name</dt>
-                  <dd>{user.displayName}</dd>
-                </div>
-                <div>
-                  <dt>Email</dt>
-                  <dd>{user.email}</dd>
-                </div>
-                <div>
-                  <dt>Full name</dt>
-                  <dd>{user.fullName || '—'}</dd>
-                </div>
-                <div>
-                  <dt>Phone</dt>
-                  <dd>{user.phone || '—'}</dd>
-                </div>
-                <div>
-                  <dt>Language</dt>
-                  <dd>{user.language || '—'}</dd>
-                </div>
-                <div>
-                  <dt>Timezone</dt>
-                  <dd>{user.timezone || '—'}</dd>
-                </div>
-                <div>
-                  <dt>Status</dt>
-                  <dd>
-                    <span className={`identity-status identity-status--${user.status}`}>{user.status}</span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Profile</dt>
-                  <dd>
-                    {isIdentityProfileComplete(user) ? (
-                      'Complete'
-                    ) : (
-                      <span className="identity-status identity-status--invited">Incomplete</span>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt>MFA</dt>
-                  <dd>{user.mfaEnabled ? 'On' : 'Off'}</dd>
-                </div>
-                <div>
-                  <dt>Created</dt>
-                  <dd>{new Date(user.createdAt).toLocaleString()}</dd>
-                </div>
-              </dl>
-            )}
-          </div>
-          {isSelf ? (
-            <div className="identity-profile-row__security">
+        <div className="identity-panel__title-row">
+          <h2>Profile</h2>
+          <div className="identity-inline-actions">
+            {!isEditing ? (
+              <Button variant="secondary" onClick={() => setIsEditing(true)}>
+                Edit Profile
+              </Button>
+            ) : null}
+            {isSelf ? (
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -384,14 +260,150 @@ export function UserDetailPage() {
                   setError(null)
                 }}
               >
-                {showPasswordForm ? 'Hide change password' : 'Change password'}
+                {showPasswordForm ? 'Hide Change Password' : 'Change Password'}
               </Button>
+            ) : null}
+            {user.mfaEnabled ? (
               <Button variant="secondary" onClick={() => navigate('/mfa/setup')}>
                 Manage MFA
               </Button>
-            </div>
-          ) : null}
+            ) : null}
+            <Button variant="secondary" onClick={() => void handleSendReset()}>
+              Send Password Reset
+            </Button>
+            <Button
+              variant={user.status === 'disabled' ? 'primary' : 'danger'}
+              onClick={() => void handleToggleStatus()}
+            >
+              {user.status === 'disabled' ? 'Activate' : 'Disable'}
+            </Button>
+          </div>
         </div>
+
+        {isEditing ? (
+          <form className="identity-form identity-form--profile" onSubmit={(event) => void handleSaveProfile(event)}>
+            <FormField label="Display name" htmlFor="detail-name">
+              <TextField
+                id="detail-name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                required
+                disabled={isSaving}
+              />
+            </FormField>
+            <FormField label="Email" htmlFor="detail-email">
+              <TextField id="detail-email" value={user.email} disabled />
+            </FormField>
+            <FormField label="Full name" htmlFor="detail-full">
+              <TextField
+                id="detail-full"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                required
+                disabled={isSaving}
+              />
+            </FormField>
+            <FormField label="Phone" htmlFor="detail-phone">
+              <TextField
+                id="detail-phone"
+                type="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                required
+                disabled={isSaving}
+              />
+            </FormField>
+            <FormField label="Language" htmlFor="detail-language">
+              <SidebarSelect
+                id="detail-language"
+                label="Language"
+                hideLabel
+                value={language}
+                options={[...PROFILE_LANGUAGES]}
+                onChange={setLanguage}
+                disabled={isSaving}
+              />
+            </FormField>
+            <FormField label="Timezone" htmlFor="detail-timezone">
+              <SidebarSelect
+                id="detail-timezone"
+                label="Timezone"
+                hideLabel
+                value={timezone}
+                options={[...PROFILE_TIMEZONES]}
+                onChange={setTimezone}
+                disabled={isSaving}
+              />
+            </FormField>
+            <div className="identity-form__actions">
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? 'Saving…' : 'Save'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="identity-profile-glance">
+            <div className="identity-profile-hero">
+              <div className="identity-profile-avatar" aria-hidden>
+                {profileInitials(user)}
+              </div>
+              <div className="identity-profile-hero__body">
+                <p className="identity-profile-hero__name">{user.fullName || user.displayName}</p>
+                <p className="identity-profile-hero__contact">
+                  <span>{user.email}</span>
+                  {user.phone ? <span>{user.phone}</span> : null}
+                </p>
+              </div>
+              <div className="identity-profile-hero__pills">
+                <span className={`identity-status identity-status--${user.status}`}>
+                  {formatStatusLabel(user.status)}
+                </span>
+                {isIdentityProfileComplete(user) ? (
+                  <span className="identity-status identity-status--active">Complete</span>
+                ) : (
+                  <span className="identity-status identity-status--invited">Incomplete</span>
+                )}
+                <span className={`identity-status ${user.mfaEnabled ? 'identity-status--active' : 'identity-status--invited'}`}>
+                  MFA {user.mfaEnabled ? 'On' : 'Off'}
+                </span>
+              </div>
+            </div>
+
+            <div className="identity-profile-tiles">
+              <div className="identity-profile-tile">
+                <span>Display name</span>
+                <strong>{user.displayName}</strong>
+              </div>
+              <div className="identity-profile-tile">
+                <span>Full name</span>
+                <strong>{user.fullName || '—'}</strong>
+              </div>
+              <div className="identity-profile-tile">
+                <span>Email</span>
+                <strong>{user.email}</strong>
+              </div>
+              <div className="identity-profile-tile">
+                <span>Phone</span>
+                <strong>{user.phone || '—'}</strong>
+              </div>
+              <div className="identity-profile-tile">
+                <span>Language</span>
+                <strong>{profileLabel(PROFILE_LANGUAGES, user.language)}</strong>
+              </div>
+              <div className="identity-profile-tile">
+                <span>Timezone</span>
+                <strong>{profileLabel(PROFILE_TIMEZONES, user.timezone)}</strong>
+              </div>
+              <div className="identity-profile-tile">
+                <span>Created</span>
+                <strong>{new Date(user.createdAt).toLocaleString()}</strong>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isSelf && showPasswordForm ? (
           <form
@@ -472,7 +484,7 @@ export function UserDetailPage() {
                     <td>{item.isPrimary ? 'Yes' : 'No'}</td>
                     <td>
                       <span className={`identity-status identity-status--${item.status}`}>
-                        {item.status}
+                        {formatStatusLabel(item.status)}
                       </span>
                     </td>
                   </tr>

@@ -5,6 +5,7 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/services/httpClient'
 import type { PositionRecord } from '@/modules/core/identity/types/identity'
+import { formatStatusLabel } from '@/modules/core/identity/types/identity'
 import {
   createPosition,
   fetchPositions,
@@ -139,7 +140,7 @@ export function PositionsPage() {
                       <td>{item.description || '—'}</td>
                       <td>
                         <span className={`identity-status identity-status--${item.status}`}>
-                          {item.status}
+                          {formatStatusLabel(item.status)}
                         </span>
                       </td>
                       <td>
