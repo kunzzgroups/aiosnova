@@ -67,7 +67,7 @@ export function UserDetailPage() {
 
     const timeoutId = window.setTimeout(() => {
       setMessage(null)
-    }, 2000)
+    }, 1000)
 
     return () => window.clearTimeout(timeoutId)
   }, [message])
