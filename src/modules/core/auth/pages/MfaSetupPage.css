@@ -3,9 +3,18 @@
   margin-bottom: var(--space-2);
 }
 
+.mfa-setup__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
 .mfa-setup__subtitle {
   color: var(--color-text-muted);
-  margin-bottom: var(--space-5);
+  margin: 0;
 }
 
 .mfa-setup__done {

@@ -197,62 +197,60 @@ export function UserDetailPage() {
 
       <section className="identity-panel">
         <h2>Profile</h2>
-        {isEditing ? (
-          <form className="identity-form identity-form--stack" onSubmit={(event) => void handleSaveProfile(event)}>
-            <FormField label="Display name" htmlFor="detail-name">
-              <TextField
-                id="detail-name"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                required
-                disabled={isSaving}
-              />
-            </FormField>
-            <FormField label="Email" htmlFor="detail-email">
-              <TextField id="detail-email" value={user.email} disabled />
-            </FormField>
-            <div className="identity-form__actions">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Save'}
-              </Button>
-              <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <dl className="identity-dl">
-            <div>
-              <dt>Display name</dt>
-              <dd>{user.displayName}</dd>
-            </div>
-            <div>
-              <dt>Email</dt>
-              <dd>{user.email}</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>
-                <span className={`identity-status identity-status--${user.status}`}>{user.status}</span>
-              </dd>
-            </div>
-            <div>
-              <dt>MFA</dt>
-              <dd>{user.mfaEnabled ? 'On' : 'Off'}</dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd>{new Date(user.createdAt).toLocaleString()}</dd>
-            </div>
-          </dl>
-        )}
-      </section>
-
-      <section className="identity-panel">
-        <h2>Security</h2>
-        <div className="identity-inline-actions identity-inline-actions--spaced">
+        <div className="identity-profile-row">
+          <div className="identity-profile-row__main">
+            {isEditing ? (
+              <form className="identity-form" onSubmit={(event) => void handleSaveProfile(event)}>
+                <FormField label="Display name" htmlFor="detail-name">
+                  <TextField
+                    id="detail-name"
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    required
+                    disabled={isSaving}
+                  />
+                </FormField>
+                <FormField label="Email" htmlFor="detail-email">
+                  <TextField id="detail-email" value={user.email} disabled />
+                </FormField>
+                <div className="identity-form__actions">
+                  <Button type="submit" disabled={isSaving}>
+                    {isSaving ? 'Saving…' : 'Save'}
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <dl className="identity-dl">
+                <div>
+                  <dt>Display name</dt>
+                  <dd>{user.displayName}</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{user.email}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <span className={`identity-status identity-status--${user.status}`}>{user.status}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>MFA</dt>
+                  <dd>{user.mfaEnabled ? 'On' : 'Off'}</dd>
+                </div>
+                <div>
+                  <dt>Created</dt>
+                  <dd>{new Date(user.createdAt).toLocaleString()}</dd>
+                </div>
+              </dl>
+            )}
+          </div>
           {isSelf ? (
-            <>
+            <div className="identity-profile-row__security">
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -265,18 +263,13 @@ export function UserDetailPage() {
               <Button variant="secondary" onClick={() => navigate('/mfa/setup')}>
                 Manage MFA
               </Button>
-            </>
-          ) : (
-            <p className="identity-hint">
-              Password change is available only for your own account. Admins should use Send password
-              reset.
-            </p>
-          )}
+            </div>
+          ) : null}
         </div>
 
         {isSelf && showPasswordForm ? (
           <form
-            className="identity-form identity-form--stack"
+            className="identity-form identity-form--stack identity-profile-password"
             onSubmit={(event) => void handleChangePassword(event)}
           >
             <FormField label="Current password" htmlFor="current-password">

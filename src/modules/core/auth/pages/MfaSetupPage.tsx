@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
@@ -11,6 +11,7 @@ import './AuthForm.css'
 import './MfaSetupPage.css'
 
 export function MfaSetupPage() {
+  const navigate = useNavigate()
   const { user } = useSession()
   const [secret, setSecret] = useState<string | null>(null)
   const [otpauthUri, setOtpauthUri] = useState<string | null>(null)
@@ -66,11 +67,18 @@ export function MfaSetupPage() {
 
   return (
     <div className="mfa-setup">
-        <h1>Set up MFA</h1>
-        <p className="mfa-setup__subtitle">
-          Protect high-risk actions with an authenticator app. Current status:{' '}
-          <strong>{user?.mfaEnabled ? 'Enabled' : 'Not enabled'}</strong>
-        </p>
+        <header className="mfa-setup__header">
+          <div>
+            <h1>Set up MFA</h1>
+            <p className="mfa-setup__subtitle">
+              Protect high-risk actions with an authenticator app. Current status:{' '}
+              <strong>{user?.mfaEnabled ? 'Enabled' : 'Not enabled'}</strong>
+            </p>
+          </div>
+          <Button variant="ghost" onClick={() => navigate(-1)}>
+            Back
+          </Button>
+        </header>
 
         {isLoading ? <p>Preparing setup…</p> : null}
         {error ? <Alert variant="error">{error}</Alert> : null}
