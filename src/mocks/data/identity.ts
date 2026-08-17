@@ -4,9 +4,18 @@ import type {
   MembershipRecord,
   OrganizationNode,
   PositionRecord,
+  UserStatus,
 } from '@/modules/core/identity/types/identity'
 
 export const DEMO_TENANT_ID = 'tenant-acme'
+
+const emptyProfile = {
+  fullName: '',
+  phone: '',
+  avatarUrl: '',
+  language: 'en',
+  timezone: 'Asia/Kuala_Lumpur',
+}
 
 export const identityCompanies: CompanyOption[] = [
   { id: 'company-retail', name: 'Acme Retail', tenantId: DEMO_TENANT_ID },
@@ -18,6 +27,11 @@ export const identityUsers: IdentityUser[] = [
     id: 'user-demo',
     email: 'demo@aios.dev',
     displayName: 'Demo User',
+    fullName: 'Demo User',
+    phone: '+60 12-345 0001',
+    avatarUrl: '',
+    language: 'en',
+    timezone: 'Asia/Kuala_Lumpur',
     status: 'active',
     mfaEnabled: false,
     createdAt: '2026-01-10T08:00:00.000Z',
@@ -26,6 +40,11 @@ export const identityUsers: IdentityUser[] = [
     id: 'user-mfa',
     email: 'mfa@aios.dev',
     displayName: 'MFA User',
+    fullName: 'MFA User',
+    phone: '+60 12-345 0002',
+    avatarUrl: '',
+    language: 'en',
+    timezone: 'Asia/Kuala_Lumpur',
     status: 'active',
     mfaEnabled: true,
     createdAt: '2026-01-12T08:00:00.000Z',
@@ -34,6 +53,11 @@ export const identityUsers: IdentityUser[] = [
     id: 'user-ops',
     email: 'ops.lead@aios.dev',
     displayName: 'Ops Lead',
+    fullName: 'Alex Tan',
+    phone: '+60 12-345 0003',
+    avatarUrl: '',
+    language: 'en',
+    timezone: 'Asia/Kuala_Lumpur',
     status: 'active',
     mfaEnabled: false,
     createdAt: '2026-02-01T08:00:00.000Z',
@@ -42,11 +66,39 @@ export const identityUsers: IdentityUser[] = [
     id: 'user-invited',
     email: 'newhire@aios.dev',
     displayName: 'New Hire',
+    ...emptyProfile,
     status: 'invited',
     mfaEnabled: false,
     createdAt: '2026-08-01T08:00:00.000Z',
   },
 ]
+
+export function upsertIdentityUser(input: {
+  id: string
+  email: string
+  displayName: string
+  status?: UserStatus
+  mfaEnabled?: boolean
+}): IdentityUser {
+  const email = input.email.trim().toLowerCase()
+  const existing = identityUsers.find((user) => user.id === input.id || user.email === email)
+  if (existing) {
+    return existing
+  }
+
+  const user: IdentityUser = {
+    id: input.id,
+    email,
+    displayName: input.displayName.trim() || email,
+    ...emptyProfile,
+    status: input.status ?? 'active',
+    mfaEnabled: input.mfaEnabled ?? false,
+    createdAt: new Date().toISOString(),
+  }
+
+  identityUsers.push(user)
+  return user
+}
 
 export const identityOrganizations: OrganizationNode[] = [
   {

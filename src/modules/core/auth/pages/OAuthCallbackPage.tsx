@@ -4,6 +4,7 @@ import { Alert } from '@/components/ui/Alert'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { ApiError } from '@/services/httpClient'
 import { completeOAuth, type OAuthProvider } from '@/modules/core/auth/services/authService'
+import { postAuthPath } from '@/modules/core/auth/types/auth'
 
 const PROVIDERS: OAuthProvider[] = ['google', 'facebook', 'apple']
 
@@ -27,9 +28,9 @@ export function OAuthCallbackPage() {
       }
 
       try {
-        await completeOAuth(provider)
+        const result = await completeOAuth(provider)
         if (!cancelled) {
-          navigate('/', { replace: true })
+          navigate(postAuthPath(result.user), { replace: true })
         }
       } catch (err) {
         if (!cancelled) {

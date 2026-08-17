@@ -15,6 +15,7 @@ import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
 import { PositionsPage } from '@/modules/core/identity/pages/PositionsPage'
 import { MembershipsPage } from '@/modules/core/identity/pages/MembershipsPage'
+import { CompleteProfilePage } from '@/modules/core/identity/pages/CompleteProfilePage'
 import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
 
 export function AppRouter() {
@@ -32,6 +33,7 @@ export function AppRouter() {
         <Route path="/oauth/:provider/callback" element={<OAuthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route path="/profile/complete" element={<CompleteProfilePage />} />
           <Route element={<AppShell />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/mfa/setup" element={<MfaSetupPage />} />

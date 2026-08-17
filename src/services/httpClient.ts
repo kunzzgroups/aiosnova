@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/authStore'
+import type { AuthUser } from '@/modules/core/auth/types/auth'
 
 export class ApiError extends Error {
   status: number
@@ -64,12 +65,7 @@ async function tryRefresh(): Promise<boolean> {
 
     const data = (await response.json()) as {
       accessToken: string
-      user: {
-        id: string
-        email: string
-        name: string
-        mfaEnabled: boolean
-      }
+      user: AuthUser
     }
 
     useAuthStore.getState().setSession(data.accessToken, data.user)

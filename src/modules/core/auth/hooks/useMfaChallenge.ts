@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
 import { verifyMfa } from '@/modules/core/auth/services/authService'
+import { postAuthPath } from '@/modules/core/auth/types/auth'
 
 export function useMfaChallenge() {
   const navigate = useNavigate()
@@ -21,8 +22,8 @@ export function useMfaChallenge() {
     setError(null)
 
     try {
-      await verifyMfa({ mfaTicket, code })
-      navigate('/')
+      const result = await verifyMfa({ mfaTicket, code })
+      navigate(postAuthPath(result.user))
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Unable to verify code.'
       setError(message)

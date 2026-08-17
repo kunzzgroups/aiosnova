@@ -145,8 +145,17 @@
   justify-content: start;
 }
 
-.identity-form--compact .ui-form-field {
-  width: 24rem;
+.identity-form--profile {
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 14rem));
+}
+
+.identity-form--profile .identity-form__actions {
+  grid-column: 1 / -1;
+}
+
+.identity-status--inline {
+  margin-left: 0.5rem;
+  vertical-align: middle;
 }
 
 .identity-form .ui-form-field {
@@ -174,7 +183,7 @@
   padding: 0.7rem 0.65rem;
   border-bottom: 1px solid var(--color-border);
   text-align: left;
-  vertical-align: top;
+  vertical-align: center;
 }
 
 .identity-table th.identity-table__actions,

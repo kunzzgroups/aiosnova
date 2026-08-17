@@ -6,6 +6,7 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/services/httpClient'
 import type { IdentityUser } from '@/modules/core/identity/types/identity'
+import { isIdentityProfileComplete } from '@/modules/core/identity/types/identity'
 import {
   createUser,
   fetchUsers,
@@ -145,6 +146,11 @@ export function UsersPage() {
                         <Link className="identity-text-link" to={`/system/core/users/${user.id}`}>
                           {user.displayName}
                         </Link>
+                        {!isIdentityProfileComplete(user) ? (
+                          <span className="identity-status identity-status--invited identity-status--inline">
+                            Incomplete
+                          </span>
+                        ) : null}
                       </td>
                       <td>{user.email}</td>
                       <td>

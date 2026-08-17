@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError } from '@/services/httpClient'
-import { isMfaRequired } from '@/modules/core/auth/types/auth'
+import { isMfaRequired, postAuthPath } from '@/modules/core/auth/types/auth'
 import { login } from '@/modules/core/auth/services/authService'
 import { clearRememberedLogin, writeRememberedLogin } from '@/modules/core/auth/utils/rememberedLogin'
 
@@ -25,7 +25,7 @@ export function useLogin() {
         navigate('/mfa/challenge')
         return
       }
-      navigate('/')
+      navigate(postAuthPath(result.user))
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Unable to sign in.'
       setError(message)

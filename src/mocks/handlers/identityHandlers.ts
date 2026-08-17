@@ -8,6 +8,7 @@ import {
   identityUsers,
 } from '@/mocks/data/identity'
 import type {
+  IdentityProfilePayload,
   IdentityUser,
   MembershipRecord,
   OrganizationNode,
@@ -111,6 +112,11 @@ export const identityHandlers = [
       id: createId('user'),
       email,
       displayName,
+      fullName: '',
+      phone: '',
+      avatarUrl: '',
+      language: 'en',
+      timezone: 'Asia/Kuala_Lumpur',
       status: body.status ?? 'invited',
       mfaEnabled: false,
       createdAt: new Date().toISOString(),
@@ -126,9 +132,24 @@ export const identityHandlers = [
       return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
     }
 
-    const body = (await request.json()) as Partial<Pick<IdentityUser, 'displayName' | 'status'>>
+    const body = (await request.json()) as IdentityProfilePayload
     if (body.displayName !== undefined) {
       user.displayName = body.displayName.trim()
+    }
+    if (body.fullName !== undefined) {
+      user.fullName = body.fullName.trim()
+    }
+    if (body.phone !== undefined) {
+      user.phone = body.phone.trim()
+    }
+    if (body.avatarUrl !== undefined) {
+      user.avatarUrl = body.avatarUrl.trim()
+    }
+    if (body.language !== undefined) {
+      user.language = body.language
+    }
+    if (body.timezone !== undefined) {
+      user.timezone = body.timezone
     }
     if (body.status !== undefined) {
       user.status = body.status

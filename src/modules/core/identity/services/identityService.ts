@@ -1,6 +1,7 @@
 import { apiRequest } from '@/services/httpClient'
 import type {
   CompanyOption,
+  IdentityProfilePayload,
   IdentityUser,
   MembershipRecord,
   OrganizationNode,
@@ -42,10 +43,7 @@ export async function createUser(payload: {
   })
 }
 
-export async function updateUser(
-  id: string,
-  payload: Partial<Pick<IdentityUser, 'displayName' | 'status'>>,
-) {
+export async function updateUser(id: string, payload: IdentityProfilePayload) {
   return apiRequest<IdentityUser>(`/api/identity/users/${id}`, {
     method: 'PATCH',
     auth: true,

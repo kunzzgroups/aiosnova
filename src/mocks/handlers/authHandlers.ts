@@ -10,6 +10,7 @@ import type {
   ResetPasswordRequest,
 } from '@/modules/core/auth/types/auth'
 import { MOCK_MFA_CODE, seedUsers, toPublicUser, type MockUser } from '@/mocks/data/users'
+import { upsertIdentityUser } from '@/mocks/data/identity'
 
 const REFRESH_COOKIE = 'aios_refresh'
 const CSRF_COOKIE = 'aios_csrf'
@@ -168,6 +169,13 @@ export const authHandlers = [
     }
 
     users.push(user)
+    upsertIdentityUser({
+      id: user.id,
+      email: user.email,
+      displayName: user.name,
+      status: 'active',
+      mfaEnabled: false,
+    })
     return issueSession(user)
   }),
 
@@ -295,6 +303,13 @@ export const authHandlers = [
       users.push(user)
     }
 
+    upsertIdentityUser({
+      id: user.id,
+      email: user.email,
+      displayName: user.name,
+      status: 'active',
+      mfaEnabled: user.mfaEnabled,
+    })
     return issueSession(user)
   }),
 

@@ -6,7 +6,12 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
-import type { IdentityUser } from '@/modules/core/identity/types/identity'
+import {
+  PROFILE_LANGUAGES,
+  PROFILE_TIMEZONES,
+  isIdentityProfileComplete,
+  type IdentityUser,
+} from '@/modules/core/identity/types/identity'
 import {
   changeOwnPassword,
   fetchUser,
@@ -25,6 +30,11 @@ export function UserDetailPage() {
   const [user, setUser] = useState<IdentityUser | null>(null)
   const [memberships, setMemberships] = useState<MembershipWithLabels[]>([])
   const [displayName, setDisplayName] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [language, setLanguage] = useState('en')
+  const [timezone, setTimezone] = useState('Asia/Kuala_Lumpur')
   const [isEditing, setIsEditing] = useState(searchParams.get('edit') === '1')
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -47,7 +57,7 @@ export function UserDetailPage() {
       const result = await fetchUser(userId)
       setUser(result.user)
       setMemberships(result.memberships)
-      setDisplayName(result.user.displayName)
+      applyProfileForm(result.user)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to load user.')
       setUser(null)
@@ -72,6 +82,25 @@ export function UserDetailPage() {
     return () => window.clearTimeout(timeoutId)
   }, [message])
 
+  function applyProfileForm(nextUser: IdentityUser) {
+    setDisplayName(nextUser.displayName)
+    setFullName(nextUser.fullName)
+    setPhone(nextUser.phone)
+    setAvatarUrl(nextUser.avatarUrl)
+    setLanguage(nextUser.language || 'en')
+    setTimezone(nextUser.timezone || 'Asia/Kuala_Lumpur')
+  }
+
+  function syncSessionIfSelf(nextUser: IdentityUser) {
+    if (sessionUser?.id === nextUser.id) {
+      useAuthStore.getState().setUser({
+        ...sessionUser,
+        name: nextUser.displayName,
+        profileComplete: isIdentityProfileComplete(nextUser),
+      })
+    }
+  }
+
   async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!user) {
@@ -81,8 +110,17 @@ export function UserDetailPage() {
     setError(null)
     setMessage(null)
     try {
-      const updated = await updateUser(user.id, { displayName })
+      const updated = await updateUser(user.id, {
+        displayName,
+        fullName,
+        phone,
+        avatarUrl,
+        language,
+        timezone,
+      })
       setUser(updated)
+      applyProfileForm(updated)
+      syncSessionIfSelf(updated)
       setIsEditing(false)
       setMessage('Profile saved.')
     } catch (err) {
@@ -94,7 +132,7 @@ export function UserDetailPage() {
 
   function handleCancelEdit() {
     if (user) {
-      setDisplayName(user.displayName)
+      applyProfileForm(user)
     }
     setIsEditing(false)
   }
@@ -212,7 +250,7 @@ export function UserDetailPage() {
         <div className="identity-profile-row">
           <div className="identity-profile-row__main">
             {isEditing ? (
-              <form className="identity-form" onSubmit={(event) => void handleSaveProfile(event)}>
+              <form className="identity-form identity-form--profile" onSubmit={(event) => void handleSaveProfile(event)}>
                 <FormField label="Display name" htmlFor="detail-name">
                   <TextField
                     id="detail-name"
@@ -224,6 +262,63 @@ export function UserDetailPage() {
                 </FormField>
                 <FormField label="Email" htmlFor="detail-email">
                   <TextField id="detail-email" value={user.email} disabled />
+                </FormField>
+                <FormField label="Full name" htmlFor="detail-full">
+                  <TextField
+                    id="detail-full"
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                    required
+                    disabled={isSaving}
+                  />
+                </FormField>
+                <FormField label="Phone" htmlFor="detail-phone">
+                  <TextField
+                    id="detail-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    required
+                    disabled={isSaving}
+                  />
+                </FormField>
+                <FormField label="Avatar URL" htmlFor="detail-avatar">
+                  <TextField
+                    id="detail-avatar"
+                    value={avatarUrl}
+                    onChange={(event) => setAvatarUrl(event.target.value)}
+                    disabled={isSaving}
+                  />
+                </FormField>
+                <FormField label="Language" htmlFor="detail-language">
+                  <select
+                    id="detail-language"
+                    className="identity-select"
+                    value={language}
+                    onChange={(event) => setLanguage(event.target.value)}
+                    disabled={isSaving}
+                  >
+                    {PROFILE_LANGUAGES.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                <FormField label="Timezone" htmlFor="detail-timezone">
+                  <select
+                    id="detail-timezone"
+                    className="identity-select"
+                    value={timezone}
+                    onChange={(event) => setTimezone(event.target.value)}
+                    disabled={isSaving}
+                  >
+                    {PROFILE_TIMEZONES.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
                 </FormField>
                 <div className="identity-form__actions">
                   <Button type="submit" disabled={isSaving}>
@@ -245,9 +340,35 @@ export function UserDetailPage() {
                   <dd>{user.email}</dd>
                 </div>
                 <div>
+                  <dt>Full name</dt>
+                  <dd>{user.fullName || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Phone</dt>
+                  <dd>{user.phone || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Language</dt>
+                  <dd>{user.language || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Timezone</dt>
+                  <dd>{user.timezone || '—'}</dd>
+                </div>
+                <div>
                   <dt>Status</dt>
                   <dd>
                     <span className={`identity-status identity-status--${user.status}`}>{user.status}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Profile</dt>
+                  <dd>
+                    {isIdentityProfileComplete(user) ? (
+                      'Complete'
+                    ) : (
+                      <span className="identity-status identity-status--invited">Incomplete</span>
+                    )}
                   </dd>
                 </div>
                 <div>

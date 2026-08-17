@@ -3,6 +3,7 @@ export type AuthUser = {
   email: string
   name: string
   mfaEnabled: boolean
+  profileComplete: boolean
 }
 
 export type LoginSuccessResponse = {
@@ -62,4 +63,8 @@ export type MessageResponse = {
 
 export function isMfaRequired(response: LoginResponse): response is MfaRequiredResponse {
   return 'status' in response && response.status === 'mfa_required'
+}
+
+export function postAuthPath(user: AuthUser) {
+  return user.profileComplete ? '/' : '/profile/complete'
 }

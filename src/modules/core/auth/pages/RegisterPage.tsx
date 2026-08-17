@@ -9,6 +9,7 @@ import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { ApiError } from '@/services/httpClient'
 import { register } from '@/modules/core/auth/services/authService'
+import { postAuthPath } from '@/modules/core/auth/types/auth'
 import './AuthForm.css'
 
 export function RegisterPage() {
@@ -36,8 +37,8 @@ export function RegisterPage() {
 
     setIsSubmitting(true)
     try {
-      await register({ name, email, password })
-      navigate('/')
+      const result = await register({ name, email, password })
+      navigate(postAuthPath(result.user))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to create account.')
     } finally {
