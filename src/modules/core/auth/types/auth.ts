@@ -57,6 +57,14 @@ export type MfaSetupConfirmResponse = {
   user: AuthUser
 }
 
+export type MfaDisableRequest = {
+  code: string
+}
+
+export type MfaDisableResponse = {
+  user: AuthUser
+}
+
 export type MessageResponse = {
   message: string
 }

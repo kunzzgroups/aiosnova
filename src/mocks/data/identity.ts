@@ -100,6 +100,13 @@ export function upsertIdentityUser(input: {
   return user
 }
 
+export function setIdentityUserMfaEnabled(userId: string, mfaEnabled: boolean) {
+  const user = identityUsers.find((item) => item.id === userId)
+  if (user) {
+    user.mfaEnabled = mfaEnabled
+  }
+}
+
 export const identityOrganizations: OrganizationNode[] = [
   {
     id: 'org-hq',

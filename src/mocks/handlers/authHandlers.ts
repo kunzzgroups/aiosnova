@@ -4,13 +4,14 @@ import type {
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
+  MfaDisableRequest,
   MfaSetupConfirmRequest,
   MfaVerifyRequest,
   RegisterRequest,
   ResetPasswordRequest,
 } from '@/modules/core/auth/types/auth'
 import { MOCK_MFA_CODE, seedUsers, toPublicUser, type MockUser } from '@/mocks/data/users'
-import { upsertIdentityUser } from '@/mocks/data/identity'
+import { setIdentityUserMfaEnabled, upsertIdentityUser } from '@/mocks/data/identity'
 
 const REFRESH_COOKIE = 'aios_refresh'
 const CSRF_COOKIE = 'aios_csrf'
@@ -433,9 +434,39 @@ export const authHandlers = [
 
     user.mfaEnabled = true
     pendingMfaSecrets.delete(user.id)
+    setIdentityUserMfaEnabled(user.id, true)
 
     return HttpResponse.json({
       recoveryCodes: ['RCVY-1111', 'RCVY-2222', 'RCVY-3333', 'RCVY-4444'],
+      user: toPublicUser(user),
+    })
+  }),
+
+  http.post('/api/auth/mfa/disable', async ({ request }) => {
+    const authUser = getBearerUser(request)
+    if (!authUser) {
+      return HttpResponse.json({ message: 'Unauthenticated.' }, { status: 401 })
+    }
+
+    const user = findUserById(authUser.id)
+    if (!user) {
+      return HttpResponse.json({ message: 'Unauthenticated.' }, { status: 401 })
+    }
+
+    if (!user.mfaEnabled) {
+      return HttpResponse.json({ message: 'MFA is not enabled.' }, { status: 400 })
+    }
+
+    const body = (await request.json()) as MfaDisableRequest
+    if (body.code !== MOCK_MFA_CODE) {
+      return HttpResponse.json({ message: 'Invalid verification code.' }, { status: 400 })
+    }
+
+    user.mfaEnabled = false
+    pendingMfaSecrets.delete(user.id)
+    setIdentityUserMfaEnabled(user.id, false)
+
+    return HttpResponse.json({
       user: toPublicUser(user),
     })
   }),

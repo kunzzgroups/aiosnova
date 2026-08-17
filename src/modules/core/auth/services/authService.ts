@@ -5,6 +5,7 @@ import type {
   LoginRequest,
   LoginResponse,
   LoginSuccessResponse,
+  MfaDisableResponse,
   MfaSetupConfirmResponse,
   MfaSetupStartResponse,
   MfaVerifyRequest,
@@ -104,6 +105,16 @@ export async function startMfaSetup() {
 
 export async function confirmMfaSetup(code: string) {
   const data = await apiRequest<MfaSetupConfirmResponse>('/api/auth/mfa/setup/confirm', {
+    method: 'POST',
+    auth: true,
+    body: { code },
+  })
+  useAuthStore.getState().setUser(data.user)
+  return data
+}
+
+export async function disableMfa(code: string) {
+  const data = await apiRequest<MfaDisableResponse>('/api/auth/mfa/disable', {
     method: 'POST',
     auth: true,
     body: { code },

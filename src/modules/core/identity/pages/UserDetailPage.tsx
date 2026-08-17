@@ -263,7 +263,7 @@ export function UserDetailPage() {
                 {showPasswordForm ? 'Hide Change Password' : 'Change Password'}
               </Button>
             ) : null}
-            {user.mfaEnabled ? (
+            {isSelf ? (
               <Button variant="secondary" onClick={() => navigate('/mfa/setup')}>
                 Manage MFA
               </Button>
