@@ -6,7 +6,7 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
-import { GoogleSignInButton } from '@/modules/core/auth/components/GoogleSignInButton'
+import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { ApiError } from '@/services/httpClient'
 import { register } from '@/modules/core/auth/services/authService'
 import './AuthForm.css'
@@ -48,7 +48,7 @@ export function RegisterPage() {
   return (
     <AuthLayout
       title="Create account"
-      subtitle="Register with email or continue with Google."
+      subtitle="Make a new AIOS workspace account with email or social sign-up."
       footer={
         <p>
           Already have an account? <Link to="/login">Sign in</Link>
@@ -56,10 +56,6 @@ export function RegisterPage() {
       }
     >
       <div className="auth-form-stack">
-        <GoogleSignInButton />
-        <div className="auth-form-divider">
-          <span>or register with email</span>
-        </div>
         <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
           {error ? <Alert variant="error">{error}</Alert> : null}
           <FormField label="Name" htmlFor="register-name">
@@ -102,9 +98,14 @@ export function RegisterPage() {
             />
           </FormField>
           <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create account'}
+            {isSubmitting ? 'Creating…' : 'Get Started'}
           </Button>
         </form>
+
+        <div className="auth-form-divider">
+          <span>Or sign up with</span>
+        </div>
+        <SocialAuthButtons />
       </div>
     </AuthLayout>
   )

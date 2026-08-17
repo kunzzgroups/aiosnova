@@ -6,8 +6,8 @@ import './AuthDemoHint.css'
 export function LoginPage() {
   return (
     <AuthLayout
-      title="Sign in"
-      subtitle="Access your AIOS workspace."
+      title="Sign in with email"
+      subtitle="Access your AIOS workspace — users, organization, and operations in one system."
       footer={
         <>
           <p>

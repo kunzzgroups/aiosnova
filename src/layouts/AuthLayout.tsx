@@ -12,14 +12,35 @@ type AuthLayoutProps = {
 export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProps) {
   return (
     <div className="auth-layout">
+      <div className="auth-layout__glow auth-layout__glow--one" aria-hidden />
+      <div className="auth-layout__glow auth-layout__glow--two" aria-hidden />
+      <div className="auth-layout__arcs" aria-hidden>
+        <span />
+        <span />
+        <span />
+      </div>
+
+      <Link to="/login" className="auth-layout__brand-mark">
+        <span className="auth-layout__brand-icon" aria-hidden>
+          A
+        </span>
+        <span>AIOS</span>
+      </Link>
+
       <div className="auth-layout__panel">
+        <div className="auth-layout__feature-icon" aria-hidden>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M10 7H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" />
+            <path d="M14 7h3v3" />
+            <path d="M10 14 17 7" />
+          </svg>
+        </div>
+
         <header className="auth-layout__header">
-          <Link to="/login" className="auth-layout__brand">
-            AIOS
-          </Link>
           <h1 className="auth-layout__title">{title}</h1>
           {subtitle ? <p className="auth-layout__subtitle">{subtitle}</p> : null}
         </header>
+
         <div className="auth-layout__body">{children}</div>
         {footer ? <footer className="auth-layout__footer">{footer}</footer> : null}
       </div>

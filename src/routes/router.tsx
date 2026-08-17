@@ -7,7 +7,7 @@ import { ForgotPasswordPage } from '@/modules/core/auth/pages/ForgotPasswordPage
 import { ResetPasswordPage } from '@/modules/core/auth/pages/ResetPasswordPage'
 import { MfaChallengePage } from '@/modules/core/auth/pages/MfaChallengePage'
 import { MfaSetupPage } from '@/modules/core/auth/pages/MfaSetupPage'
-import { GoogleOAuthCallbackPage } from '@/modules/core/auth/pages/GoogleOAuthCallbackPage'
+import { OAuthCallbackPage } from '@/modules/core/auth/pages/OAuthCallbackPage'
 import { HomePage } from '@/modules/core/auth/pages/HomePage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
@@ -27,7 +27,7 @@ export function AppRouter() {
         </Route>
 
         <Route path="/mfa/challenge" element={<MfaChallengePage />} />
-        <Route path="/oauth/google/callback" element={<GoogleOAuthCallbackPage />} />
+        <Route path="/oauth/:provider/callback" element={<OAuthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<HomePage />} />

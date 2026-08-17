@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
-import { GoogleSignInButton } from '@/modules/core/auth/components/GoogleSignInButton'
+import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { useLogin } from '@/modules/core/auth/hooks/useLogin'
 import './LoginForm.css'
 
@@ -21,10 +21,6 @@ export function LoginForm() {
 
   return (
     <div className="login-form">
-      <GoogleSignInButton />
-      <div className="login-form__divider">
-        <span>or continue with email</span>
-      </div>
       <form className="login-form__form" onSubmit={(event) => void handleSubmit(event)}>
         {error ? <Alert variant="error">{error}</Alert> : null}
         <FormField label="Email" htmlFor="login-email">
@@ -33,6 +29,7 @@ export function LoginForm() {
             name="email"
             type="email"
             autoComplete="email"
+            placeholder="Enter your email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -52,9 +49,14 @@ export function LoginForm() {
           <Link to="/forgot-password">Forgot password?</Link>
         </div>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in…' : 'Sign in'}
+          {isSubmitting ? 'Signing in…' : 'Get Started'}
         </Button>
       </form>
+
+      <div className="login-form__divider">
+        <span>Or sign in with</span>
+      </div>
+      <SocialAuthButtons />
     </div>
   )
 }

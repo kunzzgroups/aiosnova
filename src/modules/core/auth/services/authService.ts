@@ -58,15 +58,27 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function startGoogleOAuth(): Promise<string> {
-  const data = await apiRequest<{ redirectUrl: string }>('/api/auth/oauth/google/start')
+export type OAuthProvider = 'google' | 'facebook' | 'apple'
+
+export async function startOAuth(provider: OAuthProvider): Promise<string> {
+  const data = await apiRequest<{ redirectUrl: string }>(`/api/auth/oauth/${provider}/start`)
   return data.redirectUrl
 }
 
-export async function completeGoogleOAuth(): Promise<LoginSuccessResponse> {
-  const data = await apiRequest<LoginSuccessResponse>('/api/auth/oauth/google/callback')
+export async function completeOAuth(provider: OAuthProvider): Promise<LoginSuccessResponse> {
+  const data = await apiRequest<LoginSuccessResponse>(`/api/auth/oauth/${provider}/callback`)
   useAuthStore.getState().setSession(data.accessToken, data.user)
   return data
+}
+
+/** @deprecated Use startOAuth('google') */
+export async function startGoogleOAuth(): Promise<string> {
+  return startOAuth('google')
+}
+
+/** @deprecated Use completeOAuth('google') */
+export async function completeGoogleOAuth(): Promise<LoginSuccessResponse> {
+  return completeOAuth('google')
 }
 
 export async function forgotPassword(payload: ForgotPasswordRequest) {

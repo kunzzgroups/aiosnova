@@ -265,19 +265,30 @@ export const authHandlers = [
     )
   }),
 
-  http.get('/api/auth/oauth/google/start', () => {
+  http.get('/api/auth/oauth/:provider/start', ({ params }) => {
+    const provider = String(params.provider)
+    if (!['google', 'facebook', 'apple'].includes(provider)) {
+      return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
+    }
+
     return HttpResponse.json({
-      redirectUrl: '/oauth/google/callback?mock=1',
+      redirectUrl: `/oauth/${provider}/callback?mock=1`,
     })
   }),
 
-  http.get('/api/auth/oauth/google/callback', () => {
-    let user = findUserByEmail('google.user@aios.dev')
+  http.get('/api/auth/oauth/:provider/callback', ({ params }) => {
+    const provider = String(params.provider)
+    if (!['google', 'facebook', 'apple'].includes(provider)) {
+      return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
+    }
+
+    const email = `${provider}.user@aios.dev`
+    let user = findUserByEmail(email)
     if (!user) {
       user = {
-        id: 'user-google',
-        email: 'google.user@aios.dev',
-        name: 'Google User',
+        id: `user-${provider}`,
+        email,
+        name: `${provider[0]!.toUpperCase()}${provider.slice(1)} User`,
         password: '',
         mfaEnabled: false,
       }

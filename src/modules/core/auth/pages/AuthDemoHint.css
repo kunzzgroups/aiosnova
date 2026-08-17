@@ -1,15 +1,18 @@
 .auth-demo-hint {
-  margin-top: var(--space-4);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-muted);
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  color: var(--auth-muted, var(--color-text-muted));
+  text-align: left;
 }
 
 .auth-demo-hint p {
   font-weight: 600;
   margin-bottom: var(--space-2);
+  color: var(--auth-ink, var(--color-text));
 }
 
 .auth-demo-hint ul {
