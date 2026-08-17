@@ -25,7 +25,7 @@ export function AppShell({ children }: AppShellProps) {
           <div className="app-shell__header-title">Workspace</div>
           <div className="app-shell__actions">
             <span className="app-shell__user">{user?.email}</span>
-            <Link to="/mfa/setup">Manage MFA</Link>
+            <Link to={user ? `/mfa/setup?userId=${user.id}` : '/mfa/setup'}>Manage MFA</Link>
             <Button variant="secondary" size="md" onClick={() => void handleLogout()}>
               Log out
             </Button>

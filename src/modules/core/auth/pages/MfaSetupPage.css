@@ -17,6 +17,11 @@
   margin: 0;
 }
 
+.mfa-setup__account {
+  margin: 0 0 var(--space-4);
+  font-weight: 600;
+}
+
 .mfa-setup__done {
   display: flex;
   flex-direction: column;

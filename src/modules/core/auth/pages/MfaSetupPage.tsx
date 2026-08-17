@@ -1,32 +1,62 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { MfaCodeInput } from '@/modules/core/auth/components/MfaCodeInput'
 import { ApiError } from '@/services/httpClient'
+import { useAuthStore } from '@/stores/authStore'
 import { confirmMfaSetup, disableMfa, startMfaSetup } from '@/modules/core/auth/services/authService'
-import { useSession } from '@/modules/core/auth/hooks/useSession'
+import { disableUserMfa, enableUserMfa, fetchUser } from '@/modules/core/identity/services/identityService'
+import type { IdentityUser } from '@/modules/core/identity/types/identity'
 import './AuthForm.css'
 import './MfaSetupPage.css'
 
 export function MfaSetupPage() {
   const navigate = useNavigate()
-  const { user } = useSession()
+  const [searchParams] = useSearchParams()
+  const sessionUser = useAuthStore((state) => state.user)
+  const userId = searchParams.get('userId') || sessionUser?.id || ''
+
+  const [user, setUser] = useState<IdentityUser | null>(null)
   const [secret, setSecret] = useState<string | null>(null)
   const [otpauthUri, setOtpauthUri] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [justDisabled, setJustDisabled] = useState(false)
 
+  const isSelf = Boolean(sessionUser && user && sessionUser.id === user.id)
   const mfaEnabled = Boolean(user?.mfaEnabled)
 
-  useEffect(() => {
-    if (mfaEnabled || justDisabled) {
+  const loadUser = useCallback(async () => {
+    if (!userId) {
+      setError('User not found.')
       setIsLoading(false)
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    try {
+      const result = await fetchUser(userId)
+      setUser(result.user)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to load user.')
+      setUser(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    void loadUser()
+  }, [loadUser])
+
+  useEffect(() => {
+    if (!user || mfaEnabled || recoveryCodes) {
       setSecret(null)
       setOtpauthUri(null)
       return
@@ -35,21 +65,24 @@ export function MfaSetupPage() {
     let cancelled = false
 
     async function loadSetup() {
-      setIsLoading(true)
       setError(null)
       try {
-        const result = await startMfaSetup()
+        if (isSelf) {
+          const result = await startMfaSetup()
+          if (!cancelled) {
+            setSecret(result.secret)
+            setOtpauthUri(result.otpauthUri)
+          }
+          return
+        }
+
         if (!cancelled) {
-          setSecret(result.secret)
-          setOtpauthUri(result.otpauthUri)
+          setSecret('AIOSMOCKSECRET')
+          setOtpauthUri(`otpauth://totp/AIOS:${user.email}?secret=AIOSMOCKSECRET&issuer=AIOS`)
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : 'Unable to start MFA setup.')
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false)
         }
       }
     }
@@ -58,19 +91,41 @@ export function MfaSetupPage() {
     return () => {
       cancelled = true
     }
-  }, [mfaEnabled, justDisabled])
+  }, [user, isSelf, mfaEnabled, recoveryCodes])
+
+  function syncSession(nextUser: IdentityUser) {
+    if (sessionUser?.id === nextUser.id) {
+      useAuthStore.getState().setUser({
+        ...sessionUser,
+        mfaEnabled: nextUser.mfaEnabled,
+      })
+    }
+  }
 
   async function handleEnable(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!user) {
+      return
+    }
     setIsSubmitting(true)
     setError(null)
+    setMessage(null)
 
     try {
-      const result = await confirmMfaSetup(code)
-      setRecoveryCodes(result.recoveryCodes)
+      if (isSelf) {
+        const result = await confirmMfaSetup(code)
+        setRecoveryCodes(result.recoveryCodes)
+        const refreshed = await fetchUser(user.id)
+        setUser(refreshed.user)
+        syncSession(refreshed.user)
+      } else {
+        const result = await enableUserMfa(user.id, code)
+        setUser(result.user)
+        setMessage(result.message)
+      }
       setCode('')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to confirm MFA.')
+      setError(err instanceof ApiError ? err.message : 'Unable to enable MFA.')
     } finally {
       setIsSubmitting(false)
     }
@@ -78,13 +133,27 @@ export function MfaSetupPage() {
 
   async function handleDisable(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!user) {
+      return
+    }
     setIsSubmitting(true)
     setError(null)
+    setMessage(null)
 
     try {
-      await disableMfa(code)
+      if (isSelf) {
+        await disableMfa(code)
+        const refreshed = await fetchUser(user.id)
+        setUser(refreshed.user)
+        syncSession(refreshed.user)
+        setMessage('MFA has been disabled.')
+      } else {
+        const result = await disableUserMfa(user.id, code)
+        setUser(result.user)
+        setMessage(result.message)
+      }
       setCode('')
-      setJustDisabled(true)
+      setRecoveryCodes(null)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to disable MFA.')
     } finally {
@@ -92,20 +161,19 @@ export function MfaSetupPage() {
     }
   }
 
-  function handleStartEnable() {
-    setJustDisabled(false)
-    setError(null)
-    setCode('')
-  }
-
   return (
     <div className="mfa-setup">
       <header className="mfa-setup__header">
         <div>
-          <h1>{mfaEnabled ? 'Manage MFA' : 'Set up MFA'}</h1>
+          <h1>Manage MFA</h1>
           <p className="mfa-setup__subtitle">
-            Protect high-risk actions with an authenticator app. Current status:{' '}
-            <strong>{mfaEnabled ? 'Enabled' : 'Not enabled'}</strong>
+            Add this account to an authenticator app, then enter the 6-digit MFA code.
+            {user ? (
+              <>
+                {' '}
+                Current status: <strong>{mfaEnabled ? 'On' : 'Off'}</strong>
+              </>
+            ) : null}
           </p>
         </div>
         <Button variant="ghost" onClick={() => navigate(-1)}>
@@ -115,17 +183,12 @@ export function MfaSetupPage() {
 
       {isLoading ? <p>Preparing setup…</p> : null}
       {error ? <Alert variant="error">{error}</Alert> : null}
+      {message ? <Alert variant="success">{message}</Alert> : null}
 
-      {justDisabled ? (
-        <div className="mfa-setup__done">
-          <Alert variant="success">MFA has been disabled.</Alert>
-          <div className="mfa-setup__actions">
-            <Button variant="secondary" onClick={handleStartEnable}>
-              Set up MFA again
-            </Button>
-            <Link to="/">Back to home</Link>
-          </div>
-        </div>
+      {!isLoading && user ? (
+        <p className="mfa-setup__account">
+          {user.displayName} · {user.email}
+        </p>
       ) : null}
 
       {recoveryCodes ? (
@@ -136,16 +199,16 @@ export function MfaSetupPage() {
               <li key={item}>{item}</li>
             ))}
           </ul>
-          <Link to="/">Back to home</Link>
+          <Button variant="secondary" onClick={() => setRecoveryCodes(null)}>
+            Continue
+          </Button>
         </div>
       ) : null}
 
       {mfaEnabled && !recoveryCodes ? (
         <form className="auth-form" onSubmit={(event) => void handleDisable(event)}>
-          <Alert variant="info">
-            Enter a current authenticator code to turn MFA off. Demo code: 123456
-          </Alert>
-          <FormField label="Enter code to disable" htmlFor="mfa-disable-code">
+          <Alert variant="info">Enter the current authenticator code to turn MFA off. Demo code: 123456</Alert>
+          <FormField label="MFA code" htmlFor="mfa-disable-code">
             <MfaCodeInput
               id="mfa-disable-code"
               value={code}
@@ -159,16 +222,16 @@ export function MfaSetupPage() {
         </form>
       ) : null}
 
-      {!isLoading && !mfaEnabled && !justDisabled && !recoveryCodes && secret ? (
+      {!isLoading && !mfaEnabled && secret ? (
         <form className="auth-form" onSubmit={(event) => void handleEnable(event)}>
           <Alert variant="info">
             Secret: <code>{secret}</code>
             <br />
             URI: <code>{otpauthUri}</code>
             <br />
-            Demo confirmation code: 123456
+            Demo MFA code: 123456
           </Alert>
-          <FormField label="Enter code to confirm" htmlFor="mfa-setup-code">
+          <FormField label="MFA code" htmlFor="mfa-setup-code">
             <MfaCodeInput
               id="mfa-setup-code"
               value={code}

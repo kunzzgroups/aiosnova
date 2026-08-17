@@ -1,4 +1,5 @@
 import { HttpResponse, http } from 'msw'
+import { MOCK_MFA_CODE, setMockUserMfaEnabled } from '@/mocks/data/users'
 import {
   DEMO_TENANT_ID,
   identityCompanies,
@@ -87,6 +88,50 @@ export const identityHandlers = [
     return HttpResponse.json({
       message: `Password reset email queued for ${user.email} (demo — no email sent).`,
       demoHint: 'User should complete reset via Forgot password with their email.',
+    })
+  }),
+
+  http.post('/api/identity/users/:id/mfa/disable', async ({ params, request }) => {
+    const user = identityUsers.find((item) => item.id === params.id)
+    if (!user) {
+      return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
+    }
+
+    if (!user.mfaEnabled) {
+      return HttpResponse.json({ message: 'MFA is not enabled for this user.' }, { status: 400 })
+    }
+
+    const body = (await request.json()) as { code?: string }
+    if (body.code !== MOCK_MFA_CODE) {
+      return HttpResponse.json({ message: 'Invalid verification code.' }, { status: 400 })
+    }
+
+    setMockUserMfaEnabled(user.id, false)
+    return HttpResponse.json({
+      user,
+      message: `MFA disabled for ${user.displayName}.`,
+    })
+  }),
+
+  http.post('/api/identity/users/:id/mfa/enable', async ({ params, request }) => {
+    const user = identityUsers.find((item) => item.id === params.id)
+    if (!user) {
+      return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
+    }
+
+    if (user.mfaEnabled) {
+      return HttpResponse.json({ message: 'MFA is already enabled for this user.' }, { status: 400 })
+    }
+
+    const body = (await request.json()) as { code?: string }
+    if (body.code !== MOCK_MFA_CODE) {
+      return HttpResponse.json({ message: 'Invalid verification code.' }, { status: 400 })
+    }
+
+    setMockUserMfaEnabled(user.id, true)
+    return HttpResponse.json({
+      user,
+      message: `MFA enabled for ${user.displayName}.`,
     })
   }),
 

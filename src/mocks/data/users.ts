@@ -1,5 +1,5 @@
 import type { AuthUser } from '@/modules/core/auth/types/auth'
-import { identityUsers } from '@/mocks/data/identity'
+import { identityUsers, setIdentityUserMfaEnabled } from '@/mocks/data/identity'
 import { isIdentityProfileComplete } from '@/modules/core/identity/types/identity'
 
 export type MockUser = Omit<AuthUser, 'profileComplete'> & {
@@ -24,6 +24,16 @@ export const seedUsers: MockUser[] = [
     mfaEnabled: true,
   },
 ]
+
+export const mockAuthUsers: MockUser[] = [...seedUsers]
+
+export function setMockUserMfaEnabled(userId: string, mfaEnabled: boolean) {
+  const authUser = mockAuthUsers.find((item) => item.id === userId)
+  if (authUser) {
+    authUser.mfaEnabled = mfaEnabled
+  }
+  setIdentityUserMfaEnabled(userId, mfaEnabled)
+}
 
 export function toPublicUser(user: MockUser): AuthUser {
   const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)

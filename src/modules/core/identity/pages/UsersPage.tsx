@@ -186,6 +186,13 @@ export function UsersPage() {
                         <Button
                           variant="secondary"
                           size="md"
+                          onClick={() => navigate(`/mfa/setup?userId=${user.id}`)}
+                        >
+                          {user.mfaEnabled ? 'Disable MFA' : 'Enable MFA'}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="md"
                           onClick={() => void handleToggleStatus(user)}
                         >
                           {user.status === 'disabled' ? 'Activate' : 'Disable'}

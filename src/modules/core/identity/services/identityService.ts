@@ -61,6 +61,22 @@ export async function sendUserPasswordReset(id: string) {
   )
 }
 
+export async function disableUserMfa(id: string, code: string) {
+  return apiRequest<{ user: IdentityUser; message: string }>(`/api/identity/users/${id}/mfa/disable`, {
+    method: 'POST',
+    auth: true,
+    body: { code },
+  })
+}
+
+export async function enableUserMfa(id: string, code: string) {
+  return apiRequest<{ user: IdentityUser; message: string }>(`/api/identity/users/${id}/mfa/enable`, {
+    method: 'POST',
+    auth: true,
+    body: { code },
+  })
+}
+
 export async function changeOwnPassword(payload: {
   currentPassword: string
   newPassword: string

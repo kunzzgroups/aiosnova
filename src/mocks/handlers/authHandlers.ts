@@ -10,8 +10,8 @@ import type {
   RegisterRequest,
   ResetPasswordRequest,
 } from '@/modules/core/auth/types/auth'
-import { MOCK_MFA_CODE, seedUsers, toPublicUser, type MockUser } from '@/mocks/data/users'
-import { setIdentityUserMfaEnabled, upsertIdentityUser } from '@/mocks/data/identity'
+import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
+import { upsertIdentityUser } from '@/mocks/data/identity'
 
 const REFRESH_COOKIE = 'aios_refresh'
 const CSRF_COOKIE = 'aios_csrf'
@@ -32,7 +32,6 @@ type ResetTokenRecord = {
   expiresAt: number
 }
 
-const users: MockUser[] = [...seedUsers]
 const sessions = new Map<string, SessionRecord>()
 const mfaTickets = new Map<string, MfaTicketRecord>()
 const resetTokens = new Map<string, ResetTokenRecord>()
@@ -432,9 +431,8 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Unauthenticated.' }, { status: 401 })
     }
 
-    user.mfaEnabled = true
+    setMockUserMfaEnabled(user.id, true)
     pendingMfaSecrets.delete(user.id)
-    setIdentityUserMfaEnabled(user.id, true)
 
     return HttpResponse.json({
       recoveryCodes: ['RCVY-1111', 'RCVY-2222', 'RCVY-3333', 'RCVY-4444'],
@@ -462,9 +460,8 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Invalid verification code.' }, { status: 400 })
     }
 
-    user.mfaEnabled = false
+    setMockUserMfaEnabled(user.id, false)
     pendingMfaSecrets.delete(user.id)
-    setIdentityUserMfaEnabled(user.id, false)
 
     return HttpResponse.json({
       user: toPublicUser(user),

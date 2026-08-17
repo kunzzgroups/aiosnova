@@ -114,6 +114,7 @@ export function UserDetailPage() {
       useAuthStore.getState().setUser({
         ...sessionUser,
         name: nextUser.displayName,
+        mfaEnabled: nextUser.mfaEnabled,
         profileComplete: isIdentityProfileComplete(nextUser),
       })
     }
@@ -263,11 +264,12 @@ export function UserDetailPage() {
                 {showPasswordForm ? 'Hide Change Password' : 'Change Password'}
               </Button>
             ) : null}
-            {isSelf ? (
-              <Button variant="secondary" onClick={() => navigate('/mfa/setup')}>
-                Manage MFA
-              </Button>
-            ) : null}
+            <Button
+              variant="secondary"
+              onClick={() => navigate(`/mfa/setup?userId=${user.id}`)}
+            >
+              {user.mfaEnabled ? 'Disable MFA' : 'Enable MFA'}
+            </Button>
             <Button variant="secondary" onClick={() => void handleSendReset()}>
               Send Password Reset
             </Button>
