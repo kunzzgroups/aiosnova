@@ -1,22 +1,9 @@
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { LoginForm } from '@/modules/core/auth/components/LoginForm'
-import './AuthDemoHint.css'
 
 export function LoginPage() {
   return (
-    <AuthLayout
-      title="Sign in with email"
-      subtitle="Access your AIOS workspace — users, organization, and operations in one system."
-      footer={
-        <div className="auth-demo-hint">
-          <p>Demo accounts</p>
-          <ul>
-            <li>demo@aios.dev / Password1!</li>
-            <li>mfa@aios.dev / Password1! (code 123456)</li>
-          </ul>
-        </div>
-      }
-    >
+    <AuthLayout title="Sign In" hideIcon>
       <LoginForm />
     </AuthLayout>
   )

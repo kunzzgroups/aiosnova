@@ -9,6 +9,7 @@ type AuthLayoutProps = {
   footer?: ReactNode
   wide?: boolean
   compact?: boolean
+  hideIcon?: boolean
 }
 
 export function AuthLayout({
@@ -18,6 +19,7 @@ export function AuthLayout({
   footer,
   wide = false,
   compact = false,
+  hideIcon = false,
 }: AuthLayoutProps) {
   const panelClass = [
     'auth-layout__panel',
@@ -45,7 +47,7 @@ export function AuthLayout({
       </Link>
 
       <div className={panelClass}>
-        {compact ? null : (
+        {compact || hideIcon ? null : (
           <div className="auth-layout__feature-icon" aria-hidden>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M10 7H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" />

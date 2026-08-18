@@ -214,7 +214,7 @@
 .auth-layout .ui-form-field__label {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--auth-muted);
+  color: var(--auth-ink, #12181a);
 }
 
 .auth-layout .ui-text-field {

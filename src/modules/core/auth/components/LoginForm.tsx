@@ -76,7 +76,7 @@ export function LoginForm() {
           <Link to="/forgot-password">Forgot password?</Link>
         </div>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in…' : 'Get Started'}
+          {isSubmitting ? 'Signing in…' : 'Sign In'}
         </Button>
       </form>
 
