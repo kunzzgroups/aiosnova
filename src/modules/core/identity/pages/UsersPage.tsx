@@ -293,6 +293,7 @@ export function UsersPage() {
                     value={password}
                     onChange={setPassword}
                     autoComplete="new-password"
+                    placeholder="Enter your password"
                     disabled={isSubmitting}
                     revealed={passwordRevealed}
                     onRevealedChange={setPasswordRevealed}

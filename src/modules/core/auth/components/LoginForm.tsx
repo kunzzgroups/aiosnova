@@ -57,6 +57,7 @@ export function LoginForm() {
             name="password"
             value={password}
             onChange={setPassword}
+            placeholder={t('enterPassword')}
             disabled={isSubmitting}
           />
         </FormField>

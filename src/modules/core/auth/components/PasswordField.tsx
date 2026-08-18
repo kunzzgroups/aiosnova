@@ -45,6 +45,7 @@ type PasswordFieldProps = {
   autoComplete?: string
   hasError?: boolean
   disabled?: boolean
+  placeholder?: string
   revealed?: boolean
   onRevealedChange?: (revealed: boolean) => void
 }
@@ -57,6 +58,7 @@ export function PasswordField({
   autoComplete = 'current-password',
   hasError = false,
   disabled = false,
+  placeholder,
   revealed,
   onRevealedChange,
 }: PasswordFieldProps) {
@@ -79,6 +81,7 @@ export function PasswordField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete={autoComplete}
+        placeholder={placeholder}
         hasError={hasError}
         disabled={disabled}
       />
