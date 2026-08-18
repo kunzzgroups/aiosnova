@@ -47,6 +47,7 @@ export function provisionMockAuthUser(input: {
   email: string
   name: string
   mfaEnabled?: boolean
+  password?: string
 }): MockUser {
   const email = input.email.trim().toLowerCase()
   const existing = mockAuthUsers.find((item) => item.id === input.id || item.email === email)
@@ -58,7 +59,7 @@ export function provisionMockAuthUser(input: {
     id: input.id,
     email,
     name: input.name,
-    password: DEMO_LOGIN_PASSWORD,
+    password: input.password && input.password.length >= 8 ? input.password : DEMO_LOGIN_PASSWORD,
     mfaEnabled: input.mfaEnabled ?? false,
   }
   mockAuthUsers.push(user)

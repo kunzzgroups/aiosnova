@@ -45,6 +45,8 @@ type PasswordFieldProps = {
   autoComplete?: string
   hasError?: boolean
   disabled?: boolean
+  revealed?: boolean
+  onRevealedChange?: (revealed: boolean) => void
 }
 
 export function PasswordField({
@@ -55,15 +57,25 @@ export function PasswordField({
   autoComplete = 'current-password',
   hasError = false,
   disabled = false,
+  revealed,
+  onRevealedChange,
 }: PasswordFieldProps) {
-  const [revealed, setRevealed] = useState(false)
+  const [uncontrolledRevealed, setUncontrolledRevealed] = useState(false)
+  const isRevealed = revealed ?? uncontrolledRevealed
+
+  function setIsRevealed(next: boolean) {
+    onRevealedChange?.(next)
+    if (revealed === undefined) {
+      setUncontrolledRevealed(next)
+    }
+  }
 
   return (
     <div className="password-field">
       <TextField
         id={id}
         name={name}
-        type={revealed ? 'text' : 'password'}
+        type={isRevealed ? 'text' : 'password'}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete={autoComplete}
@@ -74,11 +86,11 @@ export function PasswordField({
         type="button"
         variant="ghost"
         className="password-field__toggle"
-        onClick={() => setRevealed((current) => !current)}
-        aria-label={revealed ? 'Hide password' : 'Show password'}
-        title={revealed ? 'Hide password' : 'Show password'}
+        onClick={() => setIsRevealed(!isRevealed)}
+        aria-label={isRevealed ? 'Hide password' : 'Show password'}
+        title={isRevealed ? 'Hide password' : 'Show password'}
       >
-        {revealed ? <IconEyeOff /> : <IconEye />}
+        {isRevealed ? <IconEyeOff /> : <IconEye />}
       </Button>
     </div>
   )

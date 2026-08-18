@@ -14,6 +14,7 @@ import {
   formatStatusLabel,
   isIdentityProfileComplete,
 } from '@/modules/core/identity/types/identity'
+import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import {
   createUser,
   fetchUsers,
@@ -52,11 +53,36 @@ function matchesSearch(user: IdentityUser, query: string) {
   return haystack.includes(query)
 }
 
+function randomItem(items: string) {
+  const index = crypto.getRandomValues(new Uint32Array(1))[0]! % items.length
+  return items[index]!
+}
+
+function generatePassword(length = 12) {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghijkmnopqrstuvwxyz'
+  const digits = '23456789'
+  const symbols = '!@#$%^&*'
+  const all = `${upper}${lower}${digits}${symbols}`
+  const chars = [randomItem(upper), randomItem(lower), randomItem(digits), randomItem(symbols)]
+  while (chars.length < length) {
+    chars.push(randomItem(all))
+  }
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0]! % (i + 1)
+    const current = chars[i]!
+    chars[i] = chars[j]!
+    chars[j] = current
+  }
+  return chars.join('')
+}
+
 export function UsersPage() {
   const navigate = useNavigate()
   const [users, setUsers] = useState<IdentityUser[]>([])
   const [email, setEmail] = useState('')
-  const [displayName, setDisplayName] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordRevealed, setPasswordRevealed] = useState(false)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [signInFilter, setSignInFilter] = useState('all')
@@ -117,17 +143,46 @@ export function UsersPage() {
     })
   }, [users, query, statusFilter, signInFilter, mfaFilter])
 
+  function resetInviteForm() {
+    setEmail('')
+    setPassword('')
+    setPasswordRevealed(false)
+  }
+
+  function handleToggleInvite() {
+    setShowInvite((open) => {
+      if (open) {
+        resetInviteForm()
+      }
+      return !open
+    })
+    setError(null)
+  }
+
+  function handleGeneratePassword() {
+    setPassword(generatePassword())
+    setPasswordRevealed(true)
+    setError(null)
+  }
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
     setIsSubmitting(true)
     setError(null)
     setMessage(null)
     try {
-      await createUser({ email, displayName, status: 'invited' })
-      setEmail('')
-      setDisplayName('')
+      await createUser({
+        email,
+        password,
+        status: 'invited',
+      })
+      resetInviteForm()
       setShowInvite(false)
-      setMessage('User invited. They can sign in with Password1!')
+      setMessage('User invited.')
       await loadUsers()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to create user.')
@@ -206,7 +261,7 @@ export function UsersPage() {
           <div className="identity-directory-toolbar__invite">
             <Button
               variant={showInvite ? 'secondary' : 'primary'}
-              onClick={() => setShowInvite((open) => !open)}
+              onClick={handleToggleInvite}
             >
               {showInvite ? 'Cancel' : 'Invite User'}
             </Button>
@@ -214,30 +269,47 @@ export function UsersPage() {
         </div>
 
         {showInvite ? (
-          <form className="identity-form identity-form--compact" onSubmit={(event) => void handleCreate(event)}>
-            <FormField label="Display name" htmlFor="user-name">
-              <TextField
-                id="user-name"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                required
-                disabled={isSubmitting}
-              />
-            </FormField>
-            <FormField label="Email" htmlFor="user-email">
-              <TextField
-                id="user-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                disabled={isSubmitting}
-              />
-            </FormField>
-            <div className="identity-form__actions">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : 'Invite'}
-              </Button>
+          <form className="identity-invite" onSubmit={(event) => void handleCreate(event)}>
+            <div className="identity-invite__header">
+              <h3>Invite user</h3>
+              <p>Enter an email and set a password, or generate one.</p>
+            </div>
+            <div className="identity-invite__grid">
+              <FormField label="Email" htmlFor="user-email">
+                <TextField
+                  id="user-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                />
+              </FormField>
+              <FormField label="Password" htmlFor="user-password">
+                <div className="identity-invite__password">
+                  <PasswordField
+                    id="user-password"
+                    value={password}
+                    onChange={setPassword}
+                    autoComplete="new-password"
+                    disabled={isSubmitting}
+                    revealed={passwordRevealed}
+                    onRevealedChange={setPasswordRevealed}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleGeneratePassword}
+                    disabled={isSubmitting}
+                  >
+                    Generate
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving…' : 'Invite'}
+                  </Button>
+                </div>
+              </FormField>
             </div>
           </form>
         ) : null}

@@ -138,15 +138,20 @@ export const identityHandlers = [
   http.post('/api/identity/users', async ({ request }) => {
     const body = (await request.json()) as {
       email?: string
-      displayName?: string
+      password?: string
       status?: IdentityUser['status']
     }
 
     const email = body.email?.trim().toLowerCase() ?? ''
-    const displayName = body.displayName?.trim() ?? ''
+    const password = body.password ?? ''
+    const displayName = email.split('@')[0]?.replace(/[._-]+/g, ' ').trim() || 'Invited user'
 
-    if (!email || !displayName) {
-      return HttpResponse.json({ message: 'Email and display name are required.' }, { status: 400 })
+    if (!email) {
+      return HttpResponse.json({ message: 'Email is required.' }, { status: 400 })
+    }
+
+    if (password.length < 8) {
+      return HttpResponse.json({ message: 'Password must be at least 8 characters.' }, { status: 400 })
     }
 
     if (identityUsers.some((user) => user.email === email)) {
@@ -175,6 +180,7 @@ export const identityHandlers = [
       email: user.email,
       name: user.displayName,
       mfaEnabled: user.mfaEnabled,
+      password,
     })
     return HttpResponse.json(user, { status: 201 })
   }),

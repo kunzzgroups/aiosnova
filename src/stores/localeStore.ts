@@ -9,7 +9,7 @@ export const APP_LOCALE_OPTIONS: Array<{ value: AppLocale; label: string }> = [
 const LOCALE_STORAGE_KEY = 'aios.locale'
 
 function readInitialLocale(): AppLocale {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined') {  
     return 'en'
   }
   const saved = window.localStorage.getItem(LOCALE_STORAGE_KEY)

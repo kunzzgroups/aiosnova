@@ -33,7 +33,7 @@ export async function fetchUser(id: string) {
 
 export async function createUser(payload: {
   email: string
-  displayName: string
+  password: string
   status?: IdentityUser['status']
 }) {
   return apiRequest<IdentityUser>('/api/identity/users', {
