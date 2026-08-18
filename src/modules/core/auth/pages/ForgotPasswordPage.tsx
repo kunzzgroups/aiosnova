@@ -40,6 +40,7 @@ export function ForgotPasswordPage() {
     <AuthLayout
       title="Forgot password"
       subtitle="We will email reset instructions if an account exists."
+      hideIcon
       footer={
         <p>
           Remembered it? <Link to="/login">Back to sign in</Link>

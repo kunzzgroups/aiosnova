@@ -3,6 +3,40 @@ import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/TextField'
 import './PasswordField.css'
 
+function IconEye() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
+      <path
+        d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  )
+}
+
+function IconEyeOff() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
+      <path
+        d="M3 3l18 18"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10.6 10.7a3 3 0 0 0 4.2 4.2M9.9 5.2A10.4 10.4 0 0 1 12 5c6 0 9.5 7 9.5 7a16.6 16.6 0 0 1-3.3 4.1M6.5 6.7C4.3 8.4 2.5 12 2.5 12s3.5 7 9.5 7c1.3 0 2.5-.3 3.6-.8"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 type PasswordFieldProps = {
   id: string
   name?: string
@@ -42,8 +76,9 @@ export function PasswordField({
         className="password-field__toggle"
         onClick={() => setRevealed((current) => !current)}
         aria-label={revealed ? 'Hide password' : 'Show password'}
+        title={revealed ? 'Hide password' : 'Show password'}
       >
-        {revealed ? 'Hide' : 'Show'}
+        {revealed ? <IconEyeOff /> : <IconEye />}
       </Button>
     </div>
   )
