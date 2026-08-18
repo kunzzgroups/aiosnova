@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
+import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { useLogin } from '@/modules/core/auth/hooks/useLogin'
 import {
   clearRememberedLogin,
@@ -78,6 +79,11 @@ export function LoginForm() {
           {isSubmitting ? 'Signing in…' : 'Get Started'}
         </Button>
       </form>
+
+      <div className="login-form__divider">
+        <span>Or sign in with</span>
+      </div>
+      <SocialAuthButtons />
     </div>
   )
 }
