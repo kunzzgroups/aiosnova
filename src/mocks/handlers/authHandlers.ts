@@ -375,6 +375,26 @@ export const authHandlers = [
     return HttpResponse.json({ message: 'Password updated. Please sign in with your new password.' })
   }),
 
+  http.post('/api/auth/password/set', async ({ request }) => {
+    const authUser = getBearerUser(request)
+    if (!authUser) {
+      return HttpResponse.json({ message: 'Unauthenticated.' }, { status: 401 })
+    }
+
+    const user = findUserById(authUser.id)
+    if (!user) {
+      return HttpResponse.json({ message: 'Unauthenticated.' }, { status: 401 })
+    }
+
+    const body = (await request.json()) as { password?: string }
+    if (!body.password || body.password.length < 8) {
+      return HttpResponse.json({ message: 'Password must be at least 8 characters.' }, { status: 400 })
+    }
+
+    user.password = body.password
+    return HttpResponse.json({ message: 'Password set.' })
+  }),
+
   http.post('/api/auth/mfa/setup/start', ({ request }) => {
     const authUser = getBearerUser(request)
     if (!authUser) {

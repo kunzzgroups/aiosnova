@@ -28,17 +28,6 @@ function GoogleGlyph() {
   )
 }
 
-function FacebookGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" width="25" height="25" aria-hidden>
-      <path
-        fill="#1877F2"
-        d="M24 12.1C24 5.4 18.6 0 12 0S0 5.4 0 12.1C0 18.1 4.4 23.1 10.1 24v-8.4H7.1v-3.5h3V9.4c0-3 1.8-4.6 4.5-4.6 1.3 0 2.6.2 2.6.2v2.9h-1.5c-1.5 0-1.9.9-1.9 1.9v2.3h3.3l-.5 3.5h-2.8V24C19.6 23.1 24 18.1 24 12.1z"
-      />
-    </svg>
-  )
-}
-
 function AppleGlyph() {
   return (
     <svg viewBox="0 0 24 24" width="25" height="25" aria-hidden>
@@ -56,7 +45,6 @@ const providers: Array<{
   icon: () => ReactElement
 }> = [
   { id: 'google', label: 'Google', icon: GoogleGlyph },
-  { id: 'facebook', label: 'Facebook', icon: FacebookGlyph },
   { id: 'apple', label: 'Apple', icon: AppleGlyph },
 ]
 

@@ -7,13 +7,9 @@ import { TextField } from '@/components/ui/TextField'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
-import { logout } from '@/modules/core/auth/services/authService'
-import {
-  PROFILE_LANGUAGES,
-  PROFILE_TIMEZONES,
-  isIdentityProfileComplete,
-} from '@/modules/core/identity/types/identity'
-import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { logout, setOwnPassword } from '@/modules/core/auth/services/authService'
+import { isIdentityProfileComplete } from '@/modules/core/identity/types/identity'
+import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import { fetchUser, updateUser } from '@/modules/core/identity/services/identityService'
 import './CompleteProfilePage.css'
 
@@ -25,8 +21,8 @@ export function CompleteProfilePage() {
   const [displayName, setDisplayName] = useState(sessionUser?.name ?? '')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
-  const [language, setLanguage] = useState('en')
-  const [timezone, setTimezone] = useState('Asia/Kuala_Lumpur')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -48,8 +44,6 @@ export function CompleteProfilePage() {
         setDisplayName(result.user.displayName)
         setFullName(result.user.fullName)
         setPhone(result.user.phone)
-        setLanguage(result.user.language || 'en')
-        setTimezone(result.user.timezone || 'Asia/Kuala_Lumpur')
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : 'Unable to load profile.')
@@ -72,6 +66,14 @@ export function CompleteProfilePage() {
     if (!sessionUser) {
       return
     }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Password and confirm password do not match.')
+      return
+    }
     setIsSaving(true)
     setError(null)
     try {
@@ -79,9 +81,8 @@ export function CompleteProfilePage() {
         displayName,
         fullName,
         phone,
-        language,
-        timezone,
       })
+      await setOwnPassword(password)
       setUser({
         ...sessionUser,
         name: updated.displayName,
@@ -152,25 +153,21 @@ export function CompleteProfilePage() {
               autoComplete="name"
             />
           </FormField>
-          <FormField label="Language" htmlFor="complete-language">
-            <SidebarSelect
-              id="complete-language"
-              label="Language"
-              hideLabel
-              value={language}
-              options={[...PROFILE_LANGUAGES]}
-              onChange={setLanguage}
+          <FormField label="Password" htmlFor="complete-password">
+            <PasswordField
+              id="complete-password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
               disabled={isSaving}
             />
           </FormField>
-          <FormField label="Timezone" htmlFor="complete-timezone">
-            <SidebarSelect
-              id="complete-timezone"
-              label="Timezone"
-              hideLabel
-              value={timezone}
-              options={[...PROFILE_TIMEZONES]}
-              onChange={setTimezone}
+          <FormField label="Confirm password" htmlFor="complete-confirm-password">
+            <PasswordField
+              id="complete-confirm-password"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              autoComplete="new-password"
               disabled={isSaving}
             />
           </FormField>

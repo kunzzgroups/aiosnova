@@ -49,7 +49,7 @@ export async function logout(): Promise<void> {
   }
 }
 
-export type OAuthProvider = 'google' | 'facebook' | 'apple'
+export type OAuthProvider = 'google' | 'apple'
 
 export async function startOAuth(provider: OAuthProvider): Promise<string> {
   const data = await apiRequest<{ redirectUrl: string }>(`/api/auth/oauth/${provider}/start`)
@@ -73,6 +73,14 @@ export async function resetPassword(payload: ResetPasswordRequest) {
   return apiRequest<MessageResponse>('/api/auth/password/reset', {
     method: 'POST',
     body: payload,
+  })
+}
+
+export async function setOwnPassword(password: string) {
+  return apiRequest<MessageResponse>('/api/auth/password/set', {
+    method: 'POST',
+    auth: true,
+    body: { password },
   })
 }
 

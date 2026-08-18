@@ -6,7 +6,7 @@ import { ApiError } from '@/services/httpClient'
 import { completeOAuth, type OAuthProvider } from '@/modules/core/auth/services/authService'
 import { postAuthPath } from '@/modules/core/auth/types/auth'
 
-const PROVIDERS: OAuthProvider[] = ['google', 'facebook', 'apple']
+const PROVIDERS: OAuthProvider[] = ['google', 'apple']
 
 function isOAuthProvider(value: string | undefined): value is OAuthProvider {
   return Boolean(value && PROVIDERS.includes(value as OAuthProvider))
