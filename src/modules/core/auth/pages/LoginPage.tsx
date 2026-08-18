@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { LoginForm } from '@/modules/core/auth/components/LoginForm'
 import './AuthDemoHint.css'
@@ -6,13 +5,11 @@ import './AuthDemoHint.css'
 export function LoginPage() {
   return (
     <AuthLayout
-      title="Sign in with email"
-      subtitle="Access your AIOS workspace — users, organization, and operations in one system."
+      title="Sign in"
+      subtitle="Use the email account issued by CORE. Social sign-in is not available."
       footer={
         <>
-          <p>
-            No account yet? <Link to="/register">Create one</Link>
-          </p>
+          <p>Need an account? Ask a CORE administrator to invite you.</p>
           <div className="auth-demo-hint">
             <p>Demo accounts</p>
             <ul>

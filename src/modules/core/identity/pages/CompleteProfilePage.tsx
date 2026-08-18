@@ -100,7 +100,7 @@ export function CompleteProfilePage() {
       wide
       compact
       title="Complete your profile"
-      subtitle="Google only gives us an email. Add your name and phone so we know who you are."
+      subtitle="Add your full name and phone so CORE can identify this account."
       footer={
         <p>
           <Link

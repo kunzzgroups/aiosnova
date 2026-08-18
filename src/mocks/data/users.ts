@@ -7,25 +7,63 @@ export type MockUser = Omit<AuthUser, 'profileComplete'> & {
 }
 
 export const MOCK_MFA_CODE = '123456'
+export const DEMO_LOGIN_PASSWORD = 'Password1!'
 
 export const seedUsers: MockUser[] = [
   {
     id: 'user-demo',
     email: 'demo@aios.dev',
     name: 'Demo User',
-    password: 'Password1!',
+    password: DEMO_LOGIN_PASSWORD,
     mfaEnabled: false,
   },
   {
     id: 'user-mfa',
     email: 'mfa@aios.dev',
     name: 'MFA User',
-    password: 'Password1!',
+    password: DEMO_LOGIN_PASSWORD,
     mfaEnabled: true,
+  },
+  {
+    id: 'user-ops',
+    email: 'ops.lead@aios.dev',
+    name: 'Ops Lead',
+    password: DEMO_LOGIN_PASSWORD,
+    mfaEnabled: false,
+  },
+  {
+    id: 'user-invited',
+    email: 'newhire@aios.dev',
+    name: 'New Hire',
+    password: DEMO_LOGIN_PASSWORD,
+    mfaEnabled: false,
   },
 ]
 
 export const mockAuthUsers: MockUser[] = [...seedUsers]
+
+export function provisionMockAuthUser(input: {
+  id: string
+  email: string
+  name: string
+  mfaEnabled?: boolean
+}): MockUser {
+  const email = input.email.trim().toLowerCase()
+  const existing = mockAuthUsers.find((item) => item.id === input.id || item.email === email)
+  if (existing) {
+    return existing
+  }
+
+  const user: MockUser = {
+    id: input.id,
+    email,
+    name: input.name,
+    password: DEMO_LOGIN_PASSWORD,
+    mfaEnabled: input.mfaEnabled ?? false,
+  }
+  mockAuthUsers.push(user)
+  return user
+}
 
 export function setMockUserMfaEnabled(userId: string, mfaEnabled: boolean) {
   const authUser = mockAuthUsers.find((item) => item.id === userId)

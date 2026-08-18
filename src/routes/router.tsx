@@ -3,12 +3,10 @@ import { GuestRoute } from '@/routes/GuestRoute'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { AppShell } from '@/layouts/AppShell'
 import { LoginPage } from '@/modules/core/auth/pages/LoginPage'
-import { RegisterPage } from '@/modules/core/auth/pages/RegisterPage'
 import { ForgotPasswordPage } from '@/modules/core/auth/pages/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/modules/core/auth/pages/ResetPasswordPage'
 import { MfaChallengePage } from '@/modules/core/auth/pages/MfaChallengePage'
 import { MfaSetupPage } from '@/modules/core/auth/pages/MfaSetupPage'
-import { OAuthCallbackPage } from '@/modules/core/auth/pages/OAuthCallbackPage'
 import { HomePage } from '@/modules/core/auth/pages/HomePage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
@@ -24,13 +22,12 @@ export function AppRouter() {
       <Routes>
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register" element={<Navigate to="/login" replace />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
 
         <Route path="/mfa/challenge" element={<MfaChallengePage />} />
-        <Route path="/oauth/:provider/callback" element={<OAuthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/profile/complete" element={<CompleteProfilePage />} />

@@ -62,6 +62,7 @@ export function MfaSetupPage() {
       return
     }
 
+    const account = user
     let cancelled = false
 
     async function loadSetup() {
@@ -78,7 +79,7 @@ export function MfaSetupPage() {
 
         if (!cancelled) {
           setSecret('AIOSMOCKSECRET')
-          setOtpauthUri(`otpauth://totp/AIOS:${user.email}?secret=AIOSMOCKSECRET&issuer=AIOS`)
+          setOtpauthUri(`otpauth://totp/AIOS:${account.email}?secret=AIOSMOCKSECRET&issuer=AIOS`)
         }
       } catch (err) {
         if (!cancelled) {

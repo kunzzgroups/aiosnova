@@ -51,7 +51,7 @@ export function UsersPage() {
       await createUser({ email, displayName, status: 'invited' })
       setEmail('')
       setDisplayName('')
-      setMessage('User invited.')
+      setMessage('User invited. They can sign in with Password1!')
       await loadUsers()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to create user.')
