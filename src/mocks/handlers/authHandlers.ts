@@ -1,5 +1,5 @@
 import { HttpResponse, http } from 'msw'
-import type {
+import {
   AuthUser,
   ForgotPasswordRequest,
   LoginRequest,
