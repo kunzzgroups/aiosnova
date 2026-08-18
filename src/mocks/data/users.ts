@@ -23,6 +23,20 @@ export const seedUsers: MockUser[] = [
     password: 'Password1!',
     mfaEnabled: true,
   },
+  {
+    id: 'user-ops',
+    email: 'ops.lead@aios.dev',
+    name: 'Ops Lead',
+    password: 'Password1!',
+    mfaEnabled: false,
+  },
+  {
+    id: 'user-invited',
+    email: 'newhire@aios.dev',
+    name: 'New Hire',
+    password: 'Password1!',
+    mfaEnabled: false,
+  },
 ]
 
 export const mockAuthUsers: MockUser[] = [...seedUsers]
@@ -33,6 +47,30 @@ export function setMockUserMfaEnabled(userId: string, mfaEnabled: boolean) {
     authUser.mfaEnabled = mfaEnabled
   }
   setIdentityUserMfaEnabled(userId, mfaEnabled)
+}
+
+export function provisionMockAuthUser(input: {
+  id: string
+  email: string
+  name: string
+  password?: string
+  mfaEnabled?: boolean
+}): MockUser {
+  const email = input.email.trim().toLowerCase()
+  const existing = mockAuthUsers.find((user) => user.id === input.id || user.email === email)
+  if (existing) {
+    return existing
+  }
+
+  const user: MockUser = {
+    id: input.id,
+    email,
+    name: input.name.trim() || email,
+    password: input.password ?? 'Password1!',
+    mfaEnabled: input.mfaEnabled ?? false,
+  }
+  mockAuthUsers.push(user)
+  return user
 }
 
 export function toPublicUser(user: MockUser): AuthUser {

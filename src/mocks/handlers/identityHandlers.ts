@@ -1,5 +1,5 @@
 import { HttpResponse, http } from 'msw'
-import { MOCK_MFA_CODE, setMockUserMfaEnabled } from '@/mocks/data/users'
+import { MOCK_MFA_CODE, provisionMockAuthUser, setMockUserMfaEnabled } from '@/mocks/data/users'
 import {
   DEMO_TENANT_ID,
   identityCompanies,
@@ -168,6 +168,12 @@ export const identityHandlers = [
     }
 
     identityUsers.push(user)
+    provisionMockAuthUser({
+      id: user.id,
+      email: user.email,
+      name: user.displayName,
+      mfaEnabled: false,
+    })
     return HttpResponse.json(user, { status: 201 })
   }),
 

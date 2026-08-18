@@ -1,5 +1,5 @@
 import { HttpResponse, http } from 'msw'
-import type {
+import {
   AuthUser,
   ForgotPasswordRequest,
   LoginRequest,
@@ -7,11 +7,10 @@ import type {
   MfaDisableRequest,
   MfaSetupConfirmRequest,
   MfaVerifyRequest,
-  RegisterRequest,
   ResetPasswordRequest,
 } from '@/modules/core/auth/types/auth'
 import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
-import { upsertIdentityUser } from '@/mocks/data/identity'
+import { identityUsers } from '@/mocks/data/identity'
 
 const REFRESH_COOKIE = 'aios_refresh'
 const CSRF_COOKIE = 'aios_csrf'
@@ -146,45 +145,17 @@ const FORGOT_MESSAGE =
   'If an account exists for that email, you will receive password reset instructions.'
 
 export const authHandlers = [
-  http.post('/api/auth/register', async ({ request }) => {
-    const body = (await request.json()) as RegisterRequest
-    const email = body.email?.trim() ?? ''
-    const password = body.password ?? ''
-    const name = body.name?.trim() ?? ''
-
-    if (!email || !password || password.length < 8 || !name) {
-      return HttpResponse.json({ message: 'Please provide a valid name, email, and password.' }, { status: 400 })
-    }
-
-    if (findUserByEmail(email)) {
-      return HttpResponse.json({ message: 'Unable to create account with the provided details.' }, { status: 400 })
-    }
-
-    const user: MockUser = {
-      id: createToken('user'),
-      email: email.toLowerCase(),
-      name,
-      password,
-      mfaEnabled: false,
-    }
-
-    users.push(user)
-    upsertIdentityUser({
-      id: user.id,
-      email: user.email,
-      displayName: user.name,
-      status: 'active',
-      mfaEnabled: false,
-    })
-    return issueSession(user)
-  }),
-
   http.post('/api/auth/login', async ({ request }) => {
     const body = (await request.json()) as LoginRequest
     const user = findUserByEmail(body.email ?? '')
 
     if (!user || user.password !== body.password) {
       return HttpResponse.json({ message: GENERIC_LOGIN_ERROR }, { status: 401 })
+    }
+
+    const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)
+    if (identity?.status === 'disabled') {
+      return HttpResponse.json({ message: 'This account has been disabled.' }, { status: 403 })
     }
 
     if (user.mfaEnabled) {
@@ -271,46 +242,6 @@ export const authHandlers = [
         ],
       },
     )
-  }),
-
-  http.get('/api/auth/oauth/:provider/start', ({ params }) => {
-    const provider = String(params.provider)
-    if (!['google', 'facebook', 'apple'].includes(provider)) {
-      return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
-    }
-
-    return HttpResponse.json({
-      redirectUrl: `/oauth/${provider}/callback?mock=1`,
-    })
-  }),
-
-  http.get('/api/auth/oauth/:provider/callback', ({ params }) => {
-    const provider = String(params.provider)
-    if (!['google', 'facebook', 'apple'].includes(provider)) {
-      return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
-    }
-
-    const email = `${provider}.user@aios.dev`
-    let user = findUserByEmail(email)
-    if (!user) {
-      user = {
-        id: `user-${provider}`,
-        email,
-        name: `${provider[0]!.toUpperCase()}${provider.slice(1)} User`,
-        password: '',
-        mfaEnabled: false,
-      }
-      users.push(user)
-    }
-
-    upsertIdentityUser({
-      id: user.id,
-      email: user.email,
-      displayName: user.name,
-      status: 'active',
-      mfaEnabled: user.mfaEnabled,
-    })
-    return issueSession(user)
   }),
 
   http.post('/api/auth/password/change', async ({ request }) => {

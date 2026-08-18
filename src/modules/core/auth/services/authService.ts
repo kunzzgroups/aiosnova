@@ -10,19 +10,9 @@ import type {
   MfaSetupStartResponse,
   MfaVerifyRequest,
   MessageResponse,
-  RegisterRequest,
   ResetPasswordRequest,
 } from '@/modules/core/auth/types/auth'
 import { isMfaRequired } from '@/modules/core/auth/types/auth'
-
-export async function register(payload: RegisterRequest): Promise<LoginSuccessResponse> {
-  const data = await apiRequest<LoginSuccessResponse>('/api/auth/register', {
-    method: 'POST',
-    body: payload,
-  })
-  useAuthStore.getState().setSession(data.accessToken, data.user)
-  return data
-}
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   const data = await apiRequest<LoginResponse>('/api/auth/login', {
@@ -57,29 +47,6 @@ export async function logout(): Promise<void> {
   } finally {
     useAuthStore.getState().clearSession()
   }
-}
-
-export type OAuthProvider = 'google' | 'facebook' | 'apple'
-
-export async function startOAuth(provider: OAuthProvider): Promise<string> {
-  const data = await apiRequest<{ redirectUrl: string }>(`/api/auth/oauth/${provider}/start`)
-  return data.redirectUrl
-}
-
-export async function completeOAuth(provider: OAuthProvider): Promise<LoginSuccessResponse> {
-  const data = await apiRequest<LoginSuccessResponse>(`/api/auth/oauth/${provider}/callback`)
-  useAuthStore.getState().setSession(data.accessToken, data.user)
-  return data
-}
-
-/** @deprecated Use startOAuth('google') */
-export async function startGoogleOAuth(): Promise<string> {
-  return startOAuth('google')
-}
-
-/** @deprecated Use completeOAuth('google') */
-export async function completeGoogleOAuth(): Promise<LoginSuccessResponse> {
-  return completeOAuth('google')
 }
 
 export async function forgotPassword(payload: ForgotPasswordRequest) {
