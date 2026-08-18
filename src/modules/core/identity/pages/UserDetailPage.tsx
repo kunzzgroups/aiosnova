@@ -266,9 +266,9 @@ export function UserDetailPage() {
             ) : null}
             <Button
               variant="secondary"
-              onClick={() => navigate(`/mfa/setup?userId=${user.id}`)}
+              onClick={() => navigate(`/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`)}
             >
-              {user.mfaEnabled ? 'Disable MFA' : 'Enable MFA'}
+              {user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
             </Button>
             <Button variant="secondary" onClick={() => void handleSendReset()}>
               Send Password Reset

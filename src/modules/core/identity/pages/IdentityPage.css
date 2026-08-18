@@ -424,6 +424,33 @@
   gap: 0.35rem;
 }
 
+.identity-table__actions .identity-inline-actions .identity-action-btn {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.5rem;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.identity-table__actions .identity-inline-actions .identity-action-btn--view {
+  width: 4.4rem;
+}
+
+.identity-table__actions .identity-inline-actions .identity-action-btn--edit {
+  width: 4.4rem;
+}
+
+.identity-table__actions .identity-inline-actions .identity-action-btn--reset {
+  width: 6.4rem;
+}
+
+.identity-table__actions .identity-inline-actions .identity-action-btn--mfa {
+  width: 6.8rem;
+}
+
+.identity-table__actions .identity-inline-actions .identity-action-btn--status {
+  width: 4.6rem;
+}
+
 .identity-inline-actions--spaced {
   margin-bottom: var(--space-4);
 }

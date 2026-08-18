@@ -52,6 +52,7 @@ export function formatLastActive(value: string | null) {
   if (Number.isNaN(date.getTime())) {
     return 'Never'
   }
+  const timeLabel = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -59,12 +60,12 @@ export function formatLastActive(value: string | null) {
   const diffDays = Math.round((startOfToday.getTime() - startOfValue.getTime()) / 86_400_000)
 
   if (diffDays === 0) {
-    return `Today ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    return `Today ${timeLabel}`
   }
   if (diffDays === 1) {
-    return 'Yesterday'
+    return `Yesterday ${timeLabel}`
   }
-  return date.toLocaleDateString()
+  return `${date.toLocaleDateString()} ${timeLabel}`
 }
 
 export function formatDirectoryMfa(user: Pick<IdentityUser, 'signInMethod' | 'mfaEnabled'>) {

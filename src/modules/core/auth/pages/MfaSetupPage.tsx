@@ -17,6 +17,8 @@ export function MfaSetupPage() {
   const [searchParams] = useSearchParams()
   const sessionUser = useAuthStore((state) => state.user)
   const userId = searchParams.get('userId') || sessionUser?.id || ''
+  const mfaMode = searchParams.get('mode') || 'require'
+  const resetMode = mfaMode === 'reset'
 
   const [user, setUser] = useState<IdentityUser | null>(null)
   const [secret, setSecret] = useState<string | null>(null)
@@ -56,7 +58,7 @@ export function MfaSetupPage() {
   }, [loadUser])
 
   useEffect(() => {
-    if (!user || mfaEnabled || recoveryCodes) {
+    if (!user || (mfaEnabled && !resetMode) || recoveryCodes) {
       setSecret(null)
       setOtpauthUri(null)
       return
@@ -92,7 +94,7 @@ export function MfaSetupPage() {
     return () => {
       cancelled = true
     }
-  }, [user, isSelf, mfaEnabled, recoveryCodes])
+  }, [user, isSelf, mfaEnabled, resetMode, recoveryCodes])
 
   function syncSession(nextUser: IdentityUser) {
     if (sessionUser?.id === nextUser.id) {
@@ -120,6 +122,11 @@ export function MfaSetupPage() {
         setUser(refreshed.user)
         syncSession(refreshed.user)
       } else {
+        if (resetMode) {
+          // Admin "reset" = disable first, then re-enable (mock endpoints require MFA off for enable).
+          await disableUserMfa(user.id, code)
+        }
+
         const result = await enableUserMfa(user.id, code)
         setUser(result.user)
         setMessage(result.message)
@@ -206,7 +213,7 @@ export function MfaSetupPage() {
         </div>
       ) : null}
 
-      {mfaEnabled && !recoveryCodes ? (
+      {mfaEnabled && !recoveryCodes && !resetMode ? (
         <form className="auth-form" onSubmit={(event) => void handleDisable(event)}>
           <Alert variant="info">Enter the current authenticator code to turn MFA off. Demo code: 123456</Alert>
           <FormField label="MFA code" htmlFor="mfa-disable-code">
@@ -223,10 +230,10 @@ export function MfaSetupPage() {
         </form>
       ) : null}
 
-      {!isLoading && !mfaEnabled && secret ? (
+      {(!isLoading && (!mfaEnabled || resetMode) && secret && !recoveryCodes) ? (
         <form className="auth-form" onSubmit={(event) => void handleEnable(event)}>
           <Alert variant="info">
-            Secret: <code>{secret}</code>
+            {resetMode ? 'Reset' : 'Secret'}: <code>{secret}</code>
             <br />
             URI: <code>{otpauthUri}</code>
             <br />
@@ -241,7 +248,7 @@ export function MfaSetupPage() {
             />
           </FormField>
           <Button type="submit" disabled={isSubmitting || code.length !== 6}>
-            {isSubmitting ? 'Confirming…' : 'Enable MFA'}
+            {isSubmitting ? 'Confirming…' : resetMode ? 'Reset MFA' : 'Enable MFA'}
           </Button>
         </form>
       ) : null}

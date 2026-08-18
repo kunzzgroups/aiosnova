@@ -288,6 +288,7 @@ export function UsersPage() {
                         <Button
                           variant="secondary"
                           size="md"
+                          className="identity-action-btn identity-action-btn--view"
                           onClick={() => navigate(`/system/core/users/${user.id}`)}
                         >
                           View
@@ -295,6 +296,7 @@ export function UsersPage() {
                         <Button
                           variant="secondary"
                           size="md"
+                          className="identity-action-btn identity-action-btn--edit"
                           onClick={() => navigate(`/system/core/users/${user.id}?edit=1`)}
                         >
                           Edit
@@ -302,6 +304,7 @@ export function UsersPage() {
                         <Button
                           variant="secondary"
                           size="md"
+                          className="identity-action-btn identity-action-btn--reset"
                           onClick={() => void handleSendReset(user)}
                           disabled={user.status === 'disabled' || Boolean(user.signInMethod && user.signInMethod !== 'password')}
                         >
@@ -311,14 +314,20 @@ export function UsersPage() {
                           <Button
                             variant="secondary"
                             size="md"
-                            onClick={() => navigate(`/mfa/setup?userId=${user.id}`)}
+                            className="identity-action-btn identity-action-btn--mfa"
+                            onClick={() =>
+                              navigate(
+                                `/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`,
+                              )
+                            }
                           >
-                            {user.mfaEnabled ? 'Disable MFA' : 'Enable MFA'}
+                            {user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
                           </Button>
                         ) : null}
                         <Button
                           variant="secondary"
                           size="md"
+                          className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(user)}
                         >
                           {user.status === 'disabled' ? 'Activate' : 'Disable'}
