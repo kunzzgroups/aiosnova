@@ -10,7 +10,7 @@ import type {
   ResetPasswordRequest,
 } from '@/modules/core/auth/types/auth'
 import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
-import { identityUsers } from '@/mocks/data/identity'
+import { identityUsers, upsertIdentityUser } from '@/mocks/data/identity'
 
 const REFRESH_COOKIE = 'aios_refresh'
 const CSRF_COOKIE = 'aios_csrf'
@@ -242,6 +242,46 @@ export const authHandlers = [
         ],
       },
     )
+  }),
+
+  http.get('/api/auth/oauth/:provider/start', ({ params }) => {
+    const provider = String(params.provider)
+    if (!['google', 'facebook', 'apple'].includes(provider)) {
+      return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
+    }
+
+    return HttpResponse.json({
+      redirectUrl: `/oauth/${provider}/callback?mock=1`,
+    })
+  }),
+
+  http.get('/api/auth/oauth/:provider/callback', ({ params }) => {
+    const provider = String(params.provider)
+    if (!['google', 'facebook', 'apple'].includes(provider)) {
+      return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
+    }
+
+    const email = `${provider}.user@aios.dev`
+    let user = findUserByEmail(email)
+    if (!user) {
+      user = {
+        id: `user-${provider}`,
+        email,
+        name: `${provider[0]!.toUpperCase()}${provider.slice(1)} User`,
+        password: '',
+        mfaEnabled: false,
+      }
+      users.push(user)
+    }
+
+    upsertIdentityUser({
+      id: user.id,
+      email: user.email,
+      displayName: user.name,
+      status: 'active',
+      mfaEnabled: user.mfaEnabled,
+    })
+    return issueSession(user)
   }),
 
   http.post('/api/auth/password/change', async ({ request }) => {

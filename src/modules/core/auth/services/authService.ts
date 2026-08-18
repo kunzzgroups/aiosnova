@@ -49,6 +49,19 @@ export async function logout(): Promise<void> {
   }
 }
 
+export type OAuthProvider = 'google' | 'facebook' | 'apple'
+
+export async function startOAuth(provider: OAuthProvider): Promise<string> {
+  const data = await apiRequest<{ redirectUrl: string }>(`/api/auth/oauth/${provider}/start`)
+  return data.redirectUrl
+}
+
+export async function completeOAuth(provider: OAuthProvider): Promise<LoginSuccessResponse> {
+  const data = await apiRequest<LoginSuccessResponse>(`/api/auth/oauth/${provider}/callback`)
+  useAuthStore.getState().setSession(data.accessToken, data.user)
+  return data
+}
+
 export async function forgotPassword(payload: ForgotPasswordRequest) {
   return apiRequest<MessageResponse & { demoResetToken?: string }>('/api/auth/password/forgot', {
     method: 'POST',

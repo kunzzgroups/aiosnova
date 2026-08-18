@@ -7,6 +7,7 @@ import { ForgotPasswordPage } from '@/modules/core/auth/pages/ForgotPasswordPage
 import { ResetPasswordPage } from '@/modules/core/auth/pages/ResetPasswordPage'
 import { MfaChallengePage } from '@/modules/core/auth/pages/MfaChallengePage'
 import { MfaSetupPage } from '@/modules/core/auth/pages/MfaSetupPage'
+import { OAuthCallbackPage } from '@/modules/core/auth/pages/OAuthCallbackPage'
 import { HomePage } from '@/modules/core/auth/pages/HomePage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
@@ -28,6 +29,7 @@ export function AppRouter() {
         </Route>
 
         <Route path="/mfa/challenge" element={<MfaChallengePage />} />
+        <Route path="/oauth/:provider/callback" element={<OAuthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/profile/complete" element={<CompleteProfilePage />} />
