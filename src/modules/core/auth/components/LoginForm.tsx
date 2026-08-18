@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
+import { useAuthCopy } from '@/modules/core/auth/i18n/authCopy'
 import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { useLogin } from '@/modules/core/auth/hooks/useLogin'
 import {
@@ -15,6 +16,7 @@ import './LoginForm.css'
 
 export function LoginForm() {
   const { handleLogin, isSubmitting, error } = useLogin()
+  const { t } = useAuthCopy()
   const [remembered] = useState(readRememberedLogin)
   const [email, setEmail] = useState(remembered?.email ?? '')
   const [password, setPassword] = useState(remembered?.password ?? '')
@@ -36,20 +38,20 @@ export function LoginForm() {
     <div className="login-form">
       <form className="login-form__form" onSubmit={(event) => void handleSubmit(event)}>
         {error ? <Alert variant="error">{error}</Alert> : null}
-        <FormField label="Email" htmlFor="login-email">
+        <FormField label={t('email')} htmlFor="login-email">
           <TextField
             id="login-email"
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="Enter your email"
+            placeholder={t('enterEmail')}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
             disabled={isSubmitting}
           />
         </FormField>
-        <FormField label="Password" htmlFor="login-password">
+        <FormField label={t('password')} htmlFor="login-password">
           <PasswordField
             id="login-password"
             name="password"
@@ -71,17 +73,17 @@ export function LoginForm() {
             <span className="login-form__switch" aria-hidden>
               <span className="login-form__switch-thumb" />
             </span>
-            <span className="login-form__remember-text">Remember me</span>
+            <span className="login-form__remember-text">{t('rememberMe')}</span>
           </label>
-          <Link to="/forgot-password">Forgot password?</Link>
+          <Link to="/forgot-password">{t('forgotPassword')}</Link>
         </div>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in…' : 'Sign In'}
+          {isSubmitting ? t('signingIn') : t('signInButton')}
         </Button>
       </form>
 
       <div className="login-form__divider">
-        <span>Or sign in with</span>
+        <span>{t('orSignInWith')}</span>
       </div>
       <SocialAuthButtons />
     </div>

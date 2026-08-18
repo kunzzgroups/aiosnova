@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { AuthLayout } from '@/layouts/AuthLayout'
+import { useAuthCopy } from '@/modules/core/auth/i18n/authCopy'
 import { ApiError } from '@/services/httpClient'
 import { forgotPassword } from '@/modules/core/auth/services/authService'
 import './AuthForm.css'
 
 export function ForgotPasswordPage() {
+  const { t } = useAuthCopy()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [demoToken, setDemoToken] = useState<string | null>(null)
@@ -38,12 +40,12 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      title="Forgot password"
-      subtitle="We will email reset instructions if an account exists."
+      title={t('forgotTitle')}
+      subtitle={t('forgotSubtitle')}
       hideIcon
       footer={
         <p>
-          Remembered it? <Link to="/login">Back to sign in</Link>
+          {t('rememberedIt')} <Link to="/login">{t('backToSignIn')}</Link>
         </p>
       }
     >
@@ -52,11 +54,11 @@ export function ForgotPasswordPage() {
         {message ? <Alert variant="success">{message}</Alert> : null}
         {demoToken ? (
           <Alert variant="info">
-            Demo reset link:{' '}
-            <Link to={`/reset-password?token=${encodeURIComponent(demoToken)}`}>Continue to reset</Link>
+            {t('demoResetLink')}{' '}
+            <Link to={`/reset-password?token=${encodeURIComponent(demoToken)}`}>{t('continueToReset')}</Link>
           </Alert>
         ) : null}
-        <FormField label="Email" htmlFor="forgot-email">
+        <FormField label={t('email')} htmlFor="forgot-email">
           <TextField
             id="forgot-email"
             type="email"
@@ -68,7 +70,7 @@ export function ForgotPasswordPage() {
           />
         </FormField>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Sending…' : 'Send reset link'}
+          {isSubmitting ? t('sending') : t('sendResetLink')}
         </Button>
       </form>
     </AuthLayout>

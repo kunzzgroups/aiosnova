@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { LanguageSwitcher } from '@/components/navigation/LanguageSwitcher'
 import './AuthLayout.css'
 
 type AuthLayoutProps = {
@@ -47,6 +48,10 @@ export function AuthLayout({
       </Link>
 
       <div className={panelClass}>
+        <div className="auth-layout__locale">
+          <LanguageSwitcher />
+        </div>
+
         {compact || hideIcon ? null : (
           <div className="auth-layout__feature-icon" aria-hidden>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">

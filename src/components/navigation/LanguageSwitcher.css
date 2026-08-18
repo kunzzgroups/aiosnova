@@ -1,0 +1,117 @@
+.language-switcher {
+  position: relative;
+  z-index: 4;
+}
+
+.language-switcher__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.9rem;
+  padding: 0.22rem 0.58rem 0.22rem 0.42rem;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--auth-ink, #12181a);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow:
+    0 6px 16px rgba(20, 40, 50, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.language-switcher__trigger:hover,
+.language-switcher__trigger.is-open {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(15, 61, 62, 0.2);
+  box-shadow:
+    0 10px 24px rgba(20, 40, 50, 0.1),
+    0 0 0 3px rgba(15, 61, 62, 0.08);
+}
+
+.language-switcher__globe {
+  display: grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: rgba(15, 61, 62, 0.08);
+  color: var(--auth-ink, #12181a);
+  flex-shrink: 0;
+}
+
+.language-switcher__label {
+  line-height: 1;
+}
+
+.language-switcher__chevron {
+  display: grid;
+  place-items: center;
+  color: var(--auth-muted, #5f6b70);
+  transition: transform 0.18s ease;
+}
+
+.language-switcher__trigger.is-open .language-switcher__chevron {
+  transform: rotate(180deg);
+}
+
+.language-switcher__menu {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 20;
+  min-width: 11.5rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 36px rgba(20, 40, 50, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.language-switcher__option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: var(--auth-ink, #12181a);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 550;
+  text-align: left;
+  padding: 0.58rem 0.7rem;
+  cursor: pointer;
+}
+
+.language-switcher__option:hover {
+  background: rgba(15, 61, 62, 0.06);
+}
+
+.language-switcher__option.is-selected {
+  background: rgba(15, 61, 62, 0.1);
+  font-weight: 700;
+}
+
+.language-switcher__check {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--color-brand, #0f3d3e);
+  flex-shrink: 0;
+}

@@ -120,6 +120,12 @@
   -webkit-backdrop-filter: blur(22px) saturate(1.25);
 }
 
+.auth-layout__locale {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.2rem 0 0.85rem;
+}
+
 .auth-layout__panel--wide {
   width: min(100%, 38rem);
 }
@@ -274,5 +280,9 @@
   .auth-layout__brand-mark {
     top: 1rem;
     left: 1rem;
+  }
+
+  .auth-layout__locale {
+    margin-bottom: 0.7rem;
   }
 }

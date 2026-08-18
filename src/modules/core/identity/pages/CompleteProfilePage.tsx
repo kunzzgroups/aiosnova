@@ -123,17 +123,6 @@ export function CompleteProfilePage() {
           <FormField label="Email" htmlFor="complete-email">
             <TextField id="complete-email" value={sessionUser?.email ?? ''} disabled />
           </FormField>
-          <FormField label="Phone" htmlFor="complete-phone">
-            <TextField
-              id="complete-phone"
-              type="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              required
-              disabled={isSaving}
-              autoComplete="tel"
-            />
-          </FormField>
           <FormField label="Display name" htmlFor="complete-display">
             <TextField
               id="complete-display"
@@ -151,6 +140,17 @@ export function CompleteProfilePage() {
               required
               disabled={isSaving}
               autoComplete="name"
+            />
+          </FormField>
+          <FormField label="Phone" htmlFor="complete-phone">
+            <TextField
+              id="complete-phone"
+              type="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              required
+              disabled={isSaving}
+              autoComplete="tel"
             />
           </FormField>
           <FormField label="Password" htmlFor="complete-password">
