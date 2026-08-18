@@ -128,6 +128,7 @@ export function CompleteProfilePage() {
               id="complete-display"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="Enter your display name"
               required
               disabled={isSaving}
             />
@@ -137,6 +138,7 @@ export function CompleteProfilePage() {
               id="complete-full"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
+              placeholder="Enter your full name"
               required
               disabled={isSaving}
               autoComplete="name"
@@ -148,6 +150,7 @@ export function CompleteProfilePage() {
               type="tel"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
+              placeholder="Enter your phone number"
               required
               disabled={isSaving}
               autoComplete="tel"
@@ -158,6 +161,7 @@ export function CompleteProfilePage() {
               id="complete-password"
               value={password}
               onChange={setPassword}
+              placeholder="Create a password"
               autoComplete="new-password"
               disabled={isSaving}
             />
@@ -167,6 +171,7 @@ export function CompleteProfilePage() {
               id="complete-confirm-password"
               value={confirmPassword}
               onChange={setConfirmPassword}
+              placeholder="Re-enter your password"
               autoComplete="new-password"
               disabled={isSaving}
             />

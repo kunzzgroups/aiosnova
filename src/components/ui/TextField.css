@@ -10,6 +10,12 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.ui-text-field::placeholder {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
 .ui-text-field:focus {
   border-color: var(--color-border-focus);
   box-shadow: 0 0 0 3px rgba(15, 61, 62, 0.12);
