@@ -1,5 +1,7 @@
 export type UserStatus = 'active' | 'disabled' | 'invited'
 
+export type SignInMethod = 'password' | 'google' | 'facebook' | 'apple'
+
 export type IdentityUser = {
   id: string
   email: string
@@ -10,7 +12,9 @@ export type IdentityUser = {
   language: string
   timezone: string
   status: UserStatus
+  signInMethod: SignInMethod | null
   mfaEnabled: boolean
+  lastActiveAt: string | null
   createdAt: string
 }
 
@@ -27,6 +31,47 @@ export function formatStatusLabel(status: string) {
     return status
   }
   return `${status.charAt(0).toUpperCase()}${status.slice(1)}`
+}
+
+export function formatSignInMethod(method: SignInMethod | null) {
+  if (!method) {
+    return '—'
+  }
+  if (method === 'password') {
+    return 'Password'
+  }
+  return `${method.charAt(0).toUpperCase()}${method.slice(1)}`
+}
+
+export function formatLastActive(value: string | null) {
+  if (!value) {
+    return 'Never'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Never'
+  }
+
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfValue = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diffDays = Math.round((startOfToday.getTime() - startOfValue.getTime()) / 86_400_000)
+
+  if (diffDays === 0) {
+    return `Today ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+  }
+  if (diffDays === 1) {
+    return 'Yesterday'
+  }
+  return date.toLocaleDateString()
+}
+
+export function formatDirectoryMfa(user: Pick<IdentityUser, 'signInMethod' | 'mfaEnabled'>) {
+  if (!user.signInMethod) {
+    return '—'
+  }
+  return user.mfaEnabled ? 'On' : 'Off'
 }
 
 export const PROFILE_LANGUAGES = [

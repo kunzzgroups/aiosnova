@@ -4,6 +4,7 @@ import type {
   MembershipRecord,
   OrganizationNode,
   PositionRecord,
+  SignInMethod,
   UserStatus,
 } from '@/modules/core/identity/types/identity'
 
@@ -33,7 +34,9 @@ export const identityUsers: IdentityUser[] = [
     language: 'en',
     timezone: 'Asia/Kuala_Lumpur',
     status: 'active',
+    signInMethod: 'password',
     mfaEnabled: false,
+    lastActiveAt: '2026-08-18T02:32:00.000Z',
     createdAt: '2026-01-10T08:00:00.000Z',
   },
   {
@@ -46,7 +49,9 @@ export const identityUsers: IdentityUser[] = [
     language: 'en',
     timezone: 'Asia/Kuala_Lumpur',
     status: 'active',
+    signInMethod: 'password',
     mfaEnabled: true,
+    lastActiveAt: '2026-08-17T08:00:00.000Z',
     createdAt: '2026-01-12T08:00:00.000Z',
   },
   {
@@ -59,7 +64,9 @@ export const identityUsers: IdentityUser[] = [
     language: 'en',
     timezone: 'Asia/Kuala_Lumpur',
     status: 'active',
+    signInMethod: 'password',
     mfaEnabled: false,
+    lastActiveAt: '2026-08-15T09:10:00.000Z',
     createdAt: '2026-02-01T08:00:00.000Z',
   },
   {
@@ -68,7 +75,9 @@ export const identityUsers: IdentityUser[] = [
     displayName: 'New Hire',
     ...emptyProfile,
     status: 'invited',
+    signInMethod: null,
     mfaEnabled: false,
+    lastActiveAt: null,
     createdAt: '2026-08-01T08:00:00.000Z',
   },
 ]
@@ -78,11 +87,22 @@ export function upsertIdentityUser(input: {
   email: string
   displayName: string
   status?: UserStatus
+  signInMethod?: SignInMethod | null
   mfaEnabled?: boolean
+  lastActiveAt?: string | null
 }): IdentityUser {
   const email = input.email.trim().toLowerCase()
   const existing = identityUsers.find((user) => user.id === input.id || user.email === email)
   if (existing) {
+    if (input.signInMethod !== undefined) {
+      existing.signInMethod = input.signInMethod
+    }
+    if (input.lastActiveAt !== undefined) {
+      existing.lastActiveAt = input.lastActiveAt
+    }
+    if (input.status !== undefined) {
+      existing.status = input.status
+    }
     return existing
   }
 
@@ -92,12 +112,26 @@ export function upsertIdentityUser(input: {
     displayName: input.displayName.trim() || email,
     ...emptyProfile,
     status: input.status ?? 'active',
+    signInMethod: input.signInMethod ?? null,
     mfaEnabled: input.mfaEnabled ?? false,
+    lastActiveAt: input.lastActiveAt ?? null,
     createdAt: new Date().toISOString(),
   }
 
   identityUsers.push(user)
   return user
+}
+
+export function recordIdentitySignIn(userId: string, method: SignInMethod) {
+  const user = identityUsers.find((item) => item.id === userId)
+  if (!user) {
+    return
+  }
+  user.signInMethod = method
+  user.lastActiveAt = new Date().toISOString()
+  if (user.status === 'invited') {
+    user.status = 'active'
+  }
 }
 
 export function setIdentityUserMfaEnabled(userId: string, mfaEnabled: boolean) {

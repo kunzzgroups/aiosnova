@@ -163,7 +163,9 @@ export const identityHandlers = [
       language: 'en',
       timezone: 'Asia/Kuala_Lumpur',
       status: body.status ?? 'invited',
+      signInMethod: null,
       mfaEnabled: false,
+      lastActiveAt: null,
       createdAt: new Date().toISOString(),
     }
 

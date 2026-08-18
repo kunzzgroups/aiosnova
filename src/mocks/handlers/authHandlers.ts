@@ -10,7 +10,8 @@ import type {
   ResetPasswordRequest,
 } from '@/modules/core/auth/types/auth'
 import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
-import { identityUsers, upsertIdentityUser } from '@/mocks/data/identity'
+import { identityUsers, recordIdentitySignIn, upsertIdentityUser } from '@/mocks/data/identity'
+import type { SignInMethod } from '@/modules/core/identity/types/identity'
 
 const REFRESH_COOKIE = 'aios_refresh'
 const CSRF_COOKIE = 'aios_csrf'
@@ -101,7 +102,8 @@ function getBearerUser(request: Request): AuthUser | null {
   return user ? toPublicUser(user) : null
 }
 
-function issueSession(user: MockUser) {
+function issueSession(user: MockUser, signInMethod: SignInMethod = 'password') {
+  recordIdentitySignIn(user.id, signInMethod)
   const refreshToken = createToken('refresh')
   const csrfToken = createToken('csrf')
   const accessToken = `access_${user.id}`
@@ -279,9 +281,11 @@ export const authHandlers = [
       email: user.email,
       displayName: user.name,
       status: 'active',
+      signInMethod: provider as SignInMethod,
       mfaEnabled: user.mfaEnabled,
+      lastActiveAt: new Date().toISOString(),
     })
-    return issueSession(user)
+    return issueSession(user, provider as SignInMethod)
   }),
 
   http.post('/api/auth/password/change', async ({ request }) => {

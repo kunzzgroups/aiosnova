@@ -233,6 +233,48 @@
   margin-bottom: var(--space-4);
 }
 
+.identity-directory-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.identity-directory-toolbar__search {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  max-width: 28rem;
+}
+
+.identity-directory-toolbar__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.identity-directory-toolbar .sidebar-select {
+  width: 11.5rem;
+}
+
+.identity-directory-toolbar .sidebar-select__label {
+  color: var(--color-text-muted);
+}
+
+.identity-directory-toolbar .sidebar-select__trigger {
+  min-height: 2.75rem;
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.identity-directory-toolbar__invite {
+  margin-left: auto;
+}
+
+.identity-panel .identity-form--compact {
+  margin-bottom: var(--space-4);
+}
+
 .identity-form {
   display: grid;
   gap: var(--space-3);
