@@ -114,3 +114,21 @@ export function IconStar(props: IconProps) {
     </IconSvg>
   )
 }
+
+export function IconShieldCheck(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
+      <path d="m8.7 12.1 2.2 2.2 4.4-4.5" />
+    </IconSvg>
+  )
+}
+
+export function IconX(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M6 6l12 12" />
+      <path d="M18 6 6 18" />
+    </IconSvg>
+  )
+}

@@ -277,7 +277,7 @@
 .identity-directory-toolbar__search {
   flex: 1 1 16rem;
   min-width: 12rem;
-  max-width: 28rem;
+  max-width: 20rem; 
 }
 
 .identity-directory-toolbar__filters {

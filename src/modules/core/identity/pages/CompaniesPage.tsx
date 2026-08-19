@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Alert } from '@/components/ui/Alert'
+import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
@@ -145,8 +145,12 @@ export function CompaniesPage() {
         <p>Tenant / Company — legal entities and workspaces (Layer 0).</p>
       </header>
 
-      {error ? <Alert variant="error">{error}</Alert> : null}
-      {message ? <Alert variant="success">{message}</Alert> : null}
+      <FlashToasts
+        error={error}
+        message={message}
+        onClearError={() => setError(null)}
+        onClearMessage={() => setMessage(null)}
+      />
 
       <section className="identity-panel">
         <h2>Directory</h2>

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
+import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
@@ -50,8 +51,12 @@ export function ForgotPasswordPage() {
       }
     >
       <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
-        {error ? <Alert variant="error">{error}</Alert> : null}
-        {message ? <Alert variant="success">{message}</Alert> : null}
+        <FlashToasts
+          error={error}
+          message={message}
+          onClearError={() => setError(null)}
+          onClearMessage={() => setMessage(null)}
+        />
         {demoToken ? (
           <Alert variant="info">
             {t('demoResetLink')}{' '}

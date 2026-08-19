@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Alert } from '@/components/ui/Alert'
+import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { IconButton } from '@/components/ui/IconButton'
@@ -259,7 +259,7 @@ export function UserDetailPage() {
   if (!user) {
     return (
       <div className="identity-page">
-        {error ? <Alert variant="error">{error}</Alert> : null}
+        <FlashToasts error={error} onClearError={() => setError(null)} />
         <Button variant="secondary" onClick={() => navigate('/system/core/users')}>
           Back to users
         </Button>
@@ -280,8 +280,12 @@ export function UserDetailPage() {
         </Button>
       </header>
 
-      {error ? <Alert variant="error">{error}</Alert> : null}
-      {message ? <Alert variant="success">{message}</Alert> : null}
+      <FlashToasts
+        error={error}
+        message={message}
+        onClearError={() => setError(null)}
+        onClearMessage={() => setMessage(null)}
+      />
 
       <section className="identity-panel">
         <div className="identity-panel__title-row">

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Alert } from '@/components/ui/Alert'
+import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
@@ -124,7 +124,7 @@ export function CompleteProfilePage() {
       }
     >
       {isLoading ? <p>Loading profile…</p> : null}
-      {error ? <Alert variant="error">{error}</Alert> : null}
+      <FlashToasts error={error} onClearError={() => setError(null)} />
       {!isLoading ? (
         <form className="complete-profile-form" onSubmit={(event) => void handleSubmit(event)}>
           <FormField label="Email" htmlFor="complete-email">

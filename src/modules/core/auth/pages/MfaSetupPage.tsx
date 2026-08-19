@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
+import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { MfaCodeInput } from '@/modules/core/auth/components/MfaCodeInput'
@@ -9,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { confirmMfaSetup, disableMfa, startMfaSetup } from '@/modules/core/auth/services/authService'
 import { disableUserMfa, enableUserMfa, fetchUser } from '@/modules/core/identity/services/identityService'
 import type { IdentityUser } from '@/modules/core/identity/types/identity'
+import { notifySuccess } from '@/stores/toastStore'
 import './AuthForm.css'
 import './MfaSetupPage.css'
 
@@ -118,6 +120,7 @@ export function MfaSetupPage() {
       if (isSelf) {
         const result = await confirmMfaSetup(code)
         setRecoveryCodes(result.recoveryCodes)
+        notifySuccess('MFA is enabled. Store these recovery codes securely.')
         const refreshed = await fetchUser(user.id)
         setUser(refreshed.user)
         syncSession(refreshed.user)
@@ -190,8 +193,12 @@ export function MfaSetupPage() {
       </header>
 
       {isLoading ? <p>Preparing setup…</p> : null}
-      {error ? <Alert variant="error">{error}</Alert> : null}
-      {message ? <Alert variant="success">{message}</Alert> : null}
+      <FlashToasts
+        error={error}
+        message={message}
+        onClearError={() => setError(null)}
+        onClearMessage={() => setMessage(null)}
+      />
 
       {!isLoading && user ? (
         <p className="mfa-setup__account">
@@ -201,7 +208,8 @@ export function MfaSetupPage() {
 
       {recoveryCodes ? (
         <div className="mfa-setup__done">
-          <Alert variant="success">MFA is enabled. Store these recovery codes securely.</Alert>
+          <h2>Recovery codes</h2>
+          <p>Store these recovery codes securely. Each code can be used once.</p>
           <ul className="mfa-setup__codes">
             {recoveryCodes.map((item) => (
               <li key={item}>{item}</li>
