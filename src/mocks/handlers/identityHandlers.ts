@@ -8,6 +8,7 @@ import {
   identityPositions,
   identityUsers,
 } from '@/mocks/data/identity'
+import { isValidPassword, PASSWORD_ERROR_MESSAGE } from '@/modules/core/auth/utils/passwordPolicy'
 import type {
   CompanyRecord,
   IdentityProfilePayload,
@@ -169,8 +170,8 @@ export const identityHandlers = [
       return HttpResponse.json({ message: 'Email is required.' }, { status: 400 })
     }
 
-    if (password.length < 8) {
-      return HttpResponse.json({ message: 'Password must be at least 8 characters.' }, { status: 400 })
+    if (!isValidPassword(password)) {
+      return HttpResponse.json({ message: PASSWORD_ERROR_MESSAGE }, { status: 400 })
     }
 
     const company = identityCompanies.find((item) => item.id === companyId && item.tenantId === DEMO_TENANT_ID)

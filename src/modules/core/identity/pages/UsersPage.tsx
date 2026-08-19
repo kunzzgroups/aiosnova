@@ -29,6 +29,12 @@ import {
 } from '@/modules/core/identity/types/identity'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import {
+  isValidPassword,
+  PASSWORD_CREATE_PLACEHOLDER,
+  PASSWORD_ERROR_MESSAGE,
+  PASSWORD_RULE_HINT,
+} from '@/modules/core/auth/utils/passwordPolicy'
+import {
   createUser,
   deleteUser,
   fetchCompanies,
@@ -194,8 +200,8 @@ export function UsersPage() {
       setError('Select a company for this invite.')
       return
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.')
+    if (!isValidPassword(password)) {
+      setError(PASSWORD_ERROR_MESSAGE)
       return
     }
     setIsSubmitting(true)
@@ -351,14 +357,14 @@ export function UsersPage() {
                   disabled={isSubmitting || companies.length === 0}
                 />
               </FormField>
-              <FormField label="Password" htmlFor="user-password">
+              <FormField label="Password" htmlFor="user-password" hint={PASSWORD_RULE_HINT}>
                 <div className="identity-invite__password">
                   <PasswordField
                     id="user-password"
                     value={password}
                     onChange={setPassword}
                     autoComplete="new-password"
-                    placeholder="Enter your password"
+                    placeholder={PASSWORD_CREATE_PLACEHOLDER}
                     disabled={isSubmitting}
                     revealed={passwordRevealed}
                     onRevealedChange={setPasswordRevealed}

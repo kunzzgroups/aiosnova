@@ -12,6 +12,7 @@ import type {
 import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
 import { identityUsers, recordIdentitySignIn, upsertIdentityUser } from '@/mocks/data/identity'
 import type { SignInMethod } from '@/modules/core/identity/types/identity'
+import { isValidPassword, NEW_PASSWORD_ERROR_MESSAGE, PASSWORD_ERROR_MESSAGE } from '@/modules/core/auth/utils/passwordPolicy'
 
 const REFRESH_COOKIE = 'aios_refresh'
 const CSRF_COOKIE = 'aios_csrf'
@@ -312,9 +313,9 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Current password is incorrect.' }, { status: 400 })
     }
 
-    if (!body.newPassword || body.newPassword.length < 8) {
+    if (!body.newPassword || !isValidPassword(body.newPassword)) {
       return HttpResponse.json(
-        { message: 'New password must be at least 8 characters.' },
+        { message: NEW_PASSWORD_ERROR_MESSAGE },
         { status: 400 },
       )
     }
@@ -359,8 +360,8 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Reset link is invalid or expired.' }, { status: 400 })
     }
 
-    if (!body.password || body.password.length < 8) {
-      return HttpResponse.json({ message: 'Password must be at least 8 characters.' }, { status: 400 })
+    if (!body.password || !isValidPassword(body.password)) {
+      return HttpResponse.json({ message: PASSWORD_ERROR_MESSAGE }, { status: 400 })
     }
 
     const user = findUserById(record.userId)
@@ -387,8 +388,8 @@ export const authHandlers = [
     }
 
     const body = (await request.json()) as { password?: string }
-    if (!body.password || body.password.length < 8) {
-      return HttpResponse.json({ message: 'Password must be at least 8 characters.' }, { status: 400 })
+    if (!body.password || !isValidPassword(body.password)) {
+      return HttpResponse.json({ message: PASSWORD_ERROR_MESSAGE }, { status: 400 })
     }
 
     user.password = body.password

@@ -7,6 +7,13 @@ import { AuthLayout } from '@/layouts/AuthLayout'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import { ApiError } from '@/services/httpClient'
 import { resetPassword } from '@/modules/core/auth/services/authService'
+import {
+  isValidPassword,
+  PASSWORD_CONFIRM_PLACEHOLDER,
+  PASSWORD_CREATE_PLACEHOLDER,
+  PASSWORD_ERROR_MESSAGE,
+  PASSWORD_RULE_HINT,
+} from '@/modules/core/auth/utils/passwordPolicy'
 import './AuthForm.css'
 
 export function ResetPasswordPage() {
@@ -24,6 +31,11 @@ export function ResetPasswordPage() {
 
     if (!token) {
       setError('Reset link is invalid or expired.')
+      return
+    }
+
+    if (!isValidPassword(password)) {
+      setError(PASSWORD_ERROR_MESSAGE)
       return
     }
 
@@ -56,11 +68,12 @@ export function ResetPasswordPage() {
       <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
         {error ? <Alert variant="error">{error}</Alert> : null}
         {!token ? <Alert variant="error">Missing reset token. Request a new link.</Alert> : null}
-        <FormField label="New password" htmlFor="reset-password" hint="At least 8 characters.">
+        <FormField label="New password" htmlFor="reset-password" hint={PASSWORD_RULE_HINT}>
           <PasswordField
             id="reset-password"
             value={password}
             onChange={setPassword}
+            placeholder={PASSWORD_CREATE_PLACEHOLDER}
             autoComplete="new-password"
             disabled={isSubmitting || !token}
           />
@@ -70,6 +83,7 @@ export function ResetPasswordPage() {
             id="reset-confirm"
             value={confirmPassword}
             onChange={setConfirmPassword}
+            placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
             autoComplete="new-password"
             disabled={isSubmitting || !token}
           />

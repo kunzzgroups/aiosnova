@@ -10,6 +10,13 @@ import { useAuthStore } from '@/stores/authStore'
 import { logout, setOwnPassword } from '@/modules/core/auth/services/authService'
 import { isIdentityProfileComplete } from '@/modules/core/identity/types/identity'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
+import {
+  isValidPassword,
+  PASSWORD_CONFIRM_PLACEHOLDER,
+  PASSWORD_CREATE_PLACEHOLDER,
+  PASSWORD_ERROR_MESSAGE,
+  PASSWORD_RULE_HINT,
+} from '@/modules/core/auth/utils/passwordPolicy'
 import { fetchUser, updateUser } from '@/modules/core/identity/services/identityService'
 import './CompleteProfilePage.css'
 
@@ -66,8 +73,8 @@ export function CompleteProfilePage() {
     if (!sessionUser) {
       return
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.')
+    if (!isValidPassword(password)) {
+      setError(PASSWORD_ERROR_MESSAGE)
       return
     }
     if (password !== confirmPassword) {
@@ -161,7 +168,7 @@ export function CompleteProfilePage() {
               id="complete-password"
               value={password}
               onChange={setPassword}
-              placeholder="Create a password"
+              placeholder={PASSWORD_CREATE_PLACEHOLDER}
               autoComplete="new-password"
               disabled={isSaving}
             />
@@ -171,11 +178,12 @@ export function CompleteProfilePage() {
               id="complete-confirm-password"
               value={confirmPassword}
               onChange={setConfirmPassword}
-              placeholder="Re-enter your password"
+              placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
               autoComplete="new-password"
               disabled={isSaving}
             />
           </FormField>
+          <p className="complete-profile-form__hint">{PASSWORD_RULE_HINT}</p>
           <div className="complete-profile-form__full">
             <Button type="submit" fullWidth size="lg" disabled={isSaving}>
               {isSaving ? 'Saving…' : 'Continue'}

@@ -1,6 +1,7 @@
 import type { AuthUser } from '@/modules/core/auth/types/auth'
 import { identityUsers, setIdentityUserMfaEnabled } from '@/mocks/data/identity'
 import { isIdentityProfileComplete } from '@/modules/core/identity/types/identity'
+import { isValidPassword } from '@/modules/core/auth/utils/passwordPolicy'
 
 export type MockUser = Omit<AuthUser, 'profileComplete'> & {
   password: string
@@ -59,7 +60,7 @@ export function provisionMockAuthUser(input: {
     id: input.id,
     email,
     name: input.name,
-    password: input.password && input.password.length >= 8 ? input.password : DEMO_LOGIN_PASSWORD,
+    password: input.password && isValidPassword(input.password) ? input.password : DEMO_LOGIN_PASSWORD,
     mfaEnabled: input.mfaEnabled ?? false,
   }
   mockAuthUsers.push(user)

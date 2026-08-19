@@ -24,6 +24,14 @@ import {
 } from '@/modules/core/identity/types/identity'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import {
+  isValidPassword,
+  NEW_PASSWORD_ERROR_MESSAGE,
+  PASSWORD_CONFIRM_PLACEHOLDER,
+  PASSWORD_CREATE_PLACEHOLDER,
+  PASSWORD_CURRENT_PLACEHOLDER,
+  PASSWORD_RULE_HINT,
+} from '@/modules/core/auth/utils/passwordPolicy'
+import {
   changeOwnPassword,
   deleteUser,
   fetchUser,
@@ -216,6 +224,10 @@ export function UserDetailPage() {
 
   async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!isValidPassword(newPassword)) {
+      setError(NEW_PASSWORD_ERROR_MESSAGE)
+      return
+    }
     if (newPassword !== confirmPassword) {
       setError('New password and confirmation do not match.')
       return
@@ -455,19 +467,21 @@ export function UserDetailPage() {
                 type="password"
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
+                placeholder={PASSWORD_CURRENT_PLACEHOLDER}
                 required
                 autoComplete="current-password"
                 disabled={isSaving}
               />
             </FormField>
-            <FormField label="New password" htmlFor="new-password">
+            <FormField label="New password" htmlFor="new-password" hint={PASSWORD_RULE_HINT}>
               <TextField
                 id="new-password"
                 type="password"
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
+                placeholder={PASSWORD_CREATE_PLACEHOLDER}
                 required
-                minLength={8}
+                minLength={6}
                 autoComplete="new-password"
                 disabled={isSaving}
               />
@@ -478,8 +492,9 @@ export function UserDetailPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
                 required
-                minLength={8}
+                minLength={6}
                 autoComplete="new-password"
                 disabled={isSaving}
               />
