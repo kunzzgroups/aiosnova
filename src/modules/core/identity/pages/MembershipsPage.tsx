@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { ApiError } from '@/services/httpClient'
 import type {
-  CompanyOption,
+  CompanyRecord,
   IdentityUser,
   MembershipRecord,
   OrganizationNode,
@@ -27,7 +27,7 @@ export function MembershipsPage() {
   const [users, setUsers] = useState<IdentityUser[]>([])
   const [organizations, setOrganizations] = useState<OrganizationNode[]>([])
   const [positions, setPositions] = useState<PositionRecord[]>([])
-  const [companies, setCompanies] = useState<CompanyOption[]>([])
+  const [companies, setCompanies] = useState<CompanyRecord[]>([])
   const [userId, setUserId] = useState('')
   const [companyId, setCompanyId] = useState('')
   const [organizationId, setOrganizationId] = useState('')

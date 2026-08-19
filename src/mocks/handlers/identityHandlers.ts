@@ -9,6 +9,7 @@ import {
   identityUsers,
 } from '@/mocks/data/identity'
 import type {
+  CompanyRecord,
   IdentityProfilePayload,
   IdentityUser,
   MembershipRecord,
@@ -37,6 +38,22 @@ function wouldCreateCycle(nodeId: string, newParentId: string | null): boolean {
     current = parent?.parentId ?? null
   }
   return false
+}
+
+function companyMemberCount(companyId: string) {
+  const userIds = new Set(
+    identityMemberships
+      .filter((item) => item.companyId === companyId && item.status === 'active')
+      .map((item) => item.userId),
+  )
+  return userIds.size
+}
+
+function withMemberCount(company: CompanyRecord) {
+  return {
+    ...company,
+    memberCount: companyMemberCount(company.id),
+  }
 }
 
 export const identityHandlers = [
@@ -139,11 +156,13 @@ export const identityHandlers = [
     const body = (await request.json()) as {
       email?: string
       password?: string
+      companyId?: string
       status?: IdentityUser['status']
     }
 
     const email = body.email?.trim().toLowerCase() ?? ''
     const password = body.password ?? ''
+    const companyId = body.companyId?.trim() ?? ''
     const displayName = email.split('@')[0]?.replace(/[._-]+/g, ' ').trim() || 'Invited user'
 
     if (!email) {
@@ -152,6 +171,14 @@ export const identityHandlers = [
 
     if (password.length < 8) {
       return HttpResponse.json({ message: 'Password must be at least 8 characters.' }, { status: 400 })
+    }
+
+    const company = identityCompanies.find((item) => item.id === companyId && item.tenantId === DEMO_TENANT_ID)
+    if (!company) {
+      return HttpResponse.json({ message: 'Company is required.' }, { status: 400 })
+    }
+    if (company.status !== 'active') {
+      return HttpResponse.json({ message: 'Cannot invite a user into an inactive company.' }, { status: 400 })
     }
 
     if (identityUsers.some((user) => user.email === email)) {
@@ -175,6 +202,18 @@ export const identityHandlers = [
     }
 
     identityUsers.push(user)
+    identityMemberships.push({
+      id: createId('mem'),
+      tenantId: DEMO_TENANT_ID,
+      userId: user.id,
+      companyId: company.id,
+      organizationId: null,
+      positionId: null,
+      isPrimary: true,
+      status: 'active',
+      validFrom: new Date().toISOString().slice(0, 10),
+      validTo: null,
+    })
     provisionMockAuthUser({
       id: user.id,
       email: user.email,
@@ -215,6 +254,92 @@ export const identityHandlers = [
     }
 
     return HttpResponse.json(user)
+  }),
+
+  http.get('/api/identity/companies', () => {
+    return HttpResponse.json({ items: identityCompanies.map(withMemberCount) })
+  }),
+
+  http.get('/api/identity/companies/:id', ({ params }) => {
+    const company = identityCompanies.find((item) => item.id === params.id)
+    if (!company) {
+      return HttpResponse.json({ message: 'Company not found.' }, { status: 404 })
+    }
+
+    const members = identityMemberships
+      .filter((item) => item.companyId === company.id)
+      .map((item) => {
+        const user = identityUsers.find((entry) => entry.id === item.userId)
+        return {
+          membershipId: item.id,
+          userId: item.userId,
+          displayName: user?.displayName ?? item.userId,
+          email: user?.email ?? '—',
+          userStatus: user?.status ?? 'disabled',
+          isPrimary: item.isPrimary,
+          status: item.status,
+          organizationName:
+            identityOrganizations.find((org) => org.id === item.organizationId)?.name ?? null,
+          positionName:
+            identityPositions.find((position) => position.id === item.positionId)?.name ?? null,
+        }
+      })
+
+    return HttpResponse.json({
+      company: withMemberCount(company),
+      members,
+    })
+  }),
+
+  http.post('/api/identity/companies', async ({ request }) => {
+    const body = (await request.json()) as { code?: string; name?: string }
+    const code = body.code?.trim().toUpperCase() ?? ''
+    const name = body.name?.trim() ?? ''
+
+    if (!code || !name) {
+      return HttpResponse.json({ message: 'Code and name are required.' }, { status: 400 })
+    }
+
+    if (identityCompanies.some((item) => item.tenantId === DEMO_TENANT_ID && item.code === code)) {
+      return HttpResponse.json({ message: 'A company with this code already exists.' }, { status: 409 })
+    }
+
+    const company: CompanyRecord = {
+      id: createId('company'),
+      tenantId: DEMO_TENANT_ID,
+      code,
+      name,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    }
+    identityCompanies.push(company)
+    return HttpResponse.json(withMemberCount(company), { status: 201 })
+  }),
+
+  http.patch('/api/identity/companies/:id', async ({ params, request }) => {
+    const company = identityCompanies.find((item) => item.id === params.id)
+    if (!company) {
+      return HttpResponse.json({ message: 'Company not found.' }, { status: 404 })
+    }
+
+    const body = (await request.json()) as {
+      name?: string
+      status?: CompanyRecord['status']
+    }
+
+    if (body.name !== undefined) {
+      const name = body.name.trim()
+      if (!name) {
+        return HttpResponse.json({ message: 'Name is required.' }, { status: 400 })
+      }
+      company.name = name
+    }
+
+    if (body.status !== undefined) {
+      company.status = body.status
+    }
+
+    return HttpResponse.json(withMemberCount(company))
   }),
 
   http.get('/api/identity/organizations', () => {
@@ -371,7 +496,7 @@ export const identityHandlers = [
       return HttpResponse.json({ message: 'User not found.' }, { status: 400 })
     }
 
-    if (body.companyId && !identityCompanies.some((company) => company.id === body.companyId)) {
+    if (body.companyId && !identityCompanies.some((company) => company.id === body.companyId && company.tenantId === DEMO_TENANT_ID)) {
       return HttpResponse.json({ message: 'Company not found in tenant.' }, { status: 400 })
     }
 

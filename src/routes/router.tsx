@@ -11,6 +11,8 @@ import { OAuthCallbackPage } from '@/modules/core/auth/pages/OAuthCallbackPage'
 import { HomePage } from '@/modules/core/auth/pages/HomePage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
+import { CompaniesPage } from '@/modules/core/identity/pages/CompaniesPage'
+import { CompanyDetailPage } from '@/modules/core/identity/pages/CompanyDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
 import { PositionsPage } from '@/modules/core/identity/pages/PositionsPage'
 import { MembershipsPage } from '@/modules/core/identity/pages/MembershipsPage'
@@ -38,6 +40,8 @@ export function AppRouter() {
             <Route path="/mfa/setup" element={<MfaSetupPage />} />
             <Route path="/system/core/users" element={<UsersPage />} />
             <Route path="/system/core/users/:userId" element={<UserDetailPage />} />
+            <Route path="/system/core/companies" element={<CompaniesPage />} />
+            <Route path="/system/core/companies/:companyId" element={<CompanyDetailPage />} />
             <Route path="/system/core/organization" element={<OrganizationPage />} />
             <Route path="/system/core/position" element={<PositionsPage />} />
             <Route path="/system/core/membership" element={<MembershipsPage />} />

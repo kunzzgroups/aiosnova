@@ -6,6 +6,7 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { ApiError } from '@/services/httpClient'
+import type { CompanyListItem } from '@/modules/core/identity/services/identityService'
 import type { IdentityUser, UserStatus } from '@/modules/core/identity/types/identity'
 import {
   formatDirectoryMfa,
@@ -17,6 +18,7 @@ import {
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import {
   createUser,
+  fetchCompanies,
   fetchUsers,
   sendUserPasswordReset,
   updateUser,
@@ -80,9 +82,11 @@ function generatePassword(length = 12) {
 export function UsersPage() {
   const navigate = useNavigate()
   const [users, setUsers] = useState<IdentityUser[]>([])
+  const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordRevealed, setPasswordRevealed] = useState(false)
+  const [companyId, setCompanyId] = useState('')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [signInFilter, setSignInFilter] = useState('all')
@@ -97,8 +101,11 @@ export function UsersPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const result = await fetchUsers()
-      setUsers(result.items)
+      const [usersResult, companiesResult] = await Promise.all([fetchUsers(), fetchCompanies()])
+      setUsers(usersResult.items)
+      const activeCompanies = companiesResult.items.filter((item) => item.status === 'active')
+      setCompanies(activeCompanies)
+      setCompanyId((current) => current || activeCompanies[0]?.id || '')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to load users.')
     } finally {
@@ -167,6 +174,10 @@ export function UsersPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!companyId) {
+      setError('Select a company for this invite.')
+      return
+    }
     if (password.length < 8) {
       setError('Password must be at least 8 characters.')
       return
@@ -178,6 +189,7 @@ export function UsersPage() {
       await createUser({
         email,
         password,
+        companyId,
         status: 'invited',
       })
       resetInviteForm()
@@ -272,7 +284,7 @@ export function UsersPage() {
           <form className="identity-invite" onSubmit={(event) => void handleCreate(event)}>
             <div className="identity-invite__header">
               <h3>Invite user</h3>
-              <p>Enter an email and set a password, or generate one.</p>
+              <p>Enter an email, choose a company, and set a password or generate one.</p>
             </div>
             <div className="identity-invite__grid">
               <FormField label="Email" htmlFor="user-email">
@@ -285,6 +297,23 @@ export function UsersPage() {
                   disabled={isSubmitting}
                   autoComplete="off"
                 />
+              </FormField>
+              <FormField label="Company" htmlFor="user-company">
+                <select
+                  id="user-company"
+                  className="identity-select"
+                  value={companyId}
+                  onChange={(event) => setCompanyId(event.target.value)}
+                  required
+                  disabled={isSubmitting || companies.length === 0}
+                >
+                  {companies.length === 0 ? <option value="">No active companies</option> : null}
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
               </FormField>
               <FormField label="Password" htmlFor="user-password">
                 <div className="identity-invite__password">

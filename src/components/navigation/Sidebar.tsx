@@ -16,9 +16,11 @@ import {
 } from '@/components/navigation/SidebarIcons'
 import { useAuthStore } from '@/stores/authStore'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { fetchCompanies } from '@/modules/core/identity/services/identityService'
 import './Sidebar.css'
 
 const COLLAPSED_STORAGE_KEY = 'aios.sidebar.collapsed'
+const COMPANY_STORAGE_KEY = 'aios.companyId'
 
 function SidebarNodeList({
   nodes,
@@ -156,7 +158,8 @@ export function Sidebar() {
   const user = useAuthStore((state) => state.user)
   const [query, setQuery] = useState('')
   const [tenant, setTenant] = useState('Acme Group')
-  const [company, setCompany] = useState('Acme Retail')
+  const [companyId, setCompanyId] = useState(() => window.localStorage.getItem(COMPANY_STORAGE_KEY) ?? '')
+  const [companyOptions, setCompanyOptions] = useState<Array<{ value: string; label: string }>>([])
   const [collapsed, setCollapsed] = useState(() => {
     return window.sessionStorage.getItem(COLLAPSED_STORAGE_KEY) === '1'
   })
@@ -187,6 +190,37 @@ export function Sidebar() {
   useEffect(() => {
     window.sessionStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0')
   }, [collapsed])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchCompanies()
+      .then((result) => {
+        if (cancelled) {
+          return
+        }
+        const active = result.items.filter((item) => item.status === 'active')
+        const options = active.map((item) => ({ value: item.id, label: item.name }))
+        setCompanyOptions(options)
+        setCompanyId((current) => {
+          if (current && options.some((item) => item.value === current)) {
+            return current
+          }
+          const nextId = options[0]?.value ?? ''
+          if (nextId) {
+            window.localStorage.setItem(COMPANY_STORAGE_KEY, nextId)
+          }
+          return nextId
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCompanyOptions([])
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function handleToggle(id: string) {
     if (collapsed) {
@@ -256,9 +290,15 @@ export function Sidebar() {
           />
           <SidebarSelect
             label="Company"
-            value={company}
-            options={['Acme Retail', 'Acme Wholesale']}
-            onChange={setCompany}
+            value={companyId}
+            options={companyOptions.length > 0 ? companyOptions : [{ value: '', label: 'No companies' }]}
+            onChange={(next) => {
+              setCompanyId(next)
+              if (next) {
+                window.localStorage.setItem(COMPANY_STORAGE_KEY, next)
+              }
+            }}
+            disabled={companyOptions.length === 0}
           />
         </div>
       ) : null}

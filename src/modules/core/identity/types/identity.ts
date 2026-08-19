@@ -125,8 +125,15 @@ export type MembershipRecord = {
   validTo: string | null
 }
 
-export type CompanyOption = {
+export type CompanyStatus = 'active' | 'inactive'
+
+export type CompanyRecord = {
   id: string
-  name: string
   tenantId: string
+  code: string
+  name: string
+  status: CompanyStatus
+  createdAt: string
 }
+
+export type CompanyOption = CompanyRecord

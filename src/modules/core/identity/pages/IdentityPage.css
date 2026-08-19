@@ -303,13 +303,23 @@
   gap: 0.75rem 0.9rem;
 }
 
-.identity-invite .ui-form-field {
-  min-width: 0;
+.identity-invite .identity-select {
+  width: 16rem;
+  min-height: 2.75rem;
 }
 
 .identity-invite .ui-text-field,
 .identity-invite .password-field {
   width: 16rem;
+}
+
+.identity-invite .ui-form-field {
+  min-width: 0;
+}
+
+.identity-invite .identity-select {
+  width: 16rem;
+  min-height: 2.75rem;
 }
 
 .identity-invite__password {

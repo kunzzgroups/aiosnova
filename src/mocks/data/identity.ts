@@ -1,5 +1,5 @@
 import type {
-  CompanyOption,
+  CompanyRecord,
   IdentityUser,
   MembershipRecord,
   OrganizationNode,
@@ -18,9 +18,23 @@ const emptyProfile = {
   timezone: 'Asia/Kuala_Lumpur',
 }
 
-export const identityCompanies: CompanyOption[] = [
-  { id: 'company-retail', name: 'Acme Retail', tenantId: DEMO_TENANT_ID },
-  { id: 'company-wholesale', name: 'Acme Wholesale', tenantId: DEMO_TENANT_ID },
+export const identityCompanies: CompanyRecord[] = [
+  {
+    id: 'company-retail',
+    tenantId: DEMO_TENANT_ID,
+    code: 'RETAIL',
+    name: 'Acme Retail',
+    status: 'active',
+    createdAt: '2026-01-08T08:00:00.000Z',
+  },
+  {
+    id: 'company-wholesale',
+    tenantId: DEMO_TENANT_ID,
+    code: 'WHOLESALE',
+    name: 'Acme Wholesale',
+    status: 'active',
+    createdAt: '2026-01-08T08:00:00.000Z',
+  },
 ]
 
 export const identityUsers: IdentityUser[] = [

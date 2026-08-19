@@ -1,6 +1,7 @@
 import { apiRequest } from '@/services/httpClient'
 import type {
   CompanyOption,
+  CompanyRecord,
   IdentityProfilePayload,
   IdentityUser,
   MembershipRecord,
@@ -11,6 +12,50 @@ import type {
 export async function fetchIdentityMeta() {
   return apiRequest<{ tenantId: string; companies: CompanyOption[] }>('/api/identity/meta', {
     auth: true,
+  })
+}
+
+export type CompanyListItem = CompanyRecord & { memberCount: number }
+
+export type CompanyMember = {
+  membershipId: string
+  userId: string
+  displayName: string
+  email: string
+  userStatus: IdentityUser['status']
+  isPrimary: boolean
+  status: MembershipRecord['status']
+  organizationName: string | null
+  positionName: string | null
+}
+
+export async function fetchCompanies() {
+  return apiRequest<{ items: CompanyListItem[] }>('/api/identity/companies', { auth: true })
+}
+
+export async function fetchCompany(id: string) {
+  return apiRequest<{ company: CompanyListItem; members: CompanyMember[] }>(
+    `/api/identity/companies/${id}`,
+    { auth: true },
+  )
+}
+
+export async function createCompany(payload: { code: string; name: string }) {
+  return apiRequest<CompanyListItem>('/api/identity/companies', {
+    method: 'POST',
+    auth: true,
+    body: payload,
+  })
+}
+
+export async function updateCompany(
+  id: string,
+  payload: Partial<Pick<CompanyRecord, 'name' | 'status'>>,
+) {
+  return apiRequest<CompanyListItem>(`/api/identity/companies/${id}`, {
+    method: 'PATCH',
+    auth: true,
+    body: payload,
   })
 }
 
@@ -34,6 +79,7 @@ export async function fetchUser(id: string) {
 export async function createUser(payload: {
   email: string
   password: string
+  companyId: string
   status?: IdentityUser['status']
 }) {
   return apiRequest<IdentityUser>('/api/identity/users', {
