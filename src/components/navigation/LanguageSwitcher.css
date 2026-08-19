@@ -11,7 +11,7 @@
   padding: 0.22rem 0.58rem 0.22rem 0.42rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: var(--color-bg-muted);
+  background: transparent;
   color: var(--color-text);
   font: inherit;
   font-size: 0.78rem;
@@ -35,7 +35,7 @@
   width: 1.2rem;
   height: 1.2rem;
   border-radius: 50%;
-  background: var(--color-brand-soft);
+  background: transparent;
   color: var(--color-brand);
   flex-shrink: 0;
 }

@@ -251,6 +251,7 @@
   width: 1.9rem;
   min-width: 1.9rem;
   min-height: 1.9rem;
+  border-radius: 999px;
 }
 
 .auth-layout .ui-button--primary {
@@ -258,10 +259,15 @@
   border-radius: 0.9rem;
 }
 
-.auth-layout .ui-button--secondary {
-  background: var(--color-bg-muted);
+.auth-layout__locale .ui-button--secondary {
+  background: transparent;
   border-color: var(--color-border);
   color: var(--color-text);
+}
+
+.auth-layout__locale .ui-button--secondary:hover:not(:disabled) {
+  background: var(--color-brand-soft);
+  border-color: color-mix(in srgb, var(--color-brand) 35%, var(--color-border));
 }
 
 .auth-layout .password-field__toggle {
