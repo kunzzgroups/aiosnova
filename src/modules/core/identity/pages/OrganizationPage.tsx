@@ -3,6 +3,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
+import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { ApiError } from '@/services/httpClient'
 import type { OrganizationNode } from '@/modules/core/identity/types/identity'
 import { formatStatusLabel } from '@/modules/core/identity/types/identity'
@@ -15,6 +16,13 @@ import {
 import './IdentityPage.css'
 
 type OrgTreeNode = OrganizationNode & { children: OrgTreeNode[] }
+
+const ORG_TYPE_OPTIONS = [
+  { value: 'division', label: 'Division' },
+  { value: 'department', label: 'Department' },
+  { value: 'team', label: 'Team' },
+  { value: 'other', label: 'Other' },
+] as const
 
 function buildTree(items: OrganizationNode[]): OrgTreeNode[] {
   const map = new Map<string, OrgTreeNode>()
@@ -110,6 +118,13 @@ export function OrganizationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const tree = useMemo(() => buildTree(items), [items])
+  const parentOptions = useMemo(
+    () => [
+      { value: '', label: 'Root' },
+      ...items.map((item) => ({ value: item.id, label: `${item.name} (${item.code})` })),
+    ],
+    [items],
+  )
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -198,20 +213,15 @@ export function OrganizationPage() {
           <h2>Add node</h2>
           <form className="identity-form" onSubmit={(event) => void handleCreate(event)}>
             <FormField label="Parent" htmlFor="org-parent">
-              <select
+              <SidebarSelect
                 id="org-parent"
-                className="identity-select"
+                label="Parent"
+                hideLabel
                 value={parentId}
-                onChange={(event) => setParentId(event.target.value)}
+                options={parentOptions}
+                onChange={setParentId}
                 disabled={isSubmitting}
-              >
-                <option value="">Root</option>
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.code})
-                  </option>
-                ))}
-              </select>
+              />
             </FormField>
             <FormField label="Code" htmlFor="org-code">
               <TextField
@@ -232,18 +242,15 @@ export function OrganizationPage() {
               />
             </FormField>
             <FormField label="Type" htmlFor="org-type">
-              <select
+              <SidebarSelect
                 id="org-type"
-                className="identity-select"
+                label="Type"
+                hideLabel
                 value={type}
-                onChange={(event) => setType(event.target.value as OrganizationNode['type'])}
+                options={[...ORG_TYPE_OPTIONS]}
+                onChange={(value) => setType(value as OrganizationNode['type'])}
                 disabled={isSubmitting}
-              >
-                <option value="division">division</option>
-                <option value="department">department</option>
-                <option value="team">team</option>
-                <option value="other">other</option>
-              </select>
+              />
             </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSubmitting}>
