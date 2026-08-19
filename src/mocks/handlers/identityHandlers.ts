@@ -419,6 +419,31 @@ export const identityHandlers = [
     return HttpResponse.json(node)
   }),
 
+  http.delete('/api/identity/organizations/:id', ({ params }) => {
+    const index = identityOrganizations.findIndex((item) => item.id === params.id)
+    if (index < 0) {
+      return HttpResponse.json({ message: 'Organization not found.' }, { status: 404 })
+    }
+
+    const id = String(params.id)
+    if (identityOrganizations.some((item) => item.parentId === id)) {
+      return HttpResponse.json(
+        { message: 'Cannot delete an organization that still has child nodes.' },
+        { status: 409 },
+      )
+    }
+
+    if (identityMemberships.some((item) => item.organizationId === id && item.status === 'active')) {
+      return HttpResponse.json(
+        { message: 'Cannot delete an organization that still has active memberships.' },
+        { status: 409 },
+      )
+    }
+
+    identityOrganizations.splice(index, 1)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   http.get('/api/identity/positions', () => {
     return HttpResponse.json({ items: identityPositions })
   }),

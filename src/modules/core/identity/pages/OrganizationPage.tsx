@@ -8,6 +8,7 @@ import type { OrganizationNode } from '@/modules/core/identity/types/identity'
 import { formatStatusLabel } from '@/modules/core/identity/types/identity'
 import {
   createOrganization,
+  deleteOrganization,
   fetchOrganizations,
   updateOrganization,
 } from '@/modules/core/identity/services/identityService'
@@ -45,9 +46,11 @@ function buildTree(items: OrganizationNode[]): OrgTreeNode[] {
 function OrganizationBranch({
   nodes,
   onToggleStatus,
+  onDelete,
 }: {
   nodes: OrgTreeNode[]
   onToggleStatus: (node: OrganizationNode) => void
+  onDelete: (node: OrganizationNode) => void
 }) {
   if (nodes.length === 0) {
     return null
@@ -70,12 +73,25 @@ function OrganizationBranch({
               </span>
             </div>
             <div className="identity-inline-actions">
-              <Button variant="secondary" size="md" onClick={() => onToggleStatus(node)}>
+              <Button
+                variant={node.status === 'active' ? 'danger' : 'secondary'}
+                size="md"
+                className="identity-action-btn identity-action-btn--org-status"
+                onClick={() => onToggleStatus(node)}
+              >
                 {node.status === 'active' ? 'Deactivate' : 'Activate'}
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                className="identity-action-btn identity-action-btn--delete"
+                onClick={() => onDelete(node)}
+              >
+                Delete
               </Button>
             </div>
           </div>
-          <OrganizationBranch nodes={node.children} onToggleStatus={onToggleStatus} />
+          <OrganizationBranch nodes={node.children} onToggleStatus={onToggleStatus} onDelete={onDelete} />
         </li>
       ))}
     </ul>
@@ -112,13 +128,21 @@ export function OrganizationPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!message) {
+      return
+    }
+    const timeoutId = window.setTimeout(() => setMessage(null), 1000)
+    return () => window.clearTimeout(timeoutId)
+  }, [message])
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsSubmitting(true)
     setError(null)
     setMessage(null)
     try {
-      await createOrganization({
+      const created = await createOrganization({
         parentId: parentId || null,
         code,
         name,
@@ -127,7 +151,7 @@ export function OrganizationPage() {
       setCode('')
       setName('')
       setMessage('Organization created.')
-      await load()
+      setItems((current) => [...current, created])
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to create organization.')
     } finally {
@@ -136,13 +160,27 @@ export function OrganizationPage() {
   }
 
   async function handleToggleStatus(node: OrganizationNode) {
+    setError(null)
     try {
-      await updateOrganization(node.id, {
+      const updated = await updateOrganization(node.id, {
         status: node.status === 'active' ? 'inactive' : 'active',
       })
-      await load()
+      setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to update organization.')
+    }
+  }
+
+  async function handleDelete(node: OrganizationNode) {
+    setError(null)
+    setMessage(null)
+    try {
+      await deleteOrganization(node.id)
+      setItems((current) => current.filter((item) => item.id !== node.id))
+      setParentId((current) => (current === node.id ? '' : current))
+      setMessage('Organization deleted.')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to delete organization.')
     }
   }
 
@@ -219,7 +257,11 @@ export function OrganizationPage() {
           <h2>Tree</h2>
           {isLoading ? <p className="identity-empty">Loading…</p> : null}
           {!isLoading && tree.length === 0 ? <p className="identity-empty">No organizations.</p> : null}
-          <OrganizationBranch nodes={tree} onToggleStatus={(node) => void handleToggleStatus(node)} />
+          <OrganizationBranch
+            nodes={tree}
+            onToggleStatus={(node) => void handleToggleStatus(node)}
+            onDelete={(node) => void handleDelete(node)}
+          />
         </section>
       </div>
   )

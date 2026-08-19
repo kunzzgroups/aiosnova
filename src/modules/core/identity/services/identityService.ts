@@ -163,6 +163,13 @@ export async function updateOrganization(
   })
 }
 
+export async function deleteOrganization(id: string) {
+  return apiRequest<void>(`/api/identity/organizations/${id}`, {
+    method: 'DELETE',
+    auth: true,
+  })
+}
+
 export async function fetchPositions() {
   return apiRequest<{ items: PositionRecord[] }>('/api/identity/positions', { auth: true })
 }
