@@ -164,8 +164,21 @@ function requireCsrf(request: Request) {
 
 const GENERIC_LOGIN_ERROR = 'Invalid email or password.'
 const TAC_SENT_MESSAGE = 'If this number is registered, an OTP has been sent.'
+const EMAIL_OTP_SENT_MESSAGE = 'If this email is registered, an OTP has been sent.'
 const FORGOT_MESSAGE =
   'If an account exists for that email, you will receive password reset instructions.'
+
+function tacChallengeKey(payload: { email?: string; phone?: string }) {
+  const email = payload.email?.trim().toLowerCase()
+  if (email) {
+    return `email:${email}`
+  }
+  const phone = normalizePhone(payload.phone ?? '')
+  if (phone) {
+    return `phone:${phone}`
+  }
+  return ''
+}
 
 export const authHandlers = [
   http.post('/api/auth/login', async ({ request }) => {
@@ -201,33 +214,40 @@ export const authHandlers = [
 
   http.post('/api/auth/login/tac/send', async ({ request }) => {
     const body = (await request.json()) as TacSendRequest
+    const email = body.email?.trim() ?? ''
     const phone = body.phone?.trim() ?? ''
-    if (!normalizePhone(phone)) {
+    const key = tacChallengeKey(body)
+
+    if (email) {
+      if (!email.includes('@')) {
+        return HttpResponse.json({ message: 'Enter a valid email address.' }, { status: 400 })
+      }
+    } else if (!normalizePhone(phone)) {
       return HttpResponse.json({ message: 'Enter a valid phone number.' }, { status: 400 })
     }
 
-    const user = findUserByPhone(phone)
+    const user = email ? findUserByEmail(email) : findUserByPhone(phone)
     if (user) {
       const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)
       if (identity?.status === 'disabled') {
         return HttpResponse.json({ message: 'This account has been disabled.' }, { status: 401 })
       }
-      tacChallenges.set(normalizePhone(phone), {
+      tacChallenges.set(key, {
         userId: user.id,
         expiresAt: Date.now() + 5 * 60 * 1000,
       })
     }
 
     return HttpResponse.json({
-      message: TAC_SENT_MESSAGE,
+      message: email ? EMAIL_OTP_SENT_MESSAGE : TAC_SENT_MESSAGE,
       demoHint: `Demo OTP: ${MOCK_TAC_CODE}`,
     })
   }),
 
   http.post('/api/auth/login/tac/verify', async ({ request }) => {
     const body = (await request.json()) as TacVerifyRequest
-    const phone = normalizePhone(body.phone ?? '')
-    const challenge = tacChallenges.get(phone)
+    const key = tacChallengeKey(body)
+    const challenge = key ? tacChallenges.get(key) : undefined
 
     if (!challenge || challenge.expiresAt < Date.now()) {
       return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
@@ -241,8 +261,8 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
     }
 
-    tacChallenges.delete(phone)
-    return issueSession(user)
+    tacChallenges.delete(key)
+    return issueSession(user, 'otp')
   }),
 
   http.post('/api/auth/mfa/verify', async ({ request }) => {

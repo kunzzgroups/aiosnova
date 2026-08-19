@@ -1,6 +1,6 @@
 export type UserStatus = 'active' | 'disabled' | 'invited'
 
-export type SignInMethod = 'password' | 'google' | 'facebook' | 'apple'
+export type SignInMethod = 'password' | 'otp' | 'google' | 'facebook' | 'apple'
 
 export type IdentityUser = {
   id: string
@@ -42,6 +42,9 @@ export function formatSignInMethod(method: SignInMethod | null) {
   }
   if (method === 'password') {
     return 'Password'
+  }
+  if (method === 'otp') {
+    return 'OTP'
   }
   return `${method.charAt(0).toUpperCase()}${method.slice(1)}`
 }

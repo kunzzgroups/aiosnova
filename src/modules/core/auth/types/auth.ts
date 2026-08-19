@@ -24,11 +24,13 @@ export type LoginRequest = {
 }
 
 export type TacSendRequest = {
-  phone: string
+  email?: string
+  phone?: string
 }
 
 export type TacVerifyRequest = {
-  phone: string
+  email?: string
+  phone?: string
   code: string
 }
 
