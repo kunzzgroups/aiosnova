@@ -337,21 +337,19 @@ export function UsersPage() {
                 />
               </FormField>
               <FormField label="Company" htmlFor="user-company">
-                <select
+                <SidebarSelect
                   id="user-company"
-                  className="identity-select"
+                  label="Company"
+                  hideLabel
                   value={companyId}
-                  onChange={(event) => setCompanyId(event.target.value)}
-                  required
+                  options={
+                    companies.length === 0
+                      ? [{ value: '', label: 'No active companies' }]
+                      : companies.map((company) => ({ value: company.id, label: company.name }))
+                  }
+                  onChange={setCompanyId}
                   disabled={isSubmitting || companies.length === 0}
-                >
-                  {companies.length === 0 ? <option value="">No active companies</option> : null}
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </FormField>
               <FormField label="Password" htmlFor="user-password">
                 <div className="identity-invite__password">

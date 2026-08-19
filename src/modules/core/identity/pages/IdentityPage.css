@@ -303,9 +303,14 @@
   gap: 0.75rem 0.9rem;
 }
 
-.identity-invite .identity-select {
+.identity-invite .sidebar-select {
   width: 16rem;
+}
+
+.identity-invite .sidebar-select__trigger {
   min-height: 2.75rem;
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .identity-invite .ui-text-field,
@@ -315,11 +320,6 @@
 
 .identity-invite .ui-form-field {
   min-width: 0;
-}
-
-.identity-invite .identity-select {
-  width: 16rem;
-  min-height: 2.75rem;
 }
 
 .identity-invite__password {
@@ -341,7 +341,8 @@
 @media (max-width: 720px) {
   .identity-invite .ui-text-field,
   .identity-invite .password-field,
-  .identity-invite__password .password-field {
+  .identity-invite__password .password-field,
+  .identity-invite .sidebar-select {
     width: 100%;
     flex-basis: 100%;
   }
