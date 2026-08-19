@@ -58,6 +58,7 @@ export function UserDetailPage() {
   const [memberships, setMemberships] = useState<MembershipWithLabels[]>([])
   const [displayName, setDisplayName] = useState('')
   const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [isEditing, setIsEditing] = useState(searchParams.get('edit') === '1')
@@ -111,6 +112,7 @@ export function UserDetailPage() {
   function applyProfileForm(nextUser: IdentityUser) {
     setDisplayName(nextUser.displayName)
     setFullName(nextUser.fullName)
+    setEmail(nextUser.email)
     setPhone(nextUser.phone)
     setAvatarUrl(nextUser.avatarUrl)
   }
@@ -119,6 +121,7 @@ export function UserDetailPage() {
     if (sessionUser?.id === nextUser.id) {
       useAuthStore.getState().setUser({
         ...sessionUser,
+        email: nextUser.email,
         name: nextUser.displayName,
         mfaEnabled: nextUser.mfaEnabled,
         profileComplete: isIdentityProfileComplete(nextUser),
@@ -138,6 +141,7 @@ export function UserDetailPage() {
       const updated = await updateUser(user.id, {
         displayName,
         fullName,
+        email,
         phone,
         avatarUrl,
       })
@@ -277,7 +281,16 @@ export function UserDetailPage() {
               <Button variant="secondary" onClick={() => setIsEditing(true)}>
                 Edit Profile
               </Button>
-            ) : null}
+            ) : (
+              <>
+                <Button type="submit" form="profile-edit-form" disabled={isSaving}>
+                  {isSaving ? 'Saving…' : 'Save'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+                  Cancel
+                </Button>
+              </>
+            )}
             {isSelf ? (
               <Button
                 variant="secondary"
@@ -317,45 +330,88 @@ export function UserDetailPage() {
         </div>
 
         {isEditing ? (
-          <form className="identity-form identity-form--profile" onSubmit={(event) => void handleSaveProfile(event)}>
-            <FormField label="Display name" htmlFor="detail-name">
-              <TextField
-                id="detail-name"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                required
-                disabled={isSaving}
-              />
-            </FormField>
-            <FormField label="Email" htmlFor="detail-email">
-              <TextField id="detail-email" value={user.email} readOnly />
-            </FormField>
-            <FormField label="Full name" htmlFor="detail-full">
-              <TextField
-                id="detail-full"
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                required
-                disabled={isSaving}
-              />
-            </FormField>
-            <FormField label="Phone" htmlFor="detail-phone">
-              <TextField
-                id="detail-phone"
-                type="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                required
-                disabled={isSaving}
-              />
-            </FormField>
-            <div className="identity-form__actions">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Save'}
-              </Button>
-              <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                Cancel
-              </Button>
+          <form
+            id="profile-edit-form"
+            className="identity-profile-glance"
+            onSubmit={(event) => void handleSaveProfile(event)}
+          >
+            <div className="identity-profile-hero">
+              <div className="identity-profile-avatar" aria-hidden>
+                {profileInitials({ ...user, displayName, fullName, email })}
+              </div>
+              <div className="identity-profile-hero__body">
+                <p className="identity-profile-hero__name">{fullName || displayName}</p>
+                <p className="identity-profile-hero__contact">
+                  <span>{email}</span>
+                  {phone ? <span>{phone}</span> : null}
+                </p>
+              </div>
+              <div className="identity-profile-hero__pills">
+                <span className={`identity-status identity-status--${user.status}`}>
+                  {formatStatusLabel(user.status)}
+                </span>
+                {isIdentityProfileComplete({ fullName, phone }) ? (
+                  <span className="identity-status identity-status--active">Complete</span>
+                ) : (
+                  <span className="identity-status identity-status--invited">Incomplete</span>
+                )}
+                <span className={`identity-status ${user.mfaEnabled ? 'identity-status--active' : 'identity-status--invited'}`}>
+                  MFA {user.mfaEnabled ? 'On' : 'Off'}
+                </span>
+              </div>
+            </div>
+
+            <div className="identity-profile-tiles">
+              <label className="identity-profile-tile" htmlFor="detail-name">
+                <span>Display name</span>
+                <TextField
+                  id="detail-name"
+                  className="identity-profile-tile__input"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  required
+                  disabled={isSaving}
+                />
+              </label>
+              <label className="identity-profile-tile" htmlFor="detail-full">
+                <span>Full name</span>
+                <TextField
+                  id="detail-full"
+                  className="identity-profile-tile__input"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  required
+                  disabled={isSaving}
+                />
+              </label>
+              <label className="identity-profile-tile" htmlFor="detail-email">
+                <span>Email</span>
+                <TextField
+                  id="detail-email"
+                  className="identity-profile-tile__input"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  disabled={isSaving}
+                />
+              </label>
+              <label className="identity-profile-tile" htmlFor="detail-phone">
+                <span>Phone</span>
+                <TextField
+                  id="detail-phone"
+                  className="identity-profile-tile__input"
+                  type="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  required
+                  disabled={isSaving}
+                />
+              </label>
+              <div className="identity-profile-tile">
+                <span>Created</span>
+                <strong>{new Date(user.createdAt).toLocaleString()}</strong>
+              </div>
             </div>
           </form>
         ) : (

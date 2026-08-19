@@ -1,5 +1,11 @@
 import { HttpResponse, http } from 'msw'
-import { MOCK_MFA_CODE, provisionMockAuthUser, removeMockAuthUser, setMockUserMfaEnabled } from '@/mocks/data/users'
+import {
+  MOCK_MFA_CODE,
+  provisionMockAuthUser,
+  removeMockAuthUser,
+  setMockUserMfaEnabled,
+  updateMockAuthUser,
+} from '@/mocks/data/users'
 import {
   DEMO_TENANT_ID,
   identityCompanies,
@@ -232,8 +238,20 @@ export const identityHandlers = [
     }
 
     const body = (await request.json()) as IdentityProfilePayload
+    if (body.email !== undefined) {
+      const email = body.email.trim().toLowerCase()
+      if (!email.includes('@')) {
+        return HttpResponse.json({ message: 'Enter a valid email.' }, { status: 400 })
+      }
+      if (identityUsers.some((item) => item.email === email && item.id !== user.id)) {
+        return HttpResponse.json({ message: 'A user with this email already exists.' }, { status: 409 })
+      }
+      user.email = email
+      updateMockAuthUser(user.id, { email })
+    }
     if (body.displayName !== undefined) {
       user.displayName = body.displayName.trim()
+      updateMockAuthUser(user.id, { name: user.displayName })
     }
     if (body.fullName !== undefined) {
       user.fullName = body.fullName.trim()

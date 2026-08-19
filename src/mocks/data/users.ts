@@ -74,6 +74,22 @@ export function removeMockAuthUser(userId: string) {
   }
 }
 
+export function updateMockAuthUser(
+  userId: string,
+  patch: Partial<Pick<MockUser, 'email' | 'name'>>,
+) {
+  const authUser = mockAuthUsers.find((item) => item.id === userId)
+  if (!authUser) {
+    return
+  }
+  if (patch.email !== undefined) {
+    authUser.email = patch.email
+  }
+  if (patch.name !== undefined) {
+    authUser.name = patch.name
+  }
+}
+
 export function setMockUserMfaEnabled(userId: string, mfaEnabled: boolean) {
   const authUser = mockAuthUsers.find((item) => item.id === userId)
   if (authUser) {

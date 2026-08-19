@@ -19,7 +19,7 @@ export type IdentityUser = {
 }
 
 export type IdentityProfilePayload = Partial<
-  Pick<IdentityUser, 'displayName' | 'fullName' | 'phone' | 'avatarUrl' | 'language' | 'timezone' | 'status'>
+  Pick<IdentityUser, 'email' | 'displayName' | 'fullName' | 'phone' | 'avatarUrl' | 'language' | 'timezone' | 'status'>
 >
 
 export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 'phone'>): boolean {

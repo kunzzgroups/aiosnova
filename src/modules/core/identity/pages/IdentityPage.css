@@ -233,6 +233,14 @@
   overflow-wrap: anywhere;
 }
 
+.identity-profile-tile__input {
+  min-height: 2.15rem;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  background: #fff;
+}
+
 @media (max-width: 960px) {
   .identity-profile-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
