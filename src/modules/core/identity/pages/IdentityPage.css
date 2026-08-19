@@ -447,7 +447,7 @@
 
 .identity-table th,
 .identity-table td {
-  padding: 0.7rem 0.65rem;
+  padding: 0.45rem 0.65rem;
   border-bottom: 1px solid var(--color-border);
   text-align: left;
   vertical-align: center;
@@ -550,7 +550,7 @@
 }
 
 .identity-table__actions .identity-inline-actions .ui-button {
-  min-height: 2.5rem;
+  min-height: 2.4rem;
 }
 
 .identity-inline-actions--spaced {

@@ -97,6 +97,16 @@ export function IconTrash(props: IconProps) {
   )
 }
 
+export function IconAlertTriangle(props: IconProps) {
+  return (
+    <IconSvg strokeWidth="1.85" {...props}>
+      <path d="M10.29 5.05 3.12 17.4A1.85 1.85 0 0 0 4.73 20.1h14.54a1.85 1.85 0 0 0 1.61-2.7L13.71 5.05a1.85 1.85 0 0 0-3.42 0Z" />
+      <path d="M12 9.15v4.2" />
+      <circle cx="12" cy="16.55" r="0.85" fill="currentColor" stroke="none" />
+    </IconSvg>
+  )
+}
+
 export function IconStar(props: IconProps) {
   return (
     <IconSvg {...props}>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
@@ -117,6 +118,7 @@ export function UsersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<IdentityUser | null>(null)
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true)
@@ -250,17 +252,26 @@ export function UsersPage() {
     }
   }
 
-  async function handleDelete(user: IdentityUser) {
+  function requestDelete(user: IdentityUser) {
     if (sessionUser?.id === user.id) {
       setError('You cannot delete your own account.')
       return
     }
     setError(null)
+    setPendingDelete(user)
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete) {
+      return
+    }
+    setError(null)
     setMessage(null)
-    setDeletingId(user.id)
+    setDeletingId(pendingDelete.id)
     try {
-      await deleteUser(user.id)
-      setUsers((current) => current.filter((item) => item.id !== user.id))
+      await deleteUser(pendingDelete.id)
+      setUsers((current) => current.filter((item) => item.id !== pendingDelete.id))
+      setPendingDelete(null)
       setMessage('User deleted.')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to delete user.')
@@ -473,7 +484,7 @@ export function UsersPage() {
                         <IconButton
                           label={sessionUser?.id === user.id ? 'You cannot delete your own account' : 'Delete'}
                           variant="danger"
-                          onClick={() => void handleDelete(user)}
+                          onClick={() => requestDelete(user)}
                           disabled={deletingId === user.id || sessionUser?.id === user.id}
                         >
                           <IconTrash />
@@ -487,6 +498,30 @@ export function UsersPage() {
           </div>
         ) : null}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete this user?"
+        description={
+          pendingDelete ? (
+            <>
+              This will permanently remove{' '}
+              <strong>
+                {pendingDelete.displayName} ({pendingDelete.email})
+              </strong>{' '}
+              and their memberships.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete user"
+        busy={Boolean(deletingId)}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => {
+          if (!deletingId) {
+            setPendingDelete(null)
+          }
+        }}
+      />
     </div>
   )
 }

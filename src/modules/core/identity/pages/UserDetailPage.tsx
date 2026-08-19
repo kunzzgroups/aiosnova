@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
@@ -70,6 +71,8 @@ export function UserDetailPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const isSelf = Boolean(sessionUser && user && sessionUser.id === user.id)
   const confirmPasswordMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword
@@ -194,21 +197,28 @@ export function UserDetailPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!user) {
-      return
-    }
+  function requestDelete() {
     if (isSelf) {
       setError('You cannot delete your own account.')
       return
     }
     setError(null)
+    setShowDeleteConfirm(true)
+  }
+
+  async function handleConfirmDelete() {
+    if (!user) {
+      return
+    }
+    setError(null)
     setMessage(null)
+    setIsDeleting(true)
     try {
       await deleteUser(user.id)
       navigate('/system/core/users')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to delete user.')
+      setIsDeleting(false)
     }
   }
 
@@ -321,7 +331,7 @@ export function UserDetailPage() {
             <IconButton
               label={isSelf ? 'You cannot delete your own account' : 'Delete'}
               variant="danger"
-              onClick={() => void handleDelete()}
+              onClick={requestDelete}
               disabled={isSelf}
             >
               <IconTrash />
@@ -557,6 +567,28 @@ export function UserDetailPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete this user?"
+        description={
+          <>
+            This will permanently remove{' '}
+            <strong>
+              {user.displayName} ({user.email})
+            </strong>{' '}
+            and their memberships.
+          </>
+        }
+        confirmLabel="Delete user"
+        busy={isDeleting}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => {
+          if (!isDeleting) {
+            setShowDeleteConfirm(false)
+          }
+        }}
+      />
     </div>
   )
 }
