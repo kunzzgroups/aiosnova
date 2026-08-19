@@ -29,11 +29,13 @@
   line-height: 1.2;
   white-space: nowrap;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   box-shadow: 0 8px 18px rgba(15, 20, 18, 0.18);
   transition:
     opacity 0.14s ease,
-    transform 0.14s ease;
+    transform 0.14s ease,
+    visibility 0.14s ease;
 }
 
 .ui-icon-button__tooltip::after {
@@ -49,5 +51,6 @@
 .ui-icon-button-wrap:hover .ui-icon-button__tooltip,
 .ui-icon-button-wrap:focus-within .ui-icon-button__tooltip {
   opacity: 1;
+  visibility: visible;
   transform: translateX(-50%) translateY(0);
 }
