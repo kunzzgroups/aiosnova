@@ -16,13 +16,10 @@ import {
   IconTrash,
 } from '@/components/icons/Icons'
 import {
-  PROFILE_LANGUAGES,
-  PROFILE_TIMEZONES,
   isIdentityProfileComplete,
   formatStatusLabel,
   type IdentityUser,
 } from '@/modules/core/identity/types/identity'
-import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import {
   isValidPassword,
@@ -51,13 +48,6 @@ function profileInitials(user: IdentityUser) {
   return source.slice(0, 2).toUpperCase()
 }
 
-function profileLabel(
-  items: readonly { value: string; label: string }[],
-  value: string,
-) {
-  return items.find((item) => item.value === value)?.label ?? value ?? '—'
-}
-
 export function UserDetailPage() {
   const { userId = '' } = useParams()
   const [searchParams] = useSearchParams()
@@ -70,8 +60,6 @@ export function UserDetailPage() {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
-  const [language, setLanguage] = useState('en')
-  const [timezone, setTimezone] = useState('Asia/Kuala_Lumpur')
   const [isEditing, setIsEditing] = useState(searchParams.get('edit') === '1')
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -125,8 +113,6 @@ export function UserDetailPage() {
     setFullName(nextUser.fullName)
     setPhone(nextUser.phone)
     setAvatarUrl(nextUser.avatarUrl)
-    setLanguage(nextUser.language || 'en')
-    setTimezone(nextUser.timezone || 'Asia/Kuala_Lumpur')
   }
 
   function syncSessionIfSelf(nextUser: IdentityUser) {
@@ -154,8 +140,6 @@ export function UserDetailPage() {
         fullName,
         phone,
         avatarUrl,
-        language,
-        timezone,
       })
       setUser(updated)
       applyProfileForm(updated)
@@ -365,28 +349,6 @@ export function UserDetailPage() {
                 disabled={isSaving}
               />
             </FormField>
-            <FormField label="Language" htmlFor="detail-language">
-              <SidebarSelect
-                id="detail-language"
-                label="Language"
-                hideLabel
-                value={language}
-                options={[...PROFILE_LANGUAGES]}
-                onChange={setLanguage}
-                disabled={isSaving}
-              />
-            </FormField>
-            <FormField label="Timezone" htmlFor="detail-timezone">
-              <SidebarSelect
-                id="detail-timezone"
-                label="Timezone"
-                hideLabel
-                value={timezone}
-                options={[...PROFILE_TIMEZONES]}
-                onChange={setTimezone}
-                disabled={isSaving}
-              />
-            </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? 'Saving…' : 'Save'}
@@ -440,14 +402,6 @@ export function UserDetailPage() {
               <div className="identity-profile-tile">
                 <span>Phone</span>
                 <strong>{user.phone || '—'}</strong>
-              </div>
-              <div className="identity-profile-tile">
-                <span>Language</span>
-                <strong>{profileLabel(PROFILE_LANGUAGES, user.language)}</strong>
-              </div>
-              <div className="identity-profile-tile">
-                <span>Timezone</span>
-                <strong>{profileLabel(PROFILE_TIMEZONES, user.timezone)}</strong>
               </div>
               <div className="identity-profile-tile">
                 <span>Created</span>
