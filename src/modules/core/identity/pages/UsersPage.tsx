@@ -280,7 +280,15 @@ export function UsersPage() {
       {message ? <Alert variant="success">{message}</Alert> : null}
 
       <section className="identity-panel">
-        <h2>Directory</h2>
+        <div className="identity-panel__title-row">
+          <h2>Directory</h2>
+          <Button
+            variant={showInvite ? 'secondary' : 'primary'}
+            onClick={handleToggleInvite}
+          >
+            {showInvite ? 'Cancel' : 'Invite User'}
+          </Button>
+        </div>
         <div className="identity-directory-toolbar">
           <TextField
             className="identity-directory-toolbar__search"
@@ -312,14 +320,6 @@ export function UsersPage() {
               options={[...MFA_FILTERS]}
               onChange={setMfaFilter}
             />
-          </div>
-          <div className="identity-directory-toolbar__invite">
-            <Button
-              variant={showInvite ? 'secondary' : 'primary'}
-              onClick={handleToggleInvite}
-            >
-              {showInvite ? 'Cancel' : 'Invite User'}
-            </Button>
           </div>
         </div>
 
