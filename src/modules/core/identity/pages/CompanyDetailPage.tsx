@@ -152,7 +152,7 @@ export function CompanyDetailPage() {
         {isEditing ? (
           <form className="identity-form identity-form--stack" onSubmit={(event) => void handleSave(event)}>
             <FormField label="Code" htmlFor="detail-company-code">
-              <TextField id="detail-company-code" value={company.code} disabled />
+              <TextField id="detail-company-code" value={company.code} readOnly />
             </FormField>
             <FormField label="Name" htmlFor="detail-company-name">
               <TextField

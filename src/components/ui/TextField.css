@@ -7,6 +7,8 @@
   background: var(--color-bg-elevated);
   color: var(--color-text);
   outline: none;
+  user-select: text;
+  -webkit-user-select: text;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -29,7 +31,15 @@
   box-shadow: 0 0 0 3px rgba(155, 44, 44, 0.15);
 }
 
-.ui-text-field:disabled {
+.ui-text-field:disabled,
+.ui-text-field:read-only {
   background: var(--color-bg-muted);
+}
+
+.ui-text-field:disabled {
   cursor: not-allowed;
+}
+
+.ui-text-field:read-only {
+  cursor: text;
 }

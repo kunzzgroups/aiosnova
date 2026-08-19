@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/TextField'
 import { PasswordRequirements } from '@/modules/core/auth/components/PasswordRequirements'
@@ -79,6 +79,36 @@ export function PasswordField({
     onChange(next)
   }
 
+  async function writePasswordToClipboard() {
+    if (!value) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      // Clipboard API can fail without a secure context; copy event fallback handles it.
+    }
+  }
+
+  function handleCopy(event: ClipboardEvent<HTMLInputElement>) {
+    if (!value) {
+      return
+    }
+    event.preventDefault()
+    event.clipboardData.setData('text/plain', value)
+    void writePasswordToClipboard()
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    const copyShortcut =
+      (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c' && !event.shiftKey && !event.altKey
+    if (!copyShortcut || isRevealed) {
+      return
+    }
+    event.preventDefault()
+    void writePasswordToClipboard()
+  }
+
   return (
     <div className="password-field">
       <div className="password-field__control">
@@ -89,6 +119,8 @@ export function PasswordField({
           value={value}
           onChange={(event) => handleValueChange(event.target.value)}
           onInput={(event) => handleValueChange((event.target as HTMLInputElement).value)}
+          onCopy={handleCopy}
+          onKeyDown={handleKeyDown}
           autoComplete={autoComplete}
           placeholder={placeholder}
           hasError={hasError}

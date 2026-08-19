@@ -15,6 +15,7 @@ import {
   PASSWORD_CONFIRM_PLACEHOLDER,
   PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_ERROR_MESSAGE,
+  PASSWORD_MISMATCH_MESSAGE,
 } from '@/modules/core/auth/utils/passwordPolicy'
 import { fetchUser, updateUser } from '@/modules/core/identity/services/identityService'
 import './CompleteProfilePage.css'
@@ -32,6 +33,7 @@ export function CompleteProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const confirmPasswordMismatch = confirmPassword.length > 0 && confirmPassword !== password
 
   useEffect(() => {
     let cancelled = false
@@ -77,7 +79,6 @@ export function CompleteProfilePage() {
       return
     }
     if (password !== confirmPassword) {
-      setError('Password and confirm password do not match.')
       return
     }
     setIsSaving(true)
@@ -127,7 +128,7 @@ export function CompleteProfilePage() {
       {!isLoading ? (
         <form className="complete-profile-form" onSubmit={(event) => void handleSubmit(event)}>
           <FormField label="Email" htmlFor="complete-email">
-            <TextField id="complete-email" value={sessionUser?.email ?? ''} disabled />
+            <TextField id="complete-email" value={sessionUser?.email ?? ''} readOnly />
           </FormField>
           <FormField label="Display name" htmlFor="complete-display">
             <TextField
@@ -173,13 +174,18 @@ export function CompleteProfilePage() {
               disabled={isSaving}
             />
           </FormField>
-          <FormField label="Confirm password" htmlFor="complete-confirm-password">
+          <FormField
+            label="Confirm password"
+            htmlFor="complete-confirm-password"
+            error={confirmPasswordMismatch ? PASSWORD_MISMATCH_MESSAGE : undefined}
+          >
             <PasswordField
               id="complete-confirm-password"
               value={confirmPassword}
               onChange={setConfirmPassword}
               placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
               autoComplete="new-password"
+              hasError={confirmPasswordMismatch}
               disabled={isSaving}
             />
           </FormField>

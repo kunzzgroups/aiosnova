@@ -11,7 +11,9 @@
 }
 
 .ui-form-field__error {
-  font-size: var(--text-sm);
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 550;
   color: var(--color-danger);
 }
 

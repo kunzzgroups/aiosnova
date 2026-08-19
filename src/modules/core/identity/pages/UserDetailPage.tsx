@@ -30,6 +30,7 @@ import {
   PASSWORD_CONFIRM_PLACEHOLDER,
   PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_CURRENT_PLACEHOLDER,
+  PASSWORD_MISMATCH_MESSAGE,
 } from '@/modules/core/auth/utils/passwordPolicy'
 import {
   changeOwnPassword,
@@ -82,6 +83,7 @@ export function UserDetailPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const isSelf = Boolean(sessionUser && user && sessionUser.id === user.id)
+  const confirmPasswordMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword
 
   const loadUser = useCallback(async () => {
     if (!userId) {
@@ -229,7 +231,6 @@ export function UserDetailPage() {
       return
     }
     if (newPassword !== confirmPassword) {
-      setError('New password and confirmation do not match.')
       return
     }
     setIsSaving(true)
@@ -343,7 +344,7 @@ export function UserDetailPage() {
               />
             </FormField>
             <FormField label="Email" htmlFor="detail-email">
-              <TextField id="detail-email" value={user.email} disabled />
+              <TextField id="detail-email" value={user.email} readOnly />
             </FormField>
             <FormField label="Full name" htmlFor="detail-full">
               <TextField
@@ -458,17 +459,15 @@ export function UserDetailPage() {
 
         {isSelf && showPasswordForm ? (
           <form
-            className="identity-form identity-form--stack identity-profile-password"
+            className="identity-form identity-profile-password"
             onSubmit={(event) => void handleChangePassword(event)}
           >
             <FormField label="Current password" htmlFor="current-password">
-              <TextField
+              <PasswordField
                 id="current-password"
-                type="password"
                 value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
+                onChange={setCurrentPassword}
                 placeholder={PASSWORD_CURRENT_PLACEHOLDER}
-                required
                 autoComplete="current-password"
                 disabled={isSaving}
               />
@@ -484,16 +483,18 @@ export function UserDetailPage() {
                 disabled={isSaving}
               />
             </FormField>
-            <FormField label="Confirm new password" htmlFor="confirm-password">
-              <TextField
+            <FormField
+              label="Confirm new password"
+              htmlFor="confirm-password"
+              error={confirmPasswordMismatch ? PASSWORD_MISMATCH_MESSAGE : undefined}
+            >
+              <PasswordField
                 id="confirm-password"
-                type="password"
                 value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
+                onChange={setConfirmPassword}
                 placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
-                required
-                minLength={6}
                 autoComplete="new-password"
+                hasError={confirmPasswordMismatch}
                 disabled={isSaving}
               />
             </FormField>

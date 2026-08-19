@@ -13,6 +13,8 @@ export const PASSWORD_ERROR_MESSAGE =
 export const NEW_PASSWORD_ERROR_MESSAGE =
   'New password must be at least 6 characters and include 1 uppercase letter, 1 lowercase letter, and 1 symbol.'
 
+export const PASSWORD_MISMATCH_MESSAGE = 'Passwords do not match.'
+
 const HAS_UPPER = /[A-Z]/
 const HAS_LOWER = /[a-z]/
 const HAS_SPECIAL = /[^A-Za-z0-9]/

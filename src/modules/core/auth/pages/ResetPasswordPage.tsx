@@ -12,6 +12,7 @@ import {
   PASSWORD_CONFIRM_PLACEHOLDER,
   PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_ERROR_MESSAGE,
+  PASSWORD_MISMATCH_MESSAGE,
 } from '@/modules/core/auth/utils/passwordPolicy'
 import './AuthForm.css'
 
@@ -23,6 +24,7 @@ export function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const confirmPasswordMismatch = confirmPassword.length > 0 && confirmPassword !== password
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -39,7 +41,6 @@ export function ResetPasswordPage() {
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.')
       return
     }
 
@@ -78,13 +79,18 @@ export function ResetPasswordPage() {
             disabled={isSubmitting || !token}
           />
         </FormField>
-        <FormField label="Confirm password" htmlFor="reset-confirm">
+        <FormField
+          label="Confirm password"
+          htmlFor="reset-confirm"
+          error={confirmPasswordMismatch ? PASSWORD_MISMATCH_MESSAGE : undefined}
+        >
           <PasswordField
             id="reset-confirm"
             value={confirmPassword}
             onChange={setConfirmPassword}
             placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
             autoComplete="new-password"
+            hasError={confirmPasswordMismatch}
             disabled={isSubmitting || !token}
           />
         </FormField>
