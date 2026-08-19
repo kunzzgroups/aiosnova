@@ -1,0 +1,47 @@
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  color: inherit;
+}
+
+.brand-logo--stacked {
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.brand-logo__mark {
+  display: block;
+  width: 2rem;
+  height: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.brand-logo--stacked .brand-logo__mark {
+  width: 3.75rem;
+}
+
+.brand-logo--compact .brand-logo__mark {
+  width: 1.7rem;
+}
+
+.brand-logo__wordmark {
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  color: inherit;
+}
+
+.brand-logo--stacked .brand-logo__wordmark {
+  font-size: 0.78rem;
+  letter-spacing: 0.28em;
+}
+
+.brand-logo--compact .brand-logo__wordmark {
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+}

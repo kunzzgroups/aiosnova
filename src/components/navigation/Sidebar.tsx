@@ -6,6 +6,7 @@ import {
   type SidebarNode,
   type SidebarSection,
 } from '@/navigation/sidebarNav'
+import { BrandLogo } from '@/components/brand/BrandLogo'
 import {
   getLinkIcon,
   getModuleIcon,
@@ -250,11 +251,8 @@ export function Sidebar() {
       data-collapsed={collapsed ? 'true' : 'false'}
     >
       <div className="sidebar__brand-row">
-        <div className="sidebar__brand" title="AIOS">
-          <span className="sidebar__brand-mark" aria-hidden>
-            A
-          </span>
-          <span className="sidebar__brand-text">AIOS</span>
+        <div className="sidebar__brand" title="AIOS NOVA">
+          <BrandLogo />
         </div>
         <button
           type="button"

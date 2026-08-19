@@ -77,30 +77,17 @@
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
   color: var(--auth-ink);
   text-decoration: none;
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: -0.02em;
 }
 
-.auth-layout__brand-mark:hover {
-  text-decoration: none;
+.auth-layout__brand-mark .brand-logo__mark {
+  width: 2.35rem;
 }
 
-.auth-layout__brand-icon {
-  display: grid;
-  place-items: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  border-radius: 0.55rem;
-  background: var(--color-brand);
-  color: var(--color-on-brand);
-  font-family: var(--font-display);
-  font-size: 1rem;
-  line-height: 1;
+.auth-layout__brand-mark .brand-logo__wordmark {
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
 }
 
 .auth-layout__panel {
@@ -129,12 +116,13 @@
 }
 
 .auth-layout__panel--login {
+  position: relative;
   width: min(100%, 28rem);
   padding: 1.15rem 2rem 1.1rem;
 }
 
 .auth-layout__panel--login .auth-layout__locale {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.55rem;
 }
 
 .auth-layout__panel--login .auth-layout__body {
