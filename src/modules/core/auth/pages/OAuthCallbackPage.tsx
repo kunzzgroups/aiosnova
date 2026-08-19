@@ -30,7 +30,7 @@ export function OAuthCallbackPage() {
       try {
         const result = await completeOAuth(provider)
         if (!cancelled) {
-          navigate(postAuthPath(result.user), { replace: true })
+          navigate(postAuthPath(), { replace: true })
         }
       } catch (err) {
         if (!cancelled) {

@@ -28,7 +28,7 @@ export function useLogin() {
     setError(null)
     try {
       const result = await verifyLoginTac(payload)
-      navigate(postAuthPath(result.user))
+      navigate(postAuthPath())
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to sign in.')
     } finally {

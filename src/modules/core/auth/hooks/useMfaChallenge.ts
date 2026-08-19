@@ -23,7 +23,7 @@ export function useMfaChallenge() {
 
     try {
       const result = await verifyMfa({ mfaTicket, code })
-      navigate(postAuthPath(result.user))
+      navigate(postAuthPath())
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Unable to verify code.'
       setError(message)

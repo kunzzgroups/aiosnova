@@ -78,6 +78,6 @@ export function isMfaRequired(response: LoginResponse): response is MfaRequiredR
   return 'status' in response && response.status === 'mfa_required'
 }
 
-export function postAuthPath(user: AuthUser) {
-  return user.profileComplete ? '/' : '/profile/complete'
+export function postAuthPath() {
+  return '/'
 }
