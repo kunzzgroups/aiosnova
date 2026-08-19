@@ -4,6 +4,46 @@
   gap: 0;
 }
 
+.login-form__methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 0.1rem 0 1.4rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.login-form__method {
+  position: relative;
+  min-height: 2.55rem;
+  padding: 0 0.4rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  cursor: pointer;
+}
+
+.login-form__method:hover {
+  color: var(--color-text);
+}
+
+.login-form__method.is-active {
+  color: var(--color-text);
+}
+
+.login-form__method.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-brand);
+  border-radius: 2px 2px 0 0;
+}
+
 .login-form__divider {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -27,6 +67,41 @@
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+}
+
+.login-form__tac {
+  position: relative;
+}
+
+.login-form__tac .ui-text-field {
+  padding-right: 6.75rem;
+}
+
+.login-form__tac-send {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  min-height: 2.1rem;
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--color-brand);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+
+.login-form__tac-send:hover:not(:disabled) {
+  background: var(--color-brand-soft);
+}
+
+.login-form__tac-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .login-form__meta {
@@ -132,4 +207,25 @@
 
 .login-form__meta a:hover {
   text-decoration: underline;
+}
+
+.login-form__text-action {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--auth-ink, var(--color-text));
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+
+.login-form__text-action:hover {
+  text-decoration: underline;
+}
+
+.login-form__text-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }

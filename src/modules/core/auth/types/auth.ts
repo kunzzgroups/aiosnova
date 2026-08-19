@@ -23,6 +23,15 @@ export type LoginRequest = {
   password: string
 }
 
+export type TacSendRequest = {
+  phone: string
+}
+
+export type TacVerifyRequest = {
+  phone: string
+  code: string
+}
+
 export type MfaVerifyRequest = {
   mfaTicket: string
   code: string

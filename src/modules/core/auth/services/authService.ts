@@ -11,6 +11,8 @@ import type {
   MfaVerifyRequest,
   MessageResponse,
   ResetPasswordRequest,
+  TacSendRequest,
+  TacVerifyRequest,
 } from '@/modules/core/auth/types/auth'
 import { isMfaRequired } from '@/modules/core/auth/types/auth'
 
@@ -25,6 +27,22 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     return data
   }
 
+  useAuthStore.getState().setSession(data.accessToken, data.user)
+  return data
+}
+
+export async function requestLoginTac(payload: TacSendRequest) {
+  return apiRequest<MessageResponse & { demoHint?: string }>('/api/auth/login/tac/send', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export async function verifyLoginTac(payload: TacVerifyRequest): Promise<LoginSuccessResponse> {
+  const data = await apiRequest<LoginSuccessResponse>('/api/auth/login/tac/verify', {
+    method: 'POST',
+    body: payload,
+  })
   useAuthStore.getState().setSession(data.accessToken, data.user)
   return data
 }

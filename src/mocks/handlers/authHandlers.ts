@@ -8,8 +8,10 @@ import type {
   MfaSetupConfirmRequest,
   MfaVerifyRequest,
   ResetPasswordRequest,
+  TacSendRequest,
+  TacVerifyRequest,
 } from '@/modules/core/auth/types/auth'
-import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
+import { MOCK_MFA_CODE, MOCK_TAC_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
 import { identityUsers, recordIdentitySignIn, upsertIdentityUser } from '@/mocks/data/identity'
 import type { SignInMethod } from '@/modules/core/identity/types/identity'
 import { isValidPassword, NEW_PASSWORD_ERROR_MESSAGE, PASSWORD_ERROR_MESSAGE } from '@/modules/core/auth/utils/passwordPolicy'
@@ -35,6 +37,7 @@ type ResetTokenRecord = {
 
 const sessions = new Map<string, SessionRecord>()
 const mfaTickets = new Map<string, MfaTicketRecord>()
+const tacChallenges = new Map<string, { userId: string; expiresAt: number }>()
 const resetTokens = new Map<string, ResetTokenRecord>()
 const pendingMfaSecrets = new Map<string, string>()
 
@@ -81,6 +84,22 @@ function clearCookieHeader(name: string, httpOnly = false) {
 
 function findUserByEmail(email: string) {
   return users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase())
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/[^\d+]/g, '')
+}
+
+function findUserByPhone(phone: string) {
+  const needle = normalizePhone(phone)
+  if (!needle) {
+    return undefined
+  }
+  const identity = identityUsers.find((item) => normalizePhone(item.phone) === needle)
+  if (!identity) {
+    return undefined
+  }
+  return users.find((user) => user.id === identity.id || user.email === identity.email)
 }
 
 function findUserById(id: string) {
@@ -144,6 +163,7 @@ function requireCsrf(request: Request) {
 }
 
 const GENERIC_LOGIN_ERROR = 'Invalid email or password.'
+const TAC_SENT_MESSAGE = 'If this number is registered, a TAC has been sent.'
 const FORGOT_MESSAGE =
   'If an account exists for that email, you will receive password reset instructions.'
 
@@ -176,6 +196,52 @@ export const authHandlers = [
       return HttpResponse.json(response)
     }
 
+    return issueSession(user)
+  }),
+
+  http.post('/api/auth/login/tac/send', async ({ request }) => {
+    const body = (await request.json()) as TacSendRequest
+    const phone = body.phone?.trim() ?? ''
+    if (!normalizePhone(phone)) {
+      return HttpResponse.json({ message: 'Enter a valid phone number.' }, { status: 400 })
+    }
+
+    const user = findUserByPhone(phone)
+    if (user) {
+      const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)
+      if (identity?.status === 'disabled') {
+        return HttpResponse.json({ message: 'This account has been disabled.' }, { status: 401 })
+      }
+      tacChallenges.set(normalizePhone(phone), {
+        userId: user.id,
+        expiresAt: Date.now() + 5 * 60 * 1000,
+      })
+    }
+
+    return HttpResponse.json({
+      message: TAC_SENT_MESSAGE,
+      demoHint: `Demo TAC: ${MOCK_TAC_CODE}`,
+    })
+  }),
+
+  http.post('/api/auth/login/tac/verify', async ({ request }) => {
+    const body = (await request.json()) as TacVerifyRequest
+    const phone = normalizePhone(body.phone ?? '')
+    const challenge = tacChallenges.get(phone)
+
+    if (!challenge || challenge.expiresAt < Date.now()) {
+      return HttpResponse.json({ message: 'TAC expired. Request a new code.' }, { status: 401 })
+    }
+    if (body.code !== MOCK_TAC_CODE) {
+      return HttpResponse.json({ message: 'Invalid TAC.' }, { status: 401 })
+    }
+
+    const user = findUserById(challenge.userId)
+    if (!user) {
+      return HttpResponse.json({ message: 'TAC expired. Request a new code.' }, { status: 401 })
+    }
+
+    tacChallenges.delete(phone)
     return issueSession(user)
   }),
 

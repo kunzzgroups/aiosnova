@@ -5,7 +5,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import './AuthLayout.css'
 
 type AuthLayoutProps = {
-  title: string
+  title?: string
   subtitle?: string
   children: ReactNode
   footer?: ReactNode
@@ -64,10 +64,12 @@ export function AuthLayout({
           </div>
         )}
 
-        <header className="auth-layout__header">
-          <h1 className="auth-layout__title">{title}</h1>
-          {subtitle ? <p className="auth-layout__subtitle">{subtitle}</p> : null}
-        </header>
+        {title ? (
+          <header className="auth-layout__header">
+            <h1 className="auth-layout__title">{title}</h1>
+            {subtitle ? <p className="auth-layout__subtitle">{subtitle}</p> : null}
+          </header>
+        ) : null}
 
         <div className="auth-layout__body">{children}</div>
         {footer ? <footer className="auth-layout__footer">{footer}</footer> : null}
