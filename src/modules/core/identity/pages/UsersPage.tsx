@@ -439,7 +439,7 @@ export function UsersPage() {
                           onClick={() => void handleToggleStatus(user)}
                           disabled={statusUpdatingId === user.id}
                         >
-                          {user.status === 'active' ? 'Active' : 'Disable'}
+                          {user.status === 'active' ? 'Active' : 'Inactive'}
                         </Button>
                       </div>
                     </td>

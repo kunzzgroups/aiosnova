@@ -87,7 +87,7 @@ function OrganizationBranch({
                 className="identity-action-btn identity-action-btn--status"
                 onClick={() => onToggleStatus(node)}
               >
-                {node.status === 'active' ? 'Active' : 'Disable'}
+                {node.status === 'active' ? 'Active' : 'Inactive'}
               </Button>
               <Button
                 variant="danger"
