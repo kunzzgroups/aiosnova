@@ -45,7 +45,7 @@ export function useLogin() {
       setMessage(result.demoHint ? `${result.message} ${result.demoHint}` : result.message)
       return true
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to send TAC.')
+      setError(err instanceof ApiError ? err.message : 'Unable to send OTP.')
       return false
     } finally {
       setIsSubmitting(false)

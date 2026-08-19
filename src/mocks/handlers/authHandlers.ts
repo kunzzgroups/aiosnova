@@ -163,7 +163,7 @@ function requireCsrf(request: Request) {
 }
 
 const GENERIC_LOGIN_ERROR = 'Invalid email or password.'
-const TAC_SENT_MESSAGE = 'If this number is registered, a TAC has been sent.'
+const TAC_SENT_MESSAGE = 'If this number is registered, an OTP has been sent.'
 const FORGOT_MESSAGE =
   'If an account exists for that email, you will receive password reset instructions.'
 
@@ -220,7 +220,7 @@ export const authHandlers = [
 
     return HttpResponse.json({
       message: TAC_SENT_MESSAGE,
-      demoHint: `Demo TAC: ${MOCK_TAC_CODE}`,
+      demoHint: `Demo OTP: ${MOCK_TAC_CODE}`,
     })
   }),
 
@@ -230,15 +230,15 @@ export const authHandlers = [
     const challenge = tacChallenges.get(phone)
 
     if (!challenge || challenge.expiresAt < Date.now()) {
-      return HttpResponse.json({ message: 'TAC expired. Request a new code.' }, { status: 401 })
+      return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
     }
     if (body.code !== MOCK_TAC_CODE) {
-      return HttpResponse.json({ message: 'Invalid TAC.' }, { status: 401 })
+      return HttpResponse.json({ message: 'Invalid OTP.' }, { status: 401 })
     }
 
     const user = findUserById(challenge.userId)
     if (!user) {
-      return HttpResponse.json({ message: 'TAC expired. Request a new code.' }, { status: 401 })
+      return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
     }
 
     tacChallenges.delete(phone)

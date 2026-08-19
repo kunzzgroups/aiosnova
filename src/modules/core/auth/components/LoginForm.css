@@ -113,6 +113,11 @@
   min-height: 1.5rem;
 }
 
+.login-form__meta[data-spacer='true'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .login-form__remember {
   display: inline-flex;
   align-items: center;

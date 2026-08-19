@@ -155,25 +155,30 @@ export function LoginForm() {
             </div>
           </FormField>
         )}
-        {method === 'email' ? (
-          <div className="login-form__meta">
-            <label className="login-form__remember" htmlFor="login-remember">
-              <input
-                id="login-remember"
-                className="login-form__remember-input"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(event) => handleRememberChange(event.target.checked)}
-                disabled={isSubmitting}
-              />
-              <span className="login-form__switch" aria-hidden>
-                <span className="login-form__switch-thumb" />
-              </span>
-              <span className="login-form__remember-text">{t('rememberMe')}</span>
-            </label>
-            <Link to="/forgot-password">{t('forgotPassword')}</Link>
-          </div>
-        ) : null}
+        <div
+          className="login-form__meta"
+          aria-hidden={method !== 'email'}
+          data-spacer={method !== 'email' ? 'true' : undefined}
+        >
+          <label className="login-form__remember" htmlFor="login-remember">
+            <input
+              id="login-remember"
+              className="login-form__remember-input"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(event) => handleRememberChange(event.target.checked)}
+              disabled={isSubmitting || method !== 'email'}
+              tabIndex={method === 'email' ? 0 : -1}
+            />
+            <span className="login-form__switch" aria-hidden>
+              <span className="login-form__switch-thumb" />
+            </span>
+            <span className="login-form__remember-text">{t('rememberMe')}</span>
+          </label>
+          <Link to="/forgot-password" tabIndex={method === 'email' ? 0 : -1}>
+            {t('forgotPassword')}
+          </Link>
+        </div>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
           {isSubmitting ? t('signingIn') : t('signInButton')}
         </Button>
