@@ -97,6 +97,13 @@ export async function updateUser(id: string, payload: IdentityProfilePayload) {
   })
 }
 
+export async function deleteUser(id: string) {
+  return apiRequest<void>(`/api/identity/users/${id}`, {
+    method: 'DELETE',
+    auth: true,
+  })
+}
+
 export async function sendUserPasswordReset(id: string) {
   return apiRequest<{ message: string; demoHint?: string }>(
     `/api/identity/users/${id}/password-reset`,

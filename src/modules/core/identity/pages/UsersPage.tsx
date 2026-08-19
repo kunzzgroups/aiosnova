@@ -2,10 +2,22 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import {
+  IconBan,
+  IconCircleCheck,
+  IconEye,
+  IconKey,
+  IconPencil,
+  IconShield,
+  IconShieldOff,
+  IconTrash,
+} from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
+import { useAuthStore } from '@/stores/authStore'
 import type { CompanyListItem } from '@/modules/core/identity/services/identityService'
 import type { IdentityUser, UserStatus } from '@/modules/core/identity/types/identity'
 import {
@@ -18,6 +30,7 @@ import {
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import {
   createUser,
+  deleteUser,
   fetchCompanies,
   fetchUsers,
   sendUserPasswordReset,
@@ -81,6 +94,7 @@ function generatePassword(length = 12) {
 
 export function UsersPage() {
   const navigate = useNavigate()
+  const sessionUser = useAuthStore((state) => state.user)
   const [users, setUsers] = useState<IdentityUser[]>([])
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
   const [email, setEmail] = useState('')
@@ -97,6 +111,7 @@ export function UsersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true)
@@ -227,6 +242,25 @@ export function UsersPage() {
       setMessage(result.message)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to send password reset.')
+    }
+  }
+
+  async function handleDelete(user: IdentityUser) {
+    if (sessionUser?.id === user.id) {
+      setError('You cannot delete your own account.')
+      return
+    }
+    setError(null)
+    setMessage(null)
+    setDeletingId(user.id)
+    try {
+      await deleteUser(user.id)
+      setUsers((current) => current.filter((item) => item.id !== user.id))
+      setMessage('User deleted.')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to delete user.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -393,54 +427,53 @@ export function UsersPage() {
                     <td className="identity-table__spacer" aria-hidden="true" />
                     <td className="identity-table__actions">
                       <div className="identity-inline-actions">
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          className="identity-action-btn identity-action-btn--view"
+                        <IconButton
+                          label="View"
                           onClick={() => navigate(`/system/core/users/${user.id}`)}
                         >
-                          View
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          className="identity-action-btn identity-action-btn--edit"
+                          <IconEye />
+                        </IconButton>
+                        <IconButton
+                          label="Edit"
                           onClick={() => navigate(`/system/core/users/${user.id}?edit=1`)}
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          className="identity-action-btn identity-action-btn--reset"
+                          <IconPencil />
+                        </IconButton>
+                        <IconButton
+                          label="Send password reset"
                           onClick={() => void handleSendReset(user)}
                           disabled={user.status === 'disabled' || Boolean(user.signInMethod && user.signInMethod !== 'password')}
                         >
-                          Send reset
-                        </Button>
+                          <IconKey />
+                        </IconButton>
                         {user.signInMethod ? (
-                          <Button
-                            variant="secondary"
-                            size="md"
-                            className="identity-action-btn identity-action-btn--mfa"
+                          <IconButton
+                            label={user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
                             onClick={() =>
                               navigate(
                                 `/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`,
                               )
                             }
                           >
-                            {user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
-                          </Button>
+                            {user.mfaEnabled ? <IconShieldOff /> : <IconShield />}
+                          </IconButton>
                         ) : null}
-                        <Button
+                        <IconButton
+                          label={user.status === 'active' ? 'Active' : 'Inactive'}
                           variant={user.status === 'active' ? 'secondary' : 'danger'}
-                          size="md"
-                          className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(user)}
                           disabled={statusUpdatingId === user.id}
                         >
-                          {user.status === 'active' ? 'Active' : 'Inactive'}
-                        </Button>
+                          {user.status === 'active' ? <IconCircleCheck /> : <IconBan />}
+                        </IconButton>
+                        <IconButton
+                          label={sessionUser?.id === user.id ? 'You cannot delete your own account' : 'Delete'}
+                          variant="danger"
+                          onClick={() => void handleDelete(user)}
+                          disabled={deletingId === user.id || sessionUser?.id === user.id}
+                        >
+                          <IconTrash />
+                        </IconButton>
                       </div>
                     </td>
                   </tr>

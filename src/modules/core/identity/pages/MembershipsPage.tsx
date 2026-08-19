@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
+import { IconBan, IconStar } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import type {
   CompanyRecord,
@@ -235,7 +237,7 @@ export function MembershipsPage() {
                     <th>Position</th>
                     <th>Primary</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th className="identity-table__actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -263,25 +265,24 @@ export function MembershipsPage() {
                           {formatStatusLabel(membership.status)}
                         </span>
                       </td>
-                      <td>
+                      <td className="identity-table__actions">
                         <div className="identity-inline-actions">
                           {membership.status === 'active' && !membership.isPrimary ? (
-                            <Button
-                              variant="secondary"
-                              size="md"
+                            <IconButton
+                              label="Make primary"
                               onClick={() => void handleMakePrimary(membership)}
                             >
-                              Make primary
-                            </Button>
+                              <IconStar />
+                            </IconButton>
                           ) : null}
                           {membership.status === 'active' ? (
-                            <Button
-                              variant="secondary"
-                              size="md"
+                            <IconButton
+                              label="End membership"
+                              variant="danger"
                               onClick={() => void handleEnd(membership)}
                             >
-                              End
-                            </Button>
+                              <IconBan />
+                            </IconButton>
                           ) : null}
                         </div>
                       </td>

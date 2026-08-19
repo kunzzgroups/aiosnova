@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
+import { IconBan, IconCircleCheck } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import type { PositionRecord } from '@/modules/core/identity/types/identity'
 import { formatStatusLabel } from '@/modules/core/identity/types/identity'
@@ -129,7 +131,7 @@ export function PositionsPage() {
                     <th>Name</th>
                     <th>Description</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th className="identity-table__actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -143,14 +145,16 @@ export function PositionsPage() {
                           {formatStatusLabel(item.status)}
                         </span>
                       </td>
-                      <td>
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          onClick={() => void handleToggleStatus(item)}
-                        >
-                          {item.status === 'active' ? 'Deactivate' : 'Activate'}
-                        </Button>
+                      <td className="identity-table__actions">
+                        <div className="identity-inline-actions">
+                          <IconButton
+                            label={item.status === 'active' ? 'Active' : 'Inactive'}
+                            variant={item.status === 'active' ? 'secondary' : 'danger'}
+                            onClick={() => void handleToggleStatus(item)}
+                          >
+                            {item.status === 'active' ? <IconCircleCheck /> : <IconBan />}
+                          </IconButton>
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -66,6 +66,13 @@ export function provisionMockAuthUser(input: {
   return user
 }
 
+export function removeMockAuthUser(userId: string) {
+  const index = mockAuthUsers.findIndex((item) => item.id === userId)
+  if (index >= 0) {
+    mockAuthUsers.splice(index, 1)
+  }
+}
+
 export function setMockUserMfaEnabled(userId: string, mfaEnabled: boolean) {
   const authUser = mockAuthUsers.find((item) => item.id === userId)
   if (authUser) {

@@ -507,44 +507,14 @@
   box-sizing: border-box;
 }
 
-.identity-tree .identity-action-btn--status {
-  width: 5.85rem;
-}
-
-.identity-tree .identity-action-btn--delete {
-  width: 4.6rem;
-}
-
 .identity-inline-actions {
   display: flex;
   gap: 0.35rem;
+  align-items: center;
 }
 
-.identity-table__actions .identity-inline-actions .identity-action-btn {
+.identity-table__actions .identity-inline-actions .ui-button {
   min-height: 2.5rem;
-  padding: 0.55rem 0.5rem;
-  justify-content: center;
-  white-space: nowrap;
-}
-
-.identity-table__actions .identity-inline-actions .identity-action-btn--view {
-  width: 4.4rem;
-}
-
-.identity-table__actions .identity-inline-actions .identity-action-btn--edit {
-  width: 4.4rem;
-}
-
-.identity-table__actions .identity-inline-actions .identity-action-btn--reset {
-  width: 6.4rem;
-}
-
-.identity-table__actions .identity-inline-actions .identity-action-btn--mfa {
-  width: 6.8rem;
-}
-
-.identity-table__actions .identity-inline-actions .identity-action-btn--status {
-  width: 5.85rem;
 }
 
 .identity-inline-actions--spaced {

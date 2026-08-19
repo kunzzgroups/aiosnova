@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { IconBan, IconCircleCheck, IconEye, IconPencil } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import { formatStatusLabel } from '@/modules/core/identity/types/identity'
 import type { CompanyRecord } from '@/modules/core/identity/types/identity'
@@ -245,31 +247,26 @@ export function CompaniesPage() {
                     <td className="identity-table__spacer" aria-hidden="true" />
                     <td className="identity-table__actions">
                       <div className="identity-inline-actions">
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          className="identity-action-btn identity-action-btn--view"
+                        <IconButton
+                          label="View"
                           onClick={() => navigate(`/system/core/companies/${company.id}`)}
                         >
-                          View
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          className="identity-action-btn identity-action-btn--edit"
+                          <IconEye />
+                        </IconButton>
+                        <IconButton
+                          label="Edit"
                           onClick={() => navigate(`/system/core/companies/${company.id}?edit=1`)}
                         >
-                          Edit
-                        </Button>
-                        <Button
+                          <IconPencil />
+                        </IconButton>
+                        <IconButton
+                          label={company.status === 'active' ? 'Active' : 'Inactive'}
                           variant={company.status === 'active' ? 'secondary' : 'danger'}
-                          size="md"
-                          className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(company)}
                           disabled={statusUpdatingId === company.id}
                         >
-                          {company.status === 'active' ? 'Active' : 'Inactive'}
-                        </Button>
+                          {company.status === 'active' ? <IconCircleCheck /> : <IconBan />}
+                        </IconButton>
                       </div>
                     </td>
                   </tr>

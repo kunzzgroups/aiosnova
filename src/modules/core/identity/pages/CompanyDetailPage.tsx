@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
+import { IconBan, IconCircleCheck } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import { formatStatusLabel } from '@/modules/core/identity/types/identity'
 import {
@@ -137,12 +139,13 @@ export function CompanyDetailPage() {
                 Edit
               </Button>
             ) : null}
-            <Button
+            <IconButton
+              label={company.status === 'active' ? 'Active' : 'Inactive'}
               variant={company.status === 'active' ? 'secondary' : 'danger'}
               onClick={() => void handleToggleStatus()}
             >
-              {company.status === 'active' ? 'Active' : 'Inactive'}
-            </Button>
+              {company.status === 'active' ? <IconCircleCheck /> : <IconBan />}
+            </IconButton>
           </div>
         </div>
 

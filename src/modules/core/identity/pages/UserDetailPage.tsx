@@ -2,10 +2,19 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
+import {
+  IconBan,
+  IconCircleCheck,
+  IconKey,
+  IconShield,
+  IconShieldOff,
+  IconTrash,
+} from '@/components/icons/Icons'
 import {
   PROFILE_LANGUAGES,
   PROFILE_TIMEZONES,
@@ -16,6 +25,7 @@ import {
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import {
   changeOwnPassword,
+  deleteUser,
   fetchUser,
   sendUserPasswordReset,
   updateUser,
@@ -186,6 +196,24 @@ export function UserDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!user) {
+      return
+    }
+    if (isSelf) {
+      setError('You cannot delete your own account.')
+      return
+    }
+    setError(null)
+    setMessage(null)
+    try {
+      await deleteUser(user.id)
+      navigate('/system/core/users')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to delete user.')
+    }
+  }
+
   async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (newPassword !== confirmPassword) {
@@ -264,21 +292,30 @@ export function UserDetailPage() {
                 {showPasswordForm ? 'Hide Change Password' : 'Change Password'}
               </Button>
             ) : null}
-            <Button
-              variant="secondary"
+            <IconButton
+              label={user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
               onClick={() => navigate(`/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`)}
             >
-              {user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
-            </Button>
-            <Button variant="secondary" onClick={() => void handleSendReset()}>
-              Send Password Reset
-            </Button>
-            <Button
+              {user.mfaEnabled ? <IconShieldOff /> : <IconShield />}
+            </IconButton>
+            <IconButton label="Send password reset" onClick={() => void handleSendReset()}>
+              <IconKey />
+            </IconButton>
+            <IconButton
+              label={user.status === 'active' ? 'Active' : 'Inactive'}
               variant={user.status === 'active' ? 'secondary' : 'danger'}
               onClick={() => void handleToggleStatus()}
             >
-              {user.status === 'active' ? 'Active' : 'Inactive'}
-            </Button>
+              {user.status === 'active' ? <IconCircleCheck /> : <IconBan />}
+            </IconButton>
+            <IconButton
+              label={isSelf ? 'You cannot delete your own account' : 'Delete'}
+              variant="danger"
+              onClick={() => void handleDelete()}
+              disabled={isSelf}
+            >
+              <IconTrash />
+            </IconButton>
           </div>
         </div>
 

@@ -1,25 +1,7 @@
 import type { ReactNode, SVGProps } from 'react'
+import { IconSvg as Svg } from '@/components/icons/Icons'
 
 type IconProps = SVGProps<SVGSVGElement>
-
-function Svg({ children, ...props }: IconProps & { children: ReactNode }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="1em"
-      height="1em"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      {...props}
-    >
-      {children}
-    </svg>
-  )
-}
 
 export function IconSearch(props: IconProps) {
   return (

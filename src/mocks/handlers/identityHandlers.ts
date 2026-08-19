@@ -1,5 +1,5 @@
 import { HttpResponse, http } from 'msw'
-import { MOCK_MFA_CODE, provisionMockAuthUser, setMockUserMfaEnabled } from '@/mocks/data/users'
+import { MOCK_MFA_CODE, provisionMockAuthUser, removeMockAuthUser, setMockUserMfaEnabled } from '@/mocks/data/users'
 import {
   DEMO_TENANT_ID,
   identityCompanies,
@@ -254,6 +254,29 @@ export const identityHandlers = [
     }
 
     return HttpResponse.json(user)
+  }),
+
+  http.delete('/api/identity/users/:id', ({ params, request }) => {
+    const index = identityUsers.findIndex((item) => item.id === params.id)
+    if (index < 0) {
+      return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
+    }
+
+    const id = String(params.id)
+    const auth = request.headers.get('Authorization')
+    const actorMatch = auth?.startsWith('Bearer ') ? /^access_(.+)$/.exec(auth.slice(7)) : null
+    if (actorMatch?.[1] === id) {
+      return HttpResponse.json({ message: 'You cannot delete your own account.' }, { status: 409 })
+    }
+
+    identityUsers.splice(index, 1)
+    for (let i = identityMemberships.length - 1; i >= 0; i -= 1) {
+      if (identityMemberships[i]?.userId === id) {
+        identityMemberships.splice(i, 1)
+      }
+    }
+    removeMockAuthUser(id)
+    return new HttpResponse(null, { status: 204 })
   }),
 
   http.get('/api/identity/companies', () => {

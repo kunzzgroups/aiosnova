@@ -31,6 +31,13 @@
   font-size: var(--text-md);
 }
 
+.ui-button--icon {
+  width: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+}
+
 .ui-button--full {
   width: 100%;
 }

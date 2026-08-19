@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { IconBan, IconCircleCheck, IconTrash } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import type { OrganizationNode } from '@/modules/core/identity/types/identity'
 import { formatStatusLabel } from '@/modules/core/identity/types/identity'
@@ -81,22 +83,16 @@ function OrganizationBranch({
               </span>
             </div>
             <div className="identity-inline-actions">
-              <Button
+              <IconButton
+                label={node.status === 'active' ? 'Active' : 'Inactive'}
                 variant={node.status === 'active' ? 'secondary' : 'danger'}
-                size="md"
-                className="identity-action-btn identity-action-btn--status"
                 onClick={() => onToggleStatus(node)}
               >
-                {node.status === 'active' ? 'Active' : 'Inactive'}
-              </Button>
-              <Button
-                variant="danger"
-                size="md"
-                className="identity-action-btn identity-action-btn--delete"
-                onClick={() => onDelete(node)}
-              >
-                Delete
-              </Button>
+                {node.status === 'active' ? <IconCircleCheck /> : <IconBan />}
+              </IconButton>
+              <IconButton label="Delete" variant="danger" onClick={() => onDelete(node)}>
+                <IconTrash />
+              </IconButton>
             </div>
           </div>
           <OrganizationBranch nodes={node.children} onToggleStatus={onToggleStatus} onDelete={onDelete} />
