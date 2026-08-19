@@ -20,7 +20,7 @@
 
 .ui-text-field:focus {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 3px rgba(15, 61, 62, 0.12);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .ui-text-field--error {
@@ -28,7 +28,7 @@
 }
 
 .ui-text-field--error:focus {
-  box-shadow: 0 0 0 3px rgba(155, 44, 44, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 18%, transparent);
 }
 
 .ui-text-field:disabled,

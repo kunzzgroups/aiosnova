@@ -1,15 +1,15 @@
 .sidebar {
   --sidebar-width: 15rem;
   --sidebar-collapsed-width: 4.75rem;
-  --sidebar-surface: #ffffff;
-  --sidebar-ink: #1a2422;
-  --sidebar-muted: #7a8a85;
-  --sidebar-icon: #5f736c;
-  --sidebar-hover: #f2f6f4;
-  --sidebar-active: #e4f0eb;
-  --sidebar-active-ink: #0f3d3e;
-  --sidebar-line: #e6eeea;
-  --sidebar-search-bg: #f4f7f6;
+  --sidebar-surface: var(--color-bg-elevated);
+  --sidebar-ink: var(--color-text);
+  --sidebar-muted: var(--color-text-muted);
+  --sidebar-icon: var(--color-text-muted);
+  --sidebar-hover: var(--color-bg-muted);
+  --sidebar-active: var(--color-brand-soft);
+  --sidebar-active-ink: var(--color-brand);
+  --sidebar-line: var(--color-border);
+  --sidebar-search-bg: var(--color-bg-muted);
 
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
@@ -60,13 +60,13 @@
   width: 2rem;
   height: 2rem;
   border-radius: 0.65rem;
-  background: linear-gradient(145deg, #1b5a55 0%, #0f3d3e 100%);
-  color: #f4fbf9;
+  background: var(--color-brand);
+  color: var(--color-on-brand);
   font-family: var(--font-display);
   font-size: 1.1rem;
   line-height: 1;
   flex-shrink: 0;
-  box-shadow: 0 6px 14px rgba(15, 61, 62, 0.2);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--color-brand) 28%, transparent);
 }
 
 .sidebar__brand-text {
@@ -86,7 +86,7 @@
   height: 1.85rem;
   border: 1px solid var(--sidebar-line);
   border-radius: 999px;
-  background: #fff;
+  background: var(--color-bg-elevated);
   color: var(--sidebar-icon);
   cursor: pointer;
   flex-shrink: 0;
@@ -147,9 +147,9 @@
 }
 
 .sidebar__search input:focus {
-  border-color: rgba(15, 61, 62, 0.18);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(42, 107, 90, 0.1);
+  border-color: var(--color-brand);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .sidebar__context {
@@ -328,7 +328,7 @@
 .sidebar__link {
   justify-content: flex-start;
   gap: 0.65rem;
-  color: #3d4c47;
+  color: var(--sidebar-ink);
   font-weight: 500;
   min-height: 2.15rem;
   padding: 0.4rem 0.6rem;
@@ -355,7 +355,7 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  background: linear-gradient(145deg, #d7ebe3, #b9d8ce);
+  background: var(--color-brand-soft);
   color: var(--sidebar-active-ink);
   font-size: 0.75rem;
   font-weight: 700;

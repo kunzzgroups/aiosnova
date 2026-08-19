@@ -1,9 +1,9 @@
 .auth-layout {
-  --auth-glass: rgba(255, 255, 255, 0.55);
-  --auth-glass-border: rgba(255, 255, 255, 0.7);
-  --auth-field: rgba(255, 255, 255, 0.55);
-  --auth-ink: #12181a;
-  --auth-muted: #5f6b70;
+  --auth-glass: color-mix(in srgb, var(--color-bg-elevated) 82%, transparent);
+  --auth-glass-border: var(--color-border);
+  --auth-field: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
+  --auth-ink: var(--color-text);
+  --auth-muted: var(--color-text-muted);
 
   position: relative;
   isolation: isolate;
@@ -13,10 +13,9 @@
   padding: var(--space-5);
   overflow: hidden;
   background:
-    radial-gradient(ellipse 80% 55% at 50% -10%, rgba(255, 255, 255, 0.95), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 80% 20%, rgba(186, 220, 230, 0.55), transparent 50%),
-    radial-gradient(ellipse 60% 45% at 15% 30%, rgba(210, 232, 220, 0.5), transparent 45%),
-    linear-gradient(180deg, #dcecf5 0%, #e7f1ef 42%, #d5e4df 100%);
+    radial-gradient(ellipse 70% 50% at 80% 12%, color-mix(in srgb, var(--color-brand) 18%, transparent), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 12% 88%, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 50%),
+    var(--color-bg);
 }
 
 .auth-layout__glow {
@@ -32,7 +31,7 @@
   height: min(48vw, 28rem);
   top: 8%;
   right: 8%;
-  background: rgba(173, 214, 224, 0.55);
+  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
 }
 
 .auth-layout__glow--two {
@@ -40,7 +39,7 @@
   height: min(42vw, 24rem);
   bottom: 5%;
   left: 5%;
-  background: rgba(180, 214, 198, 0.45);
+  background: color-mix(in srgb, var(--color-brand) 24%, transparent);
 }
 
 .auth-layout__arcs {
@@ -98,7 +97,7 @@
   height: 1.7rem;
   border-radius: 0.55rem;
   background: var(--color-brand);
-  color: #f7fbfa;
+  color: var(--color-on-brand);
   font-family: var(--font-display);
   font-size: 1rem;
   line-height: 1;
@@ -110,12 +109,9 @@
   width: min(100%, 26.5rem);
   padding: 1.75rem 1.6rem 1.5rem;
   border-radius: 1.75rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.42) 100%);
-  border: 1px solid var(--auth-glass-border);
-  box-shadow:
-    0 24px 60px rgba(20, 40, 50, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  background: color-mix(in srgb, var(--color-bg-elevated) 92%, transparent);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(22px) saturate(1.25);
   -webkit-backdrop-filter: blur(22px) saturate(1.25);
 }
@@ -123,6 +119,8 @@
 .auth-layout__locale {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
   margin: -0.2rem 0 0.85rem;
 }
 
@@ -232,8 +230,8 @@
 }
 
 .auth-layout .ui-text-field:focus {
-  border-color: rgba(15, 61, 62, 0.35);
-  box-shadow: 0 0 0 3px rgba(15, 61, 62, 0.1);
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -249,22 +247,21 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
+.auth-layout__locale .ui-icon-button {
+  width: 1.9rem;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+}
+
 .auth-layout .ui-button--primary {
   min-height: 3rem;
   border-radius: 0.9rem;
-  background: #171d1f;
-  font-weight: 700;
-}
-
-.auth-layout .ui-button--primary:hover:not(:disabled) {
-  background: #0d1214;
 }
 
 .auth-layout .ui-button--secondary {
-  min-height: 3rem;
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.72);
-  border-color: rgba(255, 255, 255, 0.9);
+  background: var(--color-bg-muted);
+  border-color: var(--color-border);
+  color: var(--color-text);
 }
 
 .auth-layout .password-field__toggle {

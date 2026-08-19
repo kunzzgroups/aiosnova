@@ -101,7 +101,7 @@
 .login-form__remember-input:checked + .login-form__switch {
   background: var(--color-brand);
   border-color: var(--color-brand);
-  box-shadow: 0 4px 10px rgba(15, 61, 62, 0.22);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-brand) 28%, transparent);
 }
 
 .login-form__remember-input:checked + .login-form__switch .login-form__switch-thumb {
@@ -113,7 +113,7 @@
 }
 
 .login-form__remember-input:focus-visible + .login-form__switch {
-  box-shadow: 0 0 0 3px rgba(15, 61, 62, 0.14);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .login-form__remember-input:disabled + .login-form__switch,

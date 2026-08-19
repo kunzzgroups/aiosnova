@@ -132,3 +132,20 @@ export function IconX(props: IconProps) {
     </IconSvg>
   )
 }
+
+export function IconSun(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v1.6M12 19.4V21M4.9 4.9l1.1 1.1M18 18l1.1 1.1M3 12h1.6M19.4 12H21M4.9 19.1 6 18M18 6l1.1-1.1" />
+    </IconSvg>
+  )
+}
+
+export function IconMoon(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M20 14.5A7.5 7.5 0 1 1 9.5 4 6.2 6.2 0 0 0 20 14.5Z" />
+    </IconSvg>
+  )
+}

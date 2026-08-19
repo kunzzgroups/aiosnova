@@ -2,7 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from '@/app/App'
 import { hydrateSession } from '@/modules/core/auth/services/authService'
+import { applyTheme, useThemeStore } from '@/stores/themeStore'
 import '@/design-system/global.css'
+
+applyTheme(useThemeStore.getState().theme)
 
 async function enableMocking() {
   const shouldMock = import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCK === 'true'

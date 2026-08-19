@@ -1,7 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      try {
+        var theme = localStorage.getItem('aios.theme')
+        document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark'
+      } catch (error) {}
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AIOS</title>

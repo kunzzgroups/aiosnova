@@ -19,10 +19,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  border: 1px solid var(--sidebar-line, #e6eeea);
+  border: 1px solid var(--sidebar-line, var(--color-border));
   border-radius: 0.8rem;
-  background: #fff;
-  color: var(--sidebar-ink, #1a2422);
+  background: var(--color-bg-elevated);
+  color: var(--sidebar-ink, var(--color-text));
   font: inherit;
   font-size: 0.84rem;
   font-weight: 550;
@@ -41,9 +41,9 @@
 
 .sidebar-select__trigger:hover:not(:disabled),
 .sidebar-select__trigger.is-open:not(:disabled) {
-  border-color: rgba(15, 61, 62, 0.22);
-  background: #fbfcfb;
-  box-shadow: 0 0 0 3px rgba(42, 107, 90, 0.08);
+  border-color: var(--color-brand);
+  background: var(--color-bg-muted);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .sidebar-select__value {
@@ -72,7 +72,7 @@
 
 .sidebar-select__trigger.is-open .sidebar-select__chevron {
   transform: rotate(-90deg);
-  color: var(--sidebar-active-ink, #0f3d3e);
+  color: var(--sidebar-active-ink);
 }
 
 .sidebar-select__menu {
@@ -84,10 +84,10 @@
   margin: 0;
   padding: 0.35rem;
   list-style: none;
-  border: 1px solid var(--sidebar-line, #e6eeea);
+  border: 1px solid var(--sidebar-line, var(--color-border));
   border-radius: 0.9rem;
-  background: #fff;
-  box-shadow: 0 14px 32px rgba(15, 61, 62, 0.12);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-md);
 }
 
 .sidebar-select__option {

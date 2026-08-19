@@ -44,7 +44,7 @@
 
 .ui-button--primary {
   background: var(--color-brand);
-  color: #f7fbfa;
+  color: var(--color-on-brand);
 }
 
 .ui-button--primary:hover:not(:disabled) {

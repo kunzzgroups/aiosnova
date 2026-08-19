@@ -51,7 +51,7 @@
   width: 1rem;
   height: 1rem;
   border-radius: 50%;
-  border: 2px solid rgba(15, 61, 62, 0.15);
+  border: 2px solid var(--color-focus-ring);
   border-top-color: var(--color-brand);
   animation: social-auth-spin 0.7s linear infinite;
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { LanguageSwitcher } from '@/components/navigation/LanguageSwitcher'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import './AuthLayout.css'
 
 type AuthLayoutProps = {
@@ -49,6 +50,7 @@ export function AuthLayout({
 
       <div className={panelClass}>
         <div className="auth-layout__locale">
+          <ThemeToggle />
           <LanguageSwitcher />
         </div>
 
