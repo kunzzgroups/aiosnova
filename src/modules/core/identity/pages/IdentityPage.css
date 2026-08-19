@@ -507,8 +507,8 @@
   box-sizing: border-box;
 }
 
-.identity-tree .identity-action-btn--org-status {
-  width: 6.6rem;
+.identity-tree .identity-action-btn--status {
+  width: 5.4rem;
 }
 
 .identity-tree .identity-action-btn--delete {

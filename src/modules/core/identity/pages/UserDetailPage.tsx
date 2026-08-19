@@ -274,10 +274,10 @@ export function UserDetailPage() {
               Send Password Reset
             </Button>
             <Button
-              variant={user.status === 'disabled' ? 'primary' : 'danger'}
+              variant={user.status === 'active' ? 'secondary' : 'danger'}
               onClick={() => void handleToggleStatus()}
             >
-              {user.status === 'disabled' ? 'Activate' : 'Disable'}
+              {user.status === 'active' ? 'Active' : 'Inactive'}
             </Button>
           </div>
         </div>

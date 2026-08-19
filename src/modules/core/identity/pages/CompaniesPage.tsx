@@ -262,13 +262,13 @@ export function CompaniesPage() {
                           Edit
                         </Button>
                         <Button
-                          variant={company.status === 'inactive' ? 'secondary' : 'danger'}
+                          variant={company.status === 'active' ? 'secondary' : 'danger'}
                           size="md"
                           className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(company)}
                           disabled={statusUpdatingId === company.id}
                         >
-                          {company.status === 'inactive' ? 'Activate' : 'Disable'}
+                          {company.status === 'active' ? 'Active' : 'Inactive'}
                         </Button>
                       </div>
                     </td>

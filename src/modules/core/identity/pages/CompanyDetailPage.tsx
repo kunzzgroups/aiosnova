@@ -138,10 +138,10 @@ export function CompanyDetailPage() {
               </Button>
             ) : null}
             <Button
-              variant={company.status === 'inactive' ? 'secondary' : 'danger'}
+              variant={company.status === 'active' ? 'secondary' : 'danger'}
               onClick={() => void handleToggleStatus()}
             >
-              {company.status === 'inactive' ? 'Activate' : 'Disable'}
+              {company.status === 'active' ? 'Active' : 'Inactive'}
             </Button>
           </div>
         </div>

@@ -74,12 +74,12 @@ function OrganizationBranch({
             </div>
             <div className="identity-inline-actions">
               <Button
-                variant={node.status === 'active' ? 'danger' : 'secondary'}
+                variant={node.status === 'active' ? 'secondary' : 'danger'}
                 size="md"
-                className="identity-action-btn identity-action-btn--org-status"
+                className="identity-action-btn identity-action-btn--status"
                 onClick={() => onToggleStatus(node)}
               >
-                {node.status === 'active' ? 'Deactivate' : 'Activate'}
+                {node.status === 'active' ? 'Active' : 'Disable'}
               </Button>
               <Button
                 variant="danger"

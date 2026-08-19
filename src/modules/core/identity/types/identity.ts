@@ -30,6 +30,9 @@ export function formatStatusLabel(status: string) {
   if (!status) {
     return status
   }
+  if (status === 'disabled') {
+    return 'Inactive'
+  }
   return `${status.charAt(0).toUpperCase()}${status.slice(1)}`
 }
 

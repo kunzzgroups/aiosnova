@@ -29,7 +29,7 @@ const STATUS_FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
   { value: 'invited', label: 'Invited' },
-  { value: 'disabled', label: 'Disabled' },
+  { value: 'disabled', label: 'Inactive' },
 ] as const
 
 const MFA_FILTERS = [
@@ -433,13 +433,13 @@ export function UsersPage() {
                           </Button>
                         ) : null}
                         <Button
-                          variant={user.status === 'disabled' ? 'secondary' : 'danger'}
+                          variant={user.status === 'active' ? 'secondary' : 'danger'}
                           size="md"
                           className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(user)}
                           disabled={statusUpdatingId === user.id}
                         >
-                          {user.status === 'disabled' ? 'Activate' : 'Disable'}
+                          {user.status === 'active' ? 'Active' : 'Disable'}
                         </Button>
                       </div>
                     </td>
