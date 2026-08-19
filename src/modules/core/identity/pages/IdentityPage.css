@@ -390,7 +390,7 @@
 }
 
 .identity-table-wrap {
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .identity-table {

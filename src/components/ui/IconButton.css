@@ -1,5 +1,53 @@
+.ui-icon-button-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ui-icon-button-wrap:hover,
+.ui-icon-button-wrap:focus-within {
+  z-index: 20;
+}
+
 .ui-icon-button svg {
   width: 1.05rem;
   height: 1.05rem;
   flex-shrink: 0;
+}
+
+.ui-icon-button__tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%) translateY(0.2rem);
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 8px 18px rgba(15, 20, 18, 0.18);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+
+.ui-icon-button__tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #111;
+}
+
+.ui-icon-button-wrap:hover .ui-icon-button__tooltip,
+.ui-icon-button-wrap:focus-within .ui-icon-button__tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
