@@ -67,3 +67,7 @@
   background: var(--color-danger);
   color: #fff;
 }
+
+.ui-button--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 88%, #000);
+}

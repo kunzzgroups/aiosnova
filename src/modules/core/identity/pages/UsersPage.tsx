@@ -96,6 +96,7 @@ export function UsersPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true)
@@ -207,11 +208,14 @@ export function UsersPage() {
     const nextStatus: UserStatus = user.status === 'disabled' ? 'active' : 'disabled'
     setError(null)
     setMessage(null)
+    setStatusUpdatingId(user.id)
     try {
-      await updateUser(user.id, { status: nextStatus })
-      await loadUsers()
+      const updated = await updateUser(user.id, { status: nextStatus })
+      setUsers((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to update user.')
+    } finally {
+      setStatusUpdatingId(null)
     }
   }
 
@@ -351,15 +355,16 @@ export function UsersPage() {
         ) : null}
         {filteredUsers.length > 0 ? (
           <div className="identity-table-wrap">
-            <table className="identity-table">
+            <table className="identity-table identity-table--packed">
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
-                  <th>Status</th>
+                  <th className="identity-table__status">Status</th>
                   <th>Sign-in</th>
                   <th>MFA</th>
                   <th>Last active</th>
+                  <th className="identity-table__spacer" aria-hidden="true" />
                   <th className="identity-table__actions">Actions</th>
                 </tr>
               </thead>
@@ -377,7 +382,7 @@ export function UsersPage() {
                       ) : null}
                     </td>
                     <td>{user.email}</td>
-                    <td>
+                    <td className="identity-table__status">
                       <span className={`identity-status identity-status--${user.status}`}>
                         {formatStatusLabel(user.status)}
                       </span>
@@ -385,6 +390,7 @@ export function UsersPage() {
                     <td>{formatSignInMethod(user.signInMethod)}</td>
                     <td>{formatDirectoryMfa(user)}</td>
                     <td>{formatLastActive(user.lastActiveAt)}</td>
+                    <td className="identity-table__spacer" aria-hidden="true" />
                     <td className="identity-table__actions">
                       <div className="identity-inline-actions">
                         <Button
@@ -427,10 +433,11 @@ export function UsersPage() {
                           </Button>
                         ) : null}
                         <Button
-                          variant="secondary"
+                          variant={user.status === 'disabled' ? 'secondary' : 'danger'}
                           size="md"
                           className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(user)}
+                          disabled={statusUpdatingId === user.id}
                         >
                           {user.status === 'disabled' ? 'Activate' : 'Disable'}
                         </Button>

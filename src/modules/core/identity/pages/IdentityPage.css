@@ -399,12 +399,12 @@
   font-size: var(--text-sm);
 }
 
-.identity-table--companies th,
-.identity-table--companies td {
+.identity-table--packed th,
+.identity-table--packed td {
   white-space: nowrap;
 }
 
-.identity-table--companies .identity-table__spacer {
+.identity-table--packed .identity-table__spacer {
   width: auto;
   padding: 0;
 }
@@ -418,7 +418,7 @@
 }
 
 .identity-table__status .identity-status {
-  min-width: 4.75rem;
+  min-width: 5.25rem;
   justify-content: center;
   box-sizing: border-box;
 }

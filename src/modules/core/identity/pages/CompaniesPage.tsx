@@ -216,7 +216,7 @@ export function CompaniesPage() {
         ) : null}
         {filteredCompanies.length > 0 ? (
           <div className="identity-table-wrap">
-            <table className="identity-table identity-table--companies">
+            <table className="identity-table identity-table--packed">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -262,7 +262,7 @@ export function CompaniesPage() {
                           Edit
                         </Button>
                         <Button
-                          variant="secondary"
+                          variant={company.status === 'inactive' ? 'secondary' : 'danger'}
                           size="md"
                           className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(company)}
