@@ -3,6 +3,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
+import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { IconBan, IconStar } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import type {
@@ -52,6 +53,31 @@ export function MembershipsPage() {
   const companyMap = useMemo(
     () => new Map(companies.map((company) => [company.id, company])),
     [companies],
+  )
+  const userOptions = useMemo(
+    () => users.map((user) => ({ value: user.id, label: `${user.displayName} (${user.email})` })),
+    [users],
+  )
+  const companyOptions = useMemo(
+    () => [
+      { value: '', label: 'None' },
+      ...companies.map((company) => ({ value: company.id, label: company.name })),
+    ],
+    [companies],
+  )
+  const organizationOptions = useMemo(
+    () => [
+      { value: '', label: 'None' },
+      ...organizations.map((org) => ({ value: org.id, label: org.name })),
+    ],
+    [organizations],
+  )
+  const positionOptions = useMemo(
+    () => [
+      { value: '', label: 'None' },
+      ...positions.map((position) => ({ value: position.id, label: position.name })),
+    ],
+    [positions],
   )
 
   const load = useCallback(async () => {
@@ -140,80 +166,62 @@ export function MembershipsPage() {
           <h2>Add membership</h2>
           <form className="identity-form" onSubmit={(event) => void handleCreate(event)}>
             <FormField label="User" htmlFor="mem-user">
-              <select
+              <SidebarSelect
                 id="mem-user"
-                className="identity-select"
+                label="User"
+                hideLabel
                 value={userId}
-                onChange={(event) => setUserId(event.target.value)}
-                required
+                options={userOptions}
+                onChange={setUserId}
                 disabled={isSubmitting}
-              >
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.displayName} ({user.email})
-                  </option>
-                ))}
-              </select>
+              />
             </FormField>
             <FormField label="Company" htmlFor="mem-company">
-              <select
+              <SidebarSelect
                 id="mem-company"
-                className="identity-select"
+                label="Company"
+                hideLabel
                 value={companyId}
-                onChange={(event) => setCompanyId(event.target.value)}
+                options={companyOptions}
+                onChange={setCompanyId}
                 disabled={isSubmitting}
-              >
-                <option value="">None</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
+              />
             </FormField>
             <FormField label="Organization" htmlFor="mem-org">
-              <select
+              <SidebarSelect
                 id="mem-org"
-                className="identity-select"
+                label="Organization"
+                hideLabel
                 value={organizationId}
-                onChange={(event) => setOrganizationId(event.target.value)}
+                options={organizationOptions}
+                onChange={setOrganizationId}
                 disabled={isSubmitting}
-              >
-                <option value="">None</option>
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+              />
             </FormField>
             <FormField label="Position" htmlFor="mem-pos">
-              <select
+              <SidebarSelect
                 id="mem-pos"
-                className="identity-select"
+                label="Position"
+                hideLabel
                 value={positionId}
-                onChange={(event) => setPositionId(event.target.value)}
+                options={positionOptions}
+                onChange={setPositionId}
                 disabled={isSubmitting}
-              >
-                <option value="">None</option>
-                {positions.map((position) => (
-                  <option key={position.id} value={position.id}>
-                    {position.name}
-                  </option>
-                ))}
-              </select>
+              />
             </FormField>
             <FormField label="Primary" htmlFor="mem-primary">
-              <select
+              <SidebarSelect
                 id="mem-primary"
-                className="identity-select"
+                label="Primary"
+                hideLabel
                 value={isPrimary ? 'yes' : 'no'}
-                onChange={(event) => setIsPrimary(event.target.value === 'yes')}
+                options={[
+                  { value: 'yes', label: 'Yes' },
+                  { value: 'no', label: 'No' },
+                ]}
+                onChange={(value) => setIsPrimary(value === 'yes')}
                 disabled={isSubmitting}
-              >
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
+              />
             </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSubmitting || !userId}>
