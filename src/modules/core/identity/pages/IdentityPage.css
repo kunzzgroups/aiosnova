@@ -399,12 +399,28 @@
   font-size: var(--text-sm);
 }
 
+.identity-table--companies th,
+.identity-table--companies td {
+  white-space: nowrap;
+}
+
+.identity-table--companies .identity-table__spacer {
+  width: auto;
+  padding: 0;
+}
+
 .identity-table th,
 .identity-table td {
   padding: 0.7rem 0.65rem;
   border-bottom: 1px solid var(--color-border);
   text-align: left;
   vertical-align: center;
+}
+
+.identity-table__status .identity-status {
+  min-width: 4.75rem;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .identity-table th.identity-table__actions,
@@ -519,7 +535,7 @@
 }
 
 .identity-table__actions .identity-inline-actions .identity-action-btn--status {
-  width: 4.6rem;
+  width: 5.4rem;
 }
 
 .identity-inline-actions--spaced {

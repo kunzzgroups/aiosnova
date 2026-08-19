@@ -42,9 +42,12 @@ export function CompaniesPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
 
-  const loadCompanies = useCallback(async () => {
-    setIsLoading(true)
+  const loadCompanies = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setIsLoading(true)
+    }
     setError(null)
     try {
       const result = await fetchCompanies()
@@ -52,7 +55,9 @@ export function CompaniesPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to load companies.')
     } finally {
-      setIsLoading(false)
+      if (!options?.silent) {
+        setIsLoading(false)
+      }
     }
   }, [])
 
@@ -102,11 +107,11 @@ export function CompaniesPage() {
     setError(null)
     setMessage(null)
     try {
-      await createCompany({ code, name })
+      const created = await createCompany({ code, name })
       resetCreateForm()
       setShowCreate(false)
       setMessage('Company created.')
-      await loadCompanies()
+      setCompanies((current) => [...current, created])
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to create company.')
     } finally {
@@ -118,11 +123,16 @@ export function CompaniesPage() {
     const nextStatus = company.status === 'inactive' ? 'active' : 'inactive'
     setError(null)
     setMessage(null)
+    setStatusUpdatingId(company.id)
     try {
-      await updateCompany(company.id, { status: nextStatus })
-      await loadCompanies()
+      const updated = await updateCompany(company.id, { status: nextStatus })
+      setCompanies((current) =>
+        current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+      )
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to update company.')
+    } finally {
+      setStatusUpdatingId(null)
     }
   }
 
@@ -206,13 +216,14 @@ export function CompaniesPage() {
         ) : null}
         {filteredCompanies.length > 0 ? (
           <div className="identity-table-wrap">
-            <table className="identity-table">
+            <table className="identity-table identity-table--companies">
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Code</th>
-                  <th>Status</th>
+                  <th className="identity-table__status">Status</th>
                   <th>Members</th>
+                  <th className="identity-table__spacer" aria-hidden="true" />
                   <th className="identity-table__actions">Actions</th>
                 </tr>
               </thead>
@@ -225,12 +236,13 @@ export function CompaniesPage() {
                       </Link>
                     </td>
                     <td>{company.code}</td>
-                    <td>
+                    <td className="identity-table__status">
                       <span className={`identity-status identity-status--${company.status}`}>
                         {formatStatusLabel(company.status)}
                       </span>
                     </td>
                     <td>{company.memberCount}</td>
+                    <td className="identity-table__spacer" aria-hidden="true" />
                     <td className="identity-table__actions">
                       <div className="identity-inline-actions">
                         <Button
@@ -254,6 +266,7 @@ export function CompaniesPage() {
                           size="md"
                           className="identity-action-btn identity-action-btn--status"
                           onClick={() => void handleToggleStatus(company)}
+                          disabled={statusUpdatingId === company.id}
                         >
                           {company.status === 'inactive' ? 'Activate' : 'Disable'}
                         </Button>
