@@ -2,8 +2,9 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError } from '@/services/httpClient'
-import { startOAuth, type OAuthProvider } from '@/modules/core/auth/services/authService'
+import { completeOAuth, type OAuthProvider } from '@/modules/core/auth/services/authService'
 import { useAuthCopy } from '@/modules/core/auth/i18n/authCopy'
+import { postAuthPath } from '@/modules/core/auth/types/auth'
 import './SocialAuthButtons.css'
 
 function GoogleGlyph() {
@@ -60,8 +61,8 @@ export function SocialAuthButtons() {
     setError(null)
 
     try {
-      const redirectUrl = await startOAuth(provider)
-      navigate(redirectUrl)
+      await completeOAuth(provider)
+      navigate(postAuthPath(), { replace: true })
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : `Unable to start ${provider} sign-in.`

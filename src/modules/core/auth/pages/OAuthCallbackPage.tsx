@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
-import { AuthLayout } from '@/layouts/AuthLayout'
 import { ApiError } from '@/services/httpClient'
 import { completeOAuth, type OAuthProvider } from '@/modules/core/auth/services/authService'
 import { postAuthPath } from '@/modules/core/auth/types/auth'
@@ -28,7 +27,7 @@ export function OAuthCallbackPage() {
       }
 
       try {
-        const result = await completeOAuth(provider)
+        await completeOAuth(provider)
         if (!cancelled) {
           navigate(postAuthPath(), { replace: true })
         }
@@ -45,16 +44,16 @@ export function OAuthCallbackPage() {
     }
   }, [navigate, provider, label])
 
+  if (!error) {
+    return null
+  }
+
   return (
-    <AuthLayout title={`Connecting ${label}`} subtitle="Finishing mock OAuth sign-in…">
-      {error ? (
-        <Alert variant="error">
-          {error} <Link to="/login">Back to login</Link>
-        </Alert>
-      ) : (
-        <p>Please wait…</p>
-      )}
-    </AuthLayout>
+    <div className="auth-loading">
+      <Alert variant="error">
+        {error} <Link to="/login">Back to login</Link>
+      </Alert>
+    </div>
   )
 }
 
