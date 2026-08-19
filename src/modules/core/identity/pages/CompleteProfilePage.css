@@ -10,16 +10,6 @@
   grid-column: 1 / -1;
 }
 
-.complete-profile-form__hint {
-  grid-column: 1 / -1;
-  margin: -0.35rem 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs, 0.75rem);
-  line-height: 1.35;
-  white-space: nowrap;
-  margin-bottom: var(--space-1);
-}
-
 .complete-profile-form .sidebar-select__trigger {
   min-height: 2.55rem;
   border-radius: 0.9rem;
@@ -32,9 +22,5 @@
 @media (max-width: 640px) {
   .complete-profile-form {
     grid-template-columns: 1fr;
-  }
-
-  .complete-profile-form__hint {
-    white-space: normal;
   }
 }

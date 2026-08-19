@@ -32,7 +32,6 @@ import {
   isValidPassword,
   PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_ERROR_MESSAGE,
-  PASSWORD_RULE_HINT,
 } from '@/modules/core/auth/utils/passwordPolicy'
 import {
   createUser,
@@ -357,7 +356,7 @@ export function UsersPage() {
                   disabled={isSubmitting || companies.length === 0}
                 />
               </FormField>
-              <FormField label="Password" htmlFor="user-password" hint={PASSWORD_RULE_HINT}>
+              <FormField label="Password" htmlFor="user-password">
                 <div className="identity-invite__password">
                   <PasswordField
                     id="user-password"
@@ -365,6 +364,7 @@ export function UsersPage() {
                     onChange={setPassword}
                     autoComplete="new-password"
                     placeholder={PASSWORD_CREATE_PLACEHOLDER}
+                    showRequirements
                     disabled={isSubmitting}
                     revealed={passwordRevealed}
                     onRevealedChange={setPasswordRevealed}

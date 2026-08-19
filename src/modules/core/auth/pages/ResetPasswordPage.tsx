@@ -12,7 +12,6 @@ import {
   PASSWORD_CONFIRM_PLACEHOLDER,
   PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_ERROR_MESSAGE,
-  PASSWORD_RULE_HINT,
 } from '@/modules/core/auth/utils/passwordPolicy'
 import './AuthForm.css'
 
@@ -68,13 +67,14 @@ export function ResetPasswordPage() {
       <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
         {error ? <Alert variant="error">{error}</Alert> : null}
         {!token ? <Alert variant="error">Missing reset token. Request a new link.</Alert> : null}
-        <FormField label="New password" htmlFor="reset-password" hint={PASSWORD_RULE_HINT}>
+        <FormField label="New password" htmlFor="reset-password">
           <PasswordField
             id="reset-password"
             value={password}
             onChange={setPassword}
             placeholder={PASSWORD_CREATE_PLACEHOLDER}
             autoComplete="new-password"
+            showRequirements
             disabled={isSubmitting || !token}
           />
         </FormField>

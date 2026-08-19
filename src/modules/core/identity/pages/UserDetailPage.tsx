@@ -23,13 +23,13 @@ import {
   type IdentityUser,
 } from '@/modules/core/identity/types/identity'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import {
   isValidPassword,
   NEW_PASSWORD_ERROR_MESSAGE,
   PASSWORD_CONFIRM_PLACEHOLDER,
   PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_CURRENT_PLACEHOLDER,
-  PASSWORD_RULE_HINT,
 } from '@/modules/core/auth/utils/passwordPolicy'
 import {
   changeOwnPassword,
@@ -473,16 +473,14 @@ export function UserDetailPage() {
                 disabled={isSaving}
               />
             </FormField>
-            <FormField label="New password" htmlFor="new-password" hint={PASSWORD_RULE_HINT}>
-              <TextField
+            <FormField label="New password" htmlFor="new-password">
+              <PasswordField
                 id="new-password"
-                type="password"
                 value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
+                onChange={setNewPassword}
                 placeholder={PASSWORD_CREATE_PLACEHOLDER}
-                required
-                minLength={6}
                 autoComplete="new-password"
+                showRequirements
                 disabled={isSaving}
               />
             </FormField>

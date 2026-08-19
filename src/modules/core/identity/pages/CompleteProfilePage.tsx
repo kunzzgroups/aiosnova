@@ -15,7 +15,6 @@ import {
   PASSWORD_CONFIRM_PLACEHOLDER,
   PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_ERROR_MESSAGE,
-  PASSWORD_RULE_HINT,
 } from '@/modules/core/auth/utils/passwordPolicy'
 import { fetchUser, updateUser } from '@/modules/core/identity/services/identityService'
 import './CompleteProfilePage.css'
@@ -170,6 +169,7 @@ export function CompleteProfilePage() {
               onChange={setPassword}
               placeholder={PASSWORD_CREATE_PLACEHOLDER}
               autoComplete="new-password"
+              showRequirements
               disabled={isSaving}
             />
           </FormField>
@@ -183,7 +183,6 @@ export function CompleteProfilePage() {
               disabled={isSaving}
             />
           </FormField>
-          <p className="complete-profile-form__hint">{PASSWORD_RULE_HINT}</p>
           <div className="complete-profile-form__full">
             <Button type="submit" fullWidth size="lg" disabled={isSaving}>
               {isSaving ? 'Saving…' : 'Continue'}

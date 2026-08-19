@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/TextField'
+import { PasswordRequirements } from '@/modules/core/auth/components/PasswordRequirements'
 import './PasswordField.css'
 
 function IconEye() {
@@ -48,6 +49,7 @@ type PasswordFieldProps = {
   placeholder?: string
   revealed?: boolean
   onRevealedChange?: (revealed: boolean) => void
+  showRequirements?: boolean
 }
 
 export function PasswordField({
@@ -61,6 +63,7 @@ export function PasswordField({
   placeholder,
   revealed,
   onRevealedChange,
+  showRequirements = false,
 }: PasswordFieldProps) {
   const [uncontrolledRevealed, setUncontrolledRevealed] = useState(false)
   const isRevealed = revealed ?? uncontrolledRevealed
@@ -72,29 +75,37 @@ export function PasswordField({
     }
   }
 
+  function handleValueChange(next: string) {
+    onChange(next)
+  }
+
   return (
     <div className="password-field">
-      <TextField
-        id={id}
-        name={name}
-        type={isRevealed ? 'text' : 'password'}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        hasError={hasError}
-        disabled={disabled}
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        className="password-field__toggle"
-        onClick={() => setIsRevealed(!isRevealed)}
-        aria-label={isRevealed ? 'Hide password' : 'Show password'}
-        title={isRevealed ? 'Hide password' : 'Show password'}
-      >
-        {isRevealed ? <IconEyeOff /> : <IconEye />}
-      </Button>
+      <div className="password-field__control">
+        <TextField
+          id={id}
+          name={name}
+          type={isRevealed ? 'text' : 'password'}
+          value={value}
+          onChange={(event) => handleValueChange(event.target.value)}
+          onInput={(event) => handleValueChange((event.target as HTMLInputElement).value)}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          hasError={hasError}
+          disabled={disabled}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          className="password-field__toggle"
+          onClick={() => setIsRevealed(!isRevealed)}
+          aria-label={isRevealed ? 'Hide password' : 'Show password'}
+          title={isRevealed ? 'Hide password' : 'Show password'}
+        >
+          {isRevealed ? <IconEyeOff /> : <IconEye />}
+        </Button>
+      </div>
+      {showRequirements ? <PasswordRequirements value={value} /> : null}
     </div>
   )
 }
