@@ -24,6 +24,38 @@ function IconChevron() {
   )
 }
 
+function MalaysiaFlagIcon() {
+  const clipId = useId()
+  const stripe = 24 / 14
+
+  return (
+    <svg className="login-form__dial-flag" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+      <clipPath id={clipId}>
+        <circle cx="12" cy="12" r="12" />
+      </clipPath>
+      <g clipPath={`url(#${clipId})`}>
+        {Array.from({ length: 14 }, (_, index) => (
+          <rect
+            key={index}
+            x="0"
+            y={index * stripe}
+            width="24"
+            height={stripe + 0.05}
+            fill={index % 2 === 0 ? '#CC0001' : '#FFFFFF'}
+          />
+        ))}
+        <rect x="0" y="0" width="12.2" height={stripe * 8} fill="#010066" />
+        <circle cx="6.15" cy={stripe * 4} r="3.15" fill="#FFCC00" />
+        <circle cx="7.2" cy={stripe * 4} r="2.5" fill="#010066" />
+        <polygon
+          fill="#FFCC00"
+          points="9.05,5.05 9.45,6.2 10.7,6.2 9.7,6.95 10.05,8.15 9.05,7.4 8.05,8.15 8.4,6.95 7.4,6.2 8.65,6.2"
+        />
+      </g>
+    </svg>
+  )
+}
+
 export function LoginForm() {
   const { handleRequestTac, handleVerifyTac, isSubmitting, error, setError, setMessage } = useLogin()
   const { t } = useAuthCopy()
@@ -152,7 +184,10 @@ export function LoginForm() {
                   disabled={isSubmitting}
                   onClick={() => setDialOpen((current) => !current)}
                 >
-                  <span>{selectedDial.label}</span>
+                  <span className="login-form__dial-trigger-label">
+                    {selectedDial.id === 'my' ? <MalaysiaFlagIcon /> : null}
+                    <span>{selectedDial.label}</span>
+                  </span>
                   <span className="login-form__dial-chevron" aria-hidden>
                     <IconChevron />
                   </span>
@@ -175,8 +210,10 @@ export function LoginForm() {
                               setDialOpen(false)
                             }}
                           >
-                            <span>{option.label}</span>
-                            {selected ? <span className="login-form__dial-check" aria-hidden /> : null}
+                            <span className="login-form__dial-option-label">
+                              {option.id === 'my' ? <MalaysiaFlagIcon /> : null}
+                              <span>{option.label}</span>
+                            </span>
                           </button>
                         </li>
                       )

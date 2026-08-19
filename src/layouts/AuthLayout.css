@@ -128,6 +128,24 @@
   width: min(100%, 38rem);
 }
 
+.auth-layout__panel--login {
+  width: min(100%, 28rem);
+  padding: 1.15rem 2rem 1.1rem;
+}
+
+.auth-layout__panel--login .auth-layout__locale {
+  margin: 0 0 0.35rem;
+}
+
+.auth-layout__panel--login .auth-layout__body {
+  gap: 0.65rem;
+}
+
+.auth-layout__panel--login .ui-text-field,
+.auth-layout__panel--login .ui-button--primary {
+  min-height: 2.55rem;
+}
+
 .auth-layout__panel--compact {
   padding: 1.35rem 1.45rem 1.15rem;
 }

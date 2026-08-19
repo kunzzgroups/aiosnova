@@ -12,6 +12,7 @@ type AuthLayoutProps = {
   wide?: boolean
   compact?: boolean
   hideIcon?: boolean
+  login?: boolean
 }
 
 export function AuthLayout({
@@ -22,11 +23,13 @@ export function AuthLayout({
   wide = false,
   compact = false,
   hideIcon = false,
+  login = false,
 }: AuthLayoutProps) {
   const panelClass = [
     'auth-layout__panel',
     wide ? 'auth-layout__panel--wide' : '',
     compact ? 'auth-layout__panel--compact' : '',
+    login ? 'auth-layout__panel--login' : '',
   ]
     .filter(Boolean)
     .join(' ')

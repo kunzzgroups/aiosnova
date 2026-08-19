@@ -3,7 +3,7 @@ import { LoginForm } from '@/modules/core/auth/components/LoginForm'
 
 export function LoginPage() {
   return (
-    <AuthLayout hideIcon>
+    <AuthLayout hideIcon login>
       <LoginForm />
     </AuthLayout>
   )
