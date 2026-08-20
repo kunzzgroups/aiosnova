@@ -18,6 +18,12 @@ const emptyProfile = {
   timezone: 'Asia/Kuala_Lumpur',
 }
 
+export type CompanyGroupRecord = {
+  id: string
+  name: string
+  companyIds: string[]
+}
+
 export const identityCompanies: CompanyRecord[] = [
   {
     id: 'company-retail',
@@ -34,6 +40,44 @@ export const identityCompanies: CompanyRecord[] = [
     name: 'Acme Wholesale',
     status: 'active',
     createdAt: '2026-01-09T08:00:00.000Z',
+  },
+  {
+    id: 'company-j1',
+    tenantId: DEMO_TENANT_ID,
+    code: 'J1',
+    name: 'J1 (MIDVALLEY)',
+    status: 'active',
+    createdAt: '2026-01-10T08:00:00.000Z',
+  },
+  {
+    id: 'company-j2',
+    tenantId: DEMO_TENANT_ID,
+    code: 'J2',
+    name: 'J2 (PARADIGM MALL)',
+    status: 'active',
+    createdAt: '2026-01-11T08:00:00.000Z',
+  },
+  {
+    id: 'company-tokyo-izakaya',
+    tenantId: DEMO_TENANT_ID,
+    code: 'TOKYO-I',
+    name: 'TOKYO IZAKAYA SDN BHD',
+    status: 'active',
+    createdAt: '2026-01-12T08:00:00.000Z',
+  },
+]
+
+/** Groups shown under GROUP COMPANIES. Companies not listed here appear as standalone L2 items. */
+export const identityCompanyGroups: CompanyGroupRecord[] = [
+  {
+    id: 'group-kunzz',
+    name: 'KUNZZ HOLDINGS SDN BHD',
+    companyIds: ['company-retail', 'company-wholesale'],
+  },
+  {
+    id: 'group-tokyo-cuisine',
+    name: 'TOKYO JAPANESE CUISINE SDN BHD',
+    companyIds: ['company-j1', 'company-j2'],
   },
 ]
 

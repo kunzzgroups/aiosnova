@@ -12,25 +12,29 @@ import {
   getModuleIcon,
   getSectionIcon,
   getUtilityIcon,
-  IconBriefcase,
   IconBuilding,
   IconChevron,
   IconDot,
   IconMinus,
   IconPlus,
   IconSearch,
-  IconUsers,
+  IconStore,
 } from '@/components/navigation/SidebarIcons'
 import { useAuthStore } from '@/stores/authStore'
 import { fetchCompanies } from '@/modules/core/identity/services/identityService'
 import type { CompanyRecord } from '@/modules/core/identity/types/identity'
+import type { CompanyGroupRecord } from '@/mocks/data/identity'
 import './Sidebar.css'
 
-const DEFAULT_TENANT_NAME = 'GROUP COMPANIE'
+const GROUP_COMPANIES_LABEL = 'GROUP COMPANIES'
 const COLLAPSED_STORAGE_KEY = 'aios.sidebar.collapsed'
 const COMPANY_STORAGE_KEY = 'aios.companyId'
 
 type CompanyOption = { value: string; label: string }
+
+type Level2Item =
+  | { kind: 'group'; id: string; label: string; companies: CompanyOption[] }
+  | { kind: 'company'; id: string; label: string }
 
 function toCompanyOptions(items: Array<Pick<CompanyRecord, 'id' | 'name' | 'status'>>): CompanyOption[] {
   return items
@@ -38,63 +42,68 @@ function toCompanyOptions(items: Array<Pick<CompanyRecord, 'id' | 'name' | 'stat
     .map((item) => ({ value: item.id, label: item.name }))
 }
 
-async function loadCompanyOptions(): Promise<CompanyOption[]> {
+function buildLevel2Items(
+  companies: CompanyOption[],
+  groups: CompanyGroupRecord[],
+): Level2Item[] {
+  const companyMap = new Map(companies.map((item) => [item.value, item]))
+  const groupedIds = new Set(groups.flatMap((group) => group.companyIds))
+
+  const groupItems: Level2Item[] = groups.map((group) => ({
+    kind: 'group',
+    id: group.id,
+    label: group.name,
+    companies: group.companyIds
+      .map((id) => companyMap.get(id))
+      .filter((item): item is CompanyOption => Boolean(item)),
+  }))
+
+  const standalone: Level2Item[] = companies
+    .filter((item) => !groupedIds.has(item.value))
+    .map((item) => ({ kind: 'company', id: item.value, label: item.label }))
+
+  return [...groupItems, ...standalone]
+}
+
+async function loadGroupCompaniesData(): Promise<{
+  companies: CompanyOption[]
+  groups: CompanyGroupRecord[]
+}> {
+  const { identityCompanyGroups } = await import('@/mocks/data/identity')
+
   try {
     const result = await fetchCompanies()
     const items = Array.isArray(result.items) ? result.items : []
-    return toCompanyOptions(items)
+    return {
+      companies: toCompanyOptions(items),
+      groups: identityCompanyGroups,
+    }
   } catch {
     if (import.meta.env.DEV) {
       const { identityCompanies } = await import('@/mocks/data/identity')
-      return toCompanyOptions(identityCompanies)
+      return {
+        companies: toCompanyOptions(identityCompanies),
+        groups: identityCompanyGroups,
+      }
     }
-    return []
+    return { companies: [], groups: [] }
   }
 }
 
-type CompanyFlyoutSection = {
-  id: string
-  label: string
-  icon: typeof IconBriefcase
-  items: Array<{ id: string; label: string; to: string }>
-}
-
-function getCompanyFlyoutSections(companyId: string): CompanyFlyoutSection[] {
-  return [
-    {
-      id: 'workspace',
-      label: 'Workspace',
-      icon: IconBriefcase,
-      items: [{ id: 'overview', label: 'Company Overview', to: `/system/core/companies/${companyId}` }],
-    },
-    {
-      id: 'identity',
-      label: 'Identity',
-      icon: IconUsers,
-      items: [
-        { id: 'users', label: 'Users', to: '/system/core/users' },
-        { id: 'membership', label: 'Membership', to: '/system/core/membership' },
-      ],
-    },
-  ]
-}
-
-function TenantCompanyBlock({
-  tenantName,
+function GroupCompaniesBlock({
   open,
   collapsed,
-  companies,
-  highlightedCompanyId,
+  items,
+  selectedLevel2Id,
   onToggle,
-  onSelectCompany,
+  onSelectItem,
 }: {
-  tenantName: string
   open: boolean
   collapsed: boolean
-  companies: CompanyOption[]
-  highlightedCompanyId: string
+  items: Level2Item[]
+  selectedLevel2Id: string | null
   onToggle: () => void
-  onSelectCompany: (companyId: string) => void
+  onSelectItem: (item: Level2Item) => void
 }) {
   return (
     <div className={['sidebar__context-group', open ? 'is-open' : ''].filter(Boolean).join(' ')}>
@@ -102,14 +111,14 @@ function TenantCompanyBlock({
         type="button"
         className={['sidebar__item', 'sidebar__context-toggle', open ? 'is-open' : ''].filter(Boolean).join(' ')}
         aria-expanded={open}
-        title={tenantName}
+        title={GROUP_COMPANIES_LABEL}
         onClick={onToggle}
       >
         <span className="sidebar__row-main">
           <span className="sidebar__icon">
             <IconBuilding />
           </span>
-          <span className="sidebar__label">{tenantName}</span>
+          <span className="sidebar__label">{GROUP_COMPANIES_LABEL}</span>
         </span>
         {!collapsed ? (
           <span className="sidebar__expander" aria-hidden>
@@ -119,23 +128,23 @@ function TenantCompanyBlock({
       </button>
       {open && !collapsed ? (
         <ul className="sidebar__context-tree">
-          {companies.length === 0 ? (
+          {items.length === 0 ? (
             <li>
-              <span className="sidebar__context-empty">No companies</span>
+              <span className="sidebar__context-empty">No groups or companies</span>
             </li>
           ) : (
-            companies.map((company) => {
-              const selected = company.value === highlightedCompanyId
+            items.map((item) => {
+              const selected = item.id === selectedLevel2Id
               return (
-                <li key={company.value}>
+                <li key={`${item.kind}-${item.id}`}>
                   <button
                     type="button"
                     className={['sidebar__context-option', selected ? 'is-selected' : '']
                       .filter(Boolean)
                       .join(' ')}
-                    onClick={() => onSelectCompany(company.value)}
+                    onClick={() => onSelectItem(item)}
                   >
-                    <span className="sidebar__label">{company.label}</span>
+                    <span className="sidebar__label">{item.label}</span>
                   </button>
                 </li>
               )
@@ -147,45 +156,55 @@ function TenantCompanyBlock({
   )
 }
 
-function CompanyFlyout({ company }: { company: CompanyOption }) {
-  const sections = getCompanyFlyoutSections(company.value)
-
+function GroupCompaniesFlyout({
+  companies,
+  selectedCompanyId,
+  onSelectCompany,
+}: {
+  companies: CompanyOption[]
+  selectedCompanyId: string
+  onSelectCompany: (companyId: string) => void
+}) {
   return (
-    <aside className="sidebar-flyout" aria-label={company.label}>
+    <aside className="sidebar-flyout" aria-label="Companies">
       <div className="sidebar-flyout__inner">
-        <p className="sidebar-flyout__company">{company.label}</p>
-        {sections.map((section) => {
-          const SectionIcon = section.icon
-          return (
-            <section key={section.id} className="sidebar-flyout__section">
-              <header className="sidebar-flyout__section-head">
-                <SectionIcon />
-                <span>
-                  {section.label} ({section.items.length})
-                </span>
-              </header>
-              <ul className="sidebar-flyout__list">
-                {section.items.map((item) => (
-                  <li key={item.id}>
-                    <NavLink
-                      to={item.to}
-                      className={({ isActive }) =>
-                        ['sidebar-flyout__link', isActive ? 'sidebar-flyout__link--active' : '']
-                          .filter(Boolean)
-                          .join(' ')
-                      }
+        <section className="sidebar-flyout__section">
+          <header className="sidebar-flyout__section-head">
+            <IconStore />
+            <span>Companies ({companies.length})</span>
+          </header>
+          <ul className="sidebar-flyout__list">
+            {companies.length === 0 ? (
+              <li>
+                <span className="sidebar__context-empty">No companies in this group</span>
+              </li>
+            ) : (
+              companies.map((company) => {
+                const selected = company.value === selectedCompanyId
+                return (
+                  <li key={company.value}>
+                    <button
+                      type="button"
+                      className={[
+                        'sidebar-flyout__link',
+                        'sidebar-flyout__link--button',
+                        selected ? 'sidebar-flyout__link--active' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onClick={() => onSelectCompany(company.value)}
                     >
                       <span className="sidebar-flyout__link-icon" aria-hidden>
                         <IconDot />
                       </span>
-                      <span className="sidebar-flyout__link-label">{item.label}</span>
-                    </NavLink>
+                      <span className="sidebar-flyout__link-label">{company.label}</span>
+                    </button>
                   </li>
-                ))}
-              </ul>
-            </section>
-          )
-        })}
+                )
+              })
+            )}
+          </ul>
+        </section>
       </div>
     </aside>
   )
@@ -331,14 +350,19 @@ export function Sidebar() {
   const [query, setQuery] = useState('')
   const [companyId, setCompanyId] = useState(() => window.localStorage.getItem(COMPANY_STORAGE_KEY) ?? '')
   const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([])
+  const [companyGroups, setCompanyGroups] = useState<CompanyGroupRecord[]>([])
   const [collapsed, setCollapsed] = useState(() => {
     return window.sessionStorage.getItem(COLLAPSED_STORAGE_KEY) === '1'
   })
-  const [tenantOpen, setTenantOpen] = useState(true)
-  const [flyoutCompanyId, setFlyoutCompanyId] = useState<string | null>(null)
+  const [groupCompaniesOpen, setGroupCompaniesOpen] = useState(true)
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null)
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
 
   const sections = useMemo(() => filterSidebarSections(query), [query])
+  const level2Items = useMemo(
+    () => buildLevel2Items(companyOptions, companyGroups),
+    [companyOptions, companyGroups],
+  )
   const initials = (user?.name || user?.email || 'A')
     .split(/\s+/)
     .map((part) => part[0])
@@ -359,7 +383,7 @@ export function Sidebar() {
   useEffect(() => {
     window.sessionStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0')
     if (collapsed) {
-      setFlyoutCompanyId(null)
+      setOpenGroupId(null)
     }
   }, [collapsed])
 
@@ -369,16 +393,17 @@ export function Sidebar() {
     }
 
     let cancelled = false
-    void loadCompanyOptions().then((options) => {
+    void loadGroupCompaniesData().then(({ companies, groups }) => {
       if (cancelled) {
         return
       }
-      setCompanyOptions(options)
+      setCompanyOptions(companies)
+      setCompanyGroups(groups)
       setCompanyId((current) => {
-        if (current && options.some((item) => item.value === current)) {
+        if (current && companies.some((item) => item.value === current)) {
           return current
         }
-        const nextId = options[0]?.value ?? ''
+        const nextId = companies[0]?.value ?? ''
         if (nextId) {
           window.localStorage.setItem(COMPANY_STORAGE_KEY, nextId)
         }
@@ -405,25 +430,47 @@ export function Sidebar() {
     })
   }
 
-  const FavoritesIcon = getUtilityIcon('favorites')
-  const RecentIcon = getUtilityIcon('recent')
-  const flyoutCompany = companyOptions.find((item) => item.value === flyoutCompanyId) ?? null
-  const highlightedCompanyId = flyoutCompanyId ?? companyId
-
-  function handleSelectCompany(nextCompanyId: string) {
+  function persistCompany(nextCompanyId: string) {
     setCompanyId(nextCompanyId)
     window.localStorage.setItem(COMPANY_STORAGE_KEY, nextCompanyId)
-    setFlyoutCompanyId((current) => (current === nextCompanyId ? null : nextCompanyId))
   }
 
+  function handleSelectLevel2(item: Level2Item) {
+    if (item.kind === 'group') {
+      setOpenGroupId((current) => (current === item.id ? null : item.id))
+      return
+    }
+
+    persistCompany(item.id)
+    setOpenGroupId(null)
+  }
+
+  function handleSelectCompanyFromGroup(nextCompanyId: string) {
+    persistCompany(nextCompanyId)
+  }
+
+  const FavoritesIcon = getUtilityIcon('favorites')
+  const RecentIcon = getUtilityIcon('recent')
+  const activeCompany = companyOptions.find((item) => item.value === companyId) ?? null
+
+  const selectedLevel2Id = openGroupId
+    ? openGroupId
+    : level2Items.find((item) => item.kind === 'company' && item.id === companyId)?.id ?? null
+
+  const activeGroup = openGroupId
+    ? level2Items.find((item): item is Extract<Level2Item, { kind: 'group' }> => {
+        return item.kind === 'group' && item.id === openGroupId
+      })
+    : null
+  const flyoutOpen = Boolean(activeGroup)
+
   return (
-    <div
-      className={['sidebar-shell', flyoutCompany ? 'sidebar-shell--flyout-open' : ''].filter(Boolean).join(' ')}
-    >
+    <div className={['sidebar-shell', flyoutOpen ? 'sidebar-shell--flyout-open' : ''].filter(Boolean).join(' ')}>
       <aside
         className={['sidebar', collapsed ? 'sidebar--collapsed' : ''].filter(Boolean).join(' ')}
         aria-label="Primary"
         data-collapsed={collapsed ? 'true' : 'false'}
+        data-company-id={companyId || undefined}
       >
       <div className="sidebar__brand-row">
         <div className="sidebar__brand" title="AIOS NOVA">
@@ -455,21 +502,20 @@ export function Sidebar() {
 
       {!collapsed ? (
         <div className="sidebar__context">
-          <TenantCompanyBlock
-            tenantName={DEFAULT_TENANT_NAME}
-            open={tenantOpen}
+          <GroupCompaniesBlock
+            open={groupCompaniesOpen}
             collapsed={collapsed}
-            companies={companyOptions}
-            highlightedCompanyId={highlightedCompanyId}
+            items={level2Items}
+            selectedLevel2Id={selectedLevel2Id}
             onToggle={() => {
-              setTenantOpen((current) => {
+              setGroupCompaniesOpen((current) => {
                 if (current) {
-                  setFlyoutCompanyId(null)
+                  setOpenGroupId(null)
                 }
                 return !current
               })
             }}
-            onSelectCompany={handleSelectCompany}
+            onSelectItem={handleSelectLevel2}
           />
         </div>
       ) : null}
@@ -501,6 +547,13 @@ export function Sidebar() {
         </NavLink>
       </div>
 
+      {!collapsed && activeCompany ? (
+        <div className="sidebar__company-context" title={activeCompany.label}>
+          <span className="sidebar__company-context-label">Active company</span>
+          <strong className="sidebar__company-context-name">{activeCompany.label}</strong>
+        </div>
+      ) : null}
+
       <nav className="sidebar__nav">
         {sections.map((section) => (
           <SectionBlock
@@ -524,7 +577,13 @@ export function Sidebar() {
       </div>
       </aside>
 
-      {flyoutCompany && !collapsed && tenantOpen ? <CompanyFlyout company={flyoutCompany} /> : null}
+      {activeGroup && !collapsed && groupCompaniesOpen ? (
+        <GroupCompaniesFlyout
+          companies={activeGroup.companies}
+          selectedCompanyId={companyId}
+          onSelectCompany={handleSelectCompanyFromGroup}
+        />
+      ) : null}
     </div>
   )
 }
