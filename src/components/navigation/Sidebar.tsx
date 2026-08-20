@@ -12,16 +12,101 @@ import {
   getModuleIcon,
   getSectionIcon,
   getUtilityIcon,
+  IconBuilding,
   IconChevron,
+  IconMinus,
+  IconPlus,
   IconSearch,
+  IconStore,
 } from '@/components/navigation/SidebarIcons'
 import { useAuthStore } from '@/stores/authStore'
-import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { fetchCompanies } from '@/modules/core/identity/services/identityService'
 import './Sidebar.css'
 
+const TENANT_OPTIONS = ['Acme Group', 'Nova Holdings'] as const
 const COLLAPSED_STORAGE_KEY = 'aios.sidebar.collapsed'
 const COMPANY_STORAGE_KEY = 'aios.companyId'
+
+function ContextSwitcher({
+  label,
+  icon,
+  open,
+  collapsed,
+  options,
+  value,
+  disabled,
+  onToggle,
+  onSelect,
+}: {
+  label: string
+  icon: typeof IconBuilding
+  open: boolean
+  collapsed: boolean
+  options: Array<{ value: string; label: string }>
+  value: string
+  disabled?: boolean
+  onToggle: () => void
+  onSelect: (value: string) => void
+}) {
+  const Icon = icon
+  return (
+    <div className={['sidebar__context-group', open ? 'is-open' : ''].filter(Boolean).join(' ')}>
+      <button
+        type="button"
+        className={['sidebar__item', 'sidebar__context-toggle', open ? 'is-open' : ''].filter(Boolean).join(' ')}
+        aria-expanded={open}
+        title={label}
+        disabled={disabled}
+        onClick={onToggle}
+      >
+        <span className="sidebar__row-main">
+          <span className="sidebar__icon">
+            <Icon />
+          </span>
+          <span className="sidebar__label">{label}</span>
+        </span>
+        {!collapsed ? (
+          <span className="sidebar__expander" aria-hidden>
+            {open ? <IconMinus /> : <IconPlus />}
+          </span>
+        ) : null}
+      </button>
+      {open && !collapsed ? (
+        <ul className="sidebar__context-tree">
+          {options.map((option) => {
+            const selected = option.value === value
+            return (
+              <li key={option.value || option.label}>
+                <button
+                  type="button"
+                  className={['sidebar__context-option', selected ? 'is-selected' : '']
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => onSelect(option.value)}
+                >
+                  <span className="sidebar__label">{option.label}</span>
+                  <span className="sidebar__context-chevron" aria-hidden>
+                    <IconChevron />
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+function collectGroupIds(nodes: SidebarNode[]): string[] {
+  const ids: string[] = []
+  for (const node of nodes) {
+    if (node.kind === 'group') {
+      ids.push(node.id, ...collectGroupIds(node.children))
+    }
+  }
+  return ids
+}
 
 function SidebarNodeList({
   nodes,
@@ -37,7 +122,7 @@ function SidebarNodeList({
   collapsed: boolean
 }) {
   return (
-    <ul className={`sidebar__list sidebar__list--depth-${Math.min(depth, 3)}`}>
+    <ul className={`sidebar__list sidebar__list--depth-${Math.min(depth, 2)}`}>
       {nodes.map((node) => {
         if (node.kind === 'link') {
           const LinkIcon = getLinkIcon()
@@ -50,19 +135,21 @@ function SidebarNodeList({
                   ['sidebar__link', isActive ? 'sidebar__link--active' : ''].filter(Boolean).join(' ')
                 }
               >
-                <span className="sidebar__icon">
-                  <LinkIcon />
-                </span>
+                {depth === 1 ? (
+                  <span className="sidebar__icon">
+                    <LinkIcon />
+                  </span>
+                ) : null}
                 <span className="sidebar__label">{node.label}</span>
               </NavLink>
             </li>
           )
         }
 
-        const isOpen = openIds.has(node.id)
+        const isOpen = openIds.has(node.id) && !collapsed
         const ModuleIcon = getModuleIcon(node.label)
         return (
-          <li key={node.id} className="sidebar__group">
+          <li key={node.id} className={['sidebar__group', isOpen ? 'is-open' : ''].filter(Boolean).join(' ')}>
             <button
               type="button"
               className={['sidebar__item', 'sidebar__group-toggle', isOpen ? 'is-open' : '']
@@ -79,17 +166,13 @@ function SidebarNodeList({
                 <span className="sidebar__label">{node.label}</span>
               </span>
               {!collapsed ? (
-                <span className="sidebar__chevron" aria-hidden>
-                  <IconChevron />
+                <span className="sidebar__expander" aria-hidden>
+                  {isOpen ? <IconMinus /> : <IconPlus />}
                 </span>
               ) : null}
             </button>
-            <div
-              className={['sidebar__collapse', isOpen && !collapsed ? 'is-open' : '']
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <div className="sidebar__collapse-inner">
+            {isOpen ? (
+              <div className="sidebar__subtree">
                 <SidebarNodeList
                   nodes={node.children}
                   depth={depth + 1}
@@ -98,7 +181,7 @@ function SidebarNodeList({
                   collapsed={collapsed}
                 />
               </div>
-            </div>
+            ) : null}
           </li>
         )
       })}
@@ -118,29 +201,23 @@ function SectionBlock({
   collapsed: boolean
 }) {
   const SectionIcon = getSectionIcon(section.id)
-  const isOpen = !collapsed || openIds.has(section.id)
 
   return (
     <section className="sidebar__section">
       {collapsed ? (
         <button
           type="button"
-          className={['sidebar__item', 'sidebar__section-icon-only', isOpen ? 'is-open' : '']
-            .filter(Boolean)
-            .join(' ')}
+          className="sidebar__item sidebar__section-icon-only"
           title={section.label}
-          aria-expanded={isOpen}
-          onClick={() => onToggle(section.id)}
+          onClick={() => onToggle(section.children[0]?.kind === 'group' ? section.children[0].id : section.id)}
         >
           <span className="sidebar__icon">
             <SectionIcon />
           </span>
         </button>
       ) : (
-        <p className="sidebar__section-label">{section.label}</p>
-      )}
-      <div className={['sidebar__collapse', isOpen ? 'is-open' : ''].filter(Boolean).join(' ')}>
-        <div className="sidebar__collapse-inner">
+        <>
+          <p className="sidebar__section-label">{section.label}</p>
           <SidebarNodeList
             nodes={section.children}
             depth={1}
@@ -148,8 +225,8 @@ function SectionBlock({
             onToggle={onToggle}
             collapsed={collapsed}
           />
-        </div>
-      </div>
+        </>
+      )}
     </section>
   )
 }
@@ -164,7 +241,8 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(() => {
     return window.sessionStorage.getItem(COLLAPSED_STORAGE_KEY) === '1'
   })
-  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(['overview', 'overview.dashboard']))
+  const [contextOpen, setContextOpen] = useState<'tenant' | 'company' | null>(null)
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
 
   const sections = useMemo(() => filterSidebarSections(query), [query])
   const initials = (user?.name || user?.email || 'A')
@@ -175,18 +253,14 @@ export function Sidebar() {
     .toUpperCase()
 
   useEffect(() => {
-    const ancestors = collectAncestorGroupIds(location.pathname)
-    if (ancestors.length === 0) {
+    if (query.trim()) {
+      setOpenIds(new Set(sections.flatMap((section) => collectGroupIds(section.children))))
       return
     }
-    setOpenIds((current) => {
-      const next = new Set(current)
-      for (const id of ancestors) {
-        next.add(id)
-      }
-      return next
-    })
-  }, [location.pathname])
+    const ancestors = collectAncestorGroupIds(location.pathname)
+    const groupId = ancestors.length > 1 ? ancestors[ancestors.length - 1] : ancestors[0]
+    setOpenIds(groupId ? new Set([groupId]) : new Set())
+  }, [location.pathname, query, sections])
 
   useEffect(() => {
     window.sessionStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0')
@@ -226,18 +300,15 @@ export function Sidebar() {
   function handleToggle(id: string) {
     if (collapsed) {
       setCollapsed(false)
-      setOpenIds((current) => new Set(current).add(id))
+      setOpenIds(new Set([id]))
       return
     }
 
     setOpenIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
+      if (current.has(id) && !query.trim()) {
+        return new Set()
       }
-      return next
+      return new Set([id])
     })
   }
 
@@ -280,23 +351,31 @@ export function Sidebar() {
 
       {!collapsed ? (
         <div className="sidebar__context">
-          <SidebarSelect
+          <ContextSwitcher
             label="Tenant"
+            icon={IconBuilding}
+            open={contextOpen === 'tenant'}
+            collapsed={collapsed}
+            options={TENANT_OPTIONS.map((item) => ({ value: item, label: item }))}
             value={tenant}
-            options={['Acme Group', 'Nova Holdings']}
-            onChange={setTenant}
+            onToggle={() => setContextOpen((current) => (current === 'tenant' ? null : 'tenant'))}
+            onSelect={(next) => setTenant(next)}
           />
-          <SidebarSelect
+          <ContextSwitcher
             label="Company"
+            icon={IconStore}
+            open={contextOpen === 'company'}
+            collapsed={collapsed}
+            options={companyOptions}
             value={companyId}
-            options={companyOptions.length > 0 ? companyOptions : [{ value: '', label: 'No companies' }]}
-            onChange={(next) => {
+            disabled={companyOptions.length === 0}
+            onToggle={() => setContextOpen((current) => (current === 'company' ? null : 'company'))}
+            onSelect={(next) => {
               setCompanyId(next)
               if (next) {
                 window.localStorage.setItem(COMPANY_STORAGE_KEY, next)
               }
             }}
-            disabled={companyOptions.length === 0}
           />
         </div>
       ) : null}
