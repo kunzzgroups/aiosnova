@@ -28,6 +28,7 @@
   --shadow-md: 0 16px 40px rgba(17, 24, 39, 0.08);
 }
 
+:root[data-theme='dark'],
 [data-theme='dark'] {
   color-scheme: dark;
 
