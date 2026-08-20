@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   collectAncestorGroupIds,
@@ -26,7 +26,7 @@ import { fetchCompanies } from '@/modules/core/identity/services/identityService
 import type { CompanyRecord } from '@/modules/core/identity/types/identity'
 import './Sidebar.css'
 
-const DEFAULT_TENANT_NAME = 'KUNZZ Group'
+const DEFAULT_TENANT_NAME = 'GROUP COMPANIE'
 const COLLAPSED_STORAGE_KEY = 'aios.sidebar.collapsed'
 const COMPANY_STORAGE_KEY = 'aios.companyId'
 
@@ -86,8 +86,7 @@ function TenantCompanyBlock({
   companies,
   highlightedCompanyId,
   onToggle,
-  onHoverCompany,
-  onLeaveCompanies,
+  onSelectCompany,
 }: {
   tenantName: string
   open: boolean
@@ -95,8 +94,7 @@ function TenantCompanyBlock({
   companies: CompanyOption[]
   highlightedCompanyId: string
   onToggle: () => void
-  onHoverCompany: (companyId: string) => void
-  onLeaveCompanies: () => void
+  onSelectCompany: (companyId: string) => void
 }) {
   return (
     <div className={['sidebar__context-group', open ? 'is-open' : ''].filter(Boolean).join(' ')}>
@@ -120,7 +118,7 @@ function TenantCompanyBlock({
         ) : null}
       </button>
       {open && !collapsed ? (
-        <ul className="sidebar__context-tree" onMouseLeave={onLeaveCompanies}>
+        <ul className="sidebar__context-tree">
           {companies.length === 0 ? (
             <li>
               <span className="sidebar__context-empty">No companies</span>
@@ -135,8 +133,7 @@ function TenantCompanyBlock({
                     className={['sidebar__context-option', selected ? 'is-selected' : '']
                       .filter(Boolean)
                       .join(' ')}
-                    onMouseEnter={() => onHoverCompany(company.value)}
-                    onFocus={() => onHoverCompany(company.value)}
+                    onClick={() => onSelectCompany(company.value)}
                   >
                     <span className="sidebar__label">{company.label}</span>
                   </button>
@@ -150,24 +147,11 @@ function TenantCompanyBlock({
   )
 }
 
-function CompanyFlyout({
-  company,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  company: CompanyOption
-  onMouseEnter: () => void
-  onMouseLeave: () => void
-}) {
+function CompanyFlyout({ company }: { company: CompanyOption }) {
   const sections = getCompanyFlyoutSections(company.value)
 
   return (
-    <aside
-      className="sidebar-flyout"
-      aria-label={company.label}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-    >
+    <aside className="sidebar-flyout" aria-label={company.label}>
       <div className="sidebar-flyout__inner">
         <p className="sidebar-flyout__company">{company.label}</p>
         {sections.map((section) => {
@@ -175,10 +159,10 @@ function CompanyFlyout({
           return (
             <section key={section.id} className="sidebar-flyout__section">
               <header className="sidebar-flyout__section-head">
+                <SectionIcon />
                 <span>
                   {section.label} ({section.items.length})
                 </span>
-                <SectionIcon />
               </header>
               <ul className="sidebar-flyout__list">
                 {section.items.map((item) => (
@@ -352,7 +336,6 @@ export function Sidebar() {
   })
   const [tenantOpen, setTenantOpen] = useState(true)
   const [flyoutCompanyId, setFlyoutCompanyId] = useState<string | null>(null)
-  const hideFlyoutTimerRef = useRef<number | null>(null)
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
 
   const sections = useMemo(() => filterSidebarSections(query), [query])
@@ -379,14 +362,6 @@ export function Sidebar() {
       setFlyoutCompanyId(null)
     }
   }, [collapsed])
-
-  useEffect(() => {
-    return () => {
-      if (hideFlyoutTimerRef.current !== null) {
-        window.clearTimeout(hideFlyoutTimerRef.current)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     if (!isHydrated) {
@@ -435,26 +410,10 @@ export function Sidebar() {
   const flyoutCompany = companyOptions.find((item) => item.value === flyoutCompanyId) ?? null
   const highlightedCompanyId = flyoutCompanyId ?? companyId
 
-  function cancelHideFlyout() {
-    if (hideFlyoutTimerRef.current !== null) {
-      window.clearTimeout(hideFlyoutTimerRef.current)
-      hideFlyoutTimerRef.current = null
-    }
-  }
-
-  function scheduleHideFlyout() {
-    cancelHideFlyout()
-    hideFlyoutTimerRef.current = window.setTimeout(() => {
-      setFlyoutCompanyId(null)
-      hideFlyoutTimerRef.current = null
-    }, 120)
-  }
-
-  function handleHoverCompany(nextCompanyId: string) {
-    cancelHideFlyout()
-    setFlyoutCompanyId(nextCompanyId)
+  function handleSelectCompany(nextCompanyId: string) {
     setCompanyId(nextCompanyId)
     window.localStorage.setItem(COMPANY_STORAGE_KEY, nextCompanyId)
+    setFlyoutCompanyId((current) => (current === nextCompanyId ? null : nextCompanyId))
   }
 
   return (
@@ -510,8 +469,7 @@ export function Sidebar() {
                 return !current
               })
             }}
-            onHoverCompany={handleHoverCompany}
-            onLeaveCompanies={scheduleHideFlyout}
+            onSelectCompany={handleSelectCompany}
           />
         </div>
       ) : null}
@@ -566,13 +524,7 @@ export function Sidebar() {
       </div>
       </aside>
 
-      {flyoutCompany && !collapsed && tenantOpen ? (
-        <CompanyFlyout
-          company={flyoutCompany}
-          onMouseEnter={cancelHideFlyout}
-          onMouseLeave={scheduleHideFlyout}
-        />
-      ) : null}
+      {flyoutCompany && !collapsed && tenantOpen ? <CompanyFlyout company={flyoutCompany} /> : null}
     </div>
   )
 }
