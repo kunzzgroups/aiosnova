@@ -11,7 +11,6 @@ import {
   IconBan,
   IconCircleCheck,
   IconEye,
-  IconKey,
   IconPencil,
   IconShield,
   IconShieldOff,
@@ -39,7 +38,6 @@ import {
   deleteUser,
   fetchCompanies,
   fetchUsers,
-  sendUserPasswordReset,
   updateUser,
 } from '@/modules/core/identity/services/identityService'
 import './IdentityPage.css'
@@ -238,17 +236,6 @@ export function UsersPage() {
       setError(err instanceof ApiError ? err.message : 'Unable to update user.')
     } finally {
       setStatusUpdatingId(null)
-    }
-  }
-
-  async function handleSendReset(user: IdentityUser) {
-    setError(null)
-    setMessage(null)
-    try {
-      const result = await sendUserPasswordReset(user.id)
-      setMessage(result.message)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to send password reset.')
     }
   }
 
@@ -457,13 +444,6 @@ export function UsersPage() {
                           onClick={() => navigate(`/system/core/users/${user.id}?edit=1`)}
                         >
                           <IconPencil />
-                        </IconButton>
-                        <IconButton
-                          label="Send password reset"
-                          onClick={() => void handleSendReset(user)}
-                          disabled={user.status === 'disabled' || Boolean(user.signInMethod && user.signInMethod !== 'password')}
-                        >
-                          <IconKey />
                         </IconButton>
                         {user.signInMethod ? (
                           <IconButton

@@ -488,6 +488,15 @@
   color: var(--color-success);
 }
 
+:root .identity-status--active,
+[data-theme='light'] .identity-status--active {
+  color: #047857;
+}
+
+[data-theme='dark'] .identity-status--active {
+  color: #34d399;
+}
+
 .identity-status--disabled,
 .identity-status--inactive,
 .identity-status--ended {

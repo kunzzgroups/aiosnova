@@ -96,25 +96,6 @@ export const identityHandlers = [
     return HttpResponse.json({ user, memberships })
   }),
 
-  http.post('/api/identity/users/:id/password-reset', ({ params }) => {
-    const user = identityUsers.find((item) => item.id === params.id)
-    if (!user) {
-      return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
-    }
-
-    if (user.status === 'disabled') {
-      return HttpResponse.json(
-        { message: 'Cannot send a password reset for a disabled user.' },
-        { status: 400 },
-      )
-    }
-
-    return HttpResponse.json({
-      message: `Password reset email queued for ${user.email} (demo — no email sent).`,
-      demoHint: 'User should complete reset via Forgot password with their email.',
-    })
-  }),
-
   http.post('/api/identity/users/:id/mfa/disable', async ({ params, request }) => {
     const user = identityUsers.find((item) => item.id === params.id)
     if (!user) {

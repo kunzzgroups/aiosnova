@@ -39,17 +39,6 @@ export function IconPencil(props: IconProps) {
   )
 }
 
-export function IconKey(props: IconProps) {
-  return (
-    <IconSvg {...props}>
-      <circle cx="7.5" cy="15.5" r="4.5" />
-      <path d="M11 13 21 3" />
-      <path d="M16 3h5v5" />
-      <path d="M17.5 6.5 15 9" />
-    </IconSvg>
-  )
-}
-
 export function IconShield(props: IconProps) {
   return (
     <IconSvg {...props}>

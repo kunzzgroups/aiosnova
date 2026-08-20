@@ -104,16 +104,6 @@ export async function deleteUser(id: string) {
   })
 }
 
-export async function sendUserPasswordReset(id: string) {
-  return apiRequest<{ message: string; demoHint?: string }>(
-    `/api/identity/users/${id}/password-reset`,
-    {
-      method: 'POST',
-      auth: true,
-    },
-  )
-}
-
 export async function disableUserMfa(id: string, code: string) {
   return apiRequest<{ user: IdentityUser; message: string }>(`/api/identity/users/${id}/mfa/disable`, {
     method: 'POST',

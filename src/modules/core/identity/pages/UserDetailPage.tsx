@@ -11,7 +11,6 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   IconBan,
   IconCircleCheck,
-  IconKey,
   IconShield,
   IconShieldOff,
   IconTrash,
@@ -34,7 +33,6 @@ import {
   changeOwnPassword,
   deleteUser,
   fetchUser,
-  sendUserPasswordReset,
   updateUser,
   type MembershipWithLabels,
 } from '@/modules/core/identity/services/identityService'
@@ -183,20 +181,6 @@ export function UserDetailPage() {
     }
   }
 
-  async function handleSendReset() {
-    if (!user) {
-      return
-    }
-    setError(null)
-    setMessage(null)
-    try {
-      const result = await sendUserPasswordReset(user.id)
-      setMessage(result.message)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to send password reset.')
-    }
-  }
-
   function requestDelete() {
     if (isSelf) {
       setError('You cannot delete your own account.')
@@ -321,9 +305,6 @@ export function UserDetailPage() {
               onClick={() => navigate(`/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`)}
             >
               {user.mfaEnabled ? <IconShieldOff /> : <IconShield />}
-            </IconButton>
-            <IconButton label="Send password reset" onClick={() => void handleSendReset()}>
-              <IconKey />
             </IconButton>
             <IconButton
               label={user.status === 'active' ? 'Active' : 'Inactive'}
