@@ -33,7 +33,7 @@ export const identityCompanies: CompanyRecord[] = [
     code: 'WHOLESALE',
     name: 'Acme Wholesale',
     status: 'active',
-    createdAt: '2026-01-08T08:00:00.000Z',
+    createdAt: '2026-01-09T08:00:00.000Z',
   },
 ]
 

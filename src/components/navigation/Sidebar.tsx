@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   collectAncestorGroupIds,
@@ -12,58 +12,106 @@ import {
   getModuleIcon,
   getSectionIcon,
   getUtilityIcon,
+  IconBriefcase,
   IconBuilding,
   IconChevron,
+  IconDot,
   IconMinus,
   IconPlus,
   IconSearch,
-  IconStore,
+  IconUsers,
 } from '@/components/navigation/SidebarIcons'
 import { useAuthStore } from '@/stores/authStore'
 import { fetchCompanies } from '@/modules/core/identity/services/identityService'
+import type { CompanyRecord } from '@/modules/core/identity/types/identity'
 import './Sidebar.css'
 
-const TENANT_OPTIONS = ['Acme Group', 'Nova Holdings'] as const
+const DEFAULT_TENANT_NAME = 'KUNZZ Group'
 const COLLAPSED_STORAGE_KEY = 'aios.sidebar.collapsed'
 const COMPANY_STORAGE_KEY = 'aios.companyId'
 
-function ContextSwitcher({
-  label,
-  icon,
+type CompanyOption = { value: string; label: string }
+
+function toCompanyOptions(items: Array<Pick<CompanyRecord, 'id' | 'name' | 'status'>>): CompanyOption[] {
+  return items
+    .filter((item) => item.status === 'active')
+    .map((item) => ({ value: item.id, label: item.name }))
+}
+
+async function loadCompanyOptions(): Promise<CompanyOption[]> {
+  try {
+    const result = await fetchCompanies()
+    const items = Array.isArray(result.items) ? result.items : []
+    return toCompanyOptions(items)
+  } catch {
+    if (import.meta.env.DEV) {
+      const { identityCompanies } = await import('@/mocks/data/identity')
+      return toCompanyOptions(identityCompanies)
+    }
+    return []
+  }
+}
+
+type CompanyFlyoutSection = {
+  id: string
+  label: string
+  icon: typeof IconBriefcase
+  items: Array<{ id: string; label: string; to: string }>
+}
+
+function getCompanyFlyoutSections(companyId: string): CompanyFlyoutSection[] {
+  return [
+    {
+      id: 'workspace',
+      label: 'Workspace',
+      icon: IconBriefcase,
+      items: [{ id: 'overview', label: 'Company Overview', to: `/system/core/companies/${companyId}` }],
+    },
+    {
+      id: 'identity',
+      label: 'Identity',
+      icon: IconUsers,
+      items: [
+        { id: 'users', label: 'Users', to: '/system/core/users' },
+        { id: 'membership', label: 'Membership', to: '/system/core/membership' },
+      ],
+    },
+  ]
+}
+
+function TenantCompanyBlock({
+  tenantName,
   open,
   collapsed,
-  options,
-  value,
-  disabled,
+  companies,
+  highlightedCompanyId,
   onToggle,
-  onSelect,
+  onHoverCompany,
+  onLeaveCompanies,
 }: {
-  label: string
-  icon: typeof IconBuilding
+  tenantName: string
   open: boolean
   collapsed: boolean
-  options: Array<{ value: string; label: string }>
-  value: string
-  disabled?: boolean
+  companies: CompanyOption[]
+  highlightedCompanyId: string
   onToggle: () => void
-  onSelect: (value: string) => void
+  onHoverCompany: (companyId: string) => void
+  onLeaveCompanies: () => void
 }) {
-  const Icon = icon
   return (
     <div className={['sidebar__context-group', open ? 'is-open' : ''].filter(Boolean).join(' ')}>
       <button
         type="button"
         className={['sidebar__item', 'sidebar__context-toggle', open ? 'is-open' : ''].filter(Boolean).join(' ')}
         aria-expanded={open}
-        title={label}
-        disabled={disabled}
+        title={tenantName}
         onClick={onToggle}
       >
         <span className="sidebar__row-main">
           <span className="sidebar__icon">
-            <Icon />
+            <IconBuilding />
           </span>
-          <span className="sidebar__label">{label}</span>
+          <span className="sidebar__label">{tenantName}</span>
         </span>
         {!collapsed ? (
           <span className="sidebar__expander" aria-hidden>
@@ -72,29 +120,90 @@ function ContextSwitcher({
         ) : null}
       </button>
       {open && !collapsed ? (
-        <ul className="sidebar__context-tree">
-          {options.map((option) => {
-            const selected = option.value === value
-            return (
-              <li key={option.value || option.label}>
-                <button
-                  type="button"
-                  className={['sidebar__context-option', selected ? 'is-selected' : '']
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => onSelect(option.value)}
-                >
-                  <span className="sidebar__label">{option.label}</span>
-                  <span className="sidebar__context-chevron" aria-hidden>
-                    <IconChevron />
-                  </span>
-                </button>
-              </li>
-            )
-          })}
+        <ul className="sidebar__context-tree" onMouseLeave={onLeaveCompanies}>
+          {companies.length === 0 ? (
+            <li>
+              <span className="sidebar__context-empty">No companies</span>
+            </li>
+          ) : (
+            companies.map((company) => {
+              const selected = company.value === highlightedCompanyId
+              return (
+                <li key={company.value}>
+                  <button
+                    type="button"
+                    className={['sidebar__context-option', selected ? 'is-selected' : '']
+                      .filter(Boolean)
+                      .join(' ')}
+                    onMouseEnter={() => onHoverCompany(company.value)}
+                    onFocus={() => onHoverCompany(company.value)}
+                  >
+                    <span className="sidebar__label">{company.label}</span>
+                  </button>
+                </li>
+              )
+            })
+          )}
         </ul>
       ) : null}
     </div>
+  )
+}
+
+function CompanyFlyout({
+  company,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  company: CompanyOption
+  onMouseEnter: () => void
+  onMouseLeave: () => void
+}) {
+  const sections = getCompanyFlyoutSections(company.value)
+
+  return (
+    <aside
+      className="sidebar-flyout"
+      aria-label={company.label}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="sidebar-flyout__inner">
+        <p className="sidebar-flyout__company">{company.label}</p>
+        {sections.map((section) => {
+          const SectionIcon = section.icon
+          return (
+            <section key={section.id} className="sidebar-flyout__section">
+              <header className="sidebar-flyout__section-head">
+                <span>
+                  {section.label} ({section.items.length})
+                </span>
+                <SectionIcon />
+              </header>
+              <ul className="sidebar-flyout__list">
+                {section.items.map((item) => (
+                  <li key={item.id}>
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) =>
+                        ['sidebar-flyout__link', isActive ? 'sidebar-flyout__link--active' : '']
+                          .filter(Boolean)
+                          .join(' ')
+                      }
+                    >
+                      <span className="sidebar-flyout__link-icon" aria-hidden>
+                        <IconDot />
+                      </span>
+                      <span className="sidebar-flyout__link-label">{item.label}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        })}
+      </div>
+    </aside>
   )
 }
 
@@ -234,14 +343,16 @@ function SectionBlock({
 export function Sidebar() {
   const location = useLocation()
   const user = useAuthStore((state) => state.user)
+  const isHydrated = useAuthStore((state) => state.isHydrated)
   const [query, setQuery] = useState('')
-  const [tenant, setTenant] = useState('Acme Group')
   const [companyId, setCompanyId] = useState(() => window.localStorage.getItem(COMPANY_STORAGE_KEY) ?? '')
-  const [companyOptions, setCompanyOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([])
   const [collapsed, setCollapsed] = useState(() => {
     return window.sessionStorage.getItem(COLLAPSED_STORAGE_KEY) === '1'
   })
-  const [contextOpen, setContextOpen] = useState<'tenant' | 'company' | null>(null)
+  const [tenantOpen, setTenantOpen] = useState(true)
+  const [flyoutCompanyId, setFlyoutCompanyId] = useState<string | null>(null)
+  const hideFlyoutTimerRef = useRef<number | null>(null)
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
 
   const sections = useMemo(() => filterSidebarSections(query), [query])
@@ -264,38 +375,45 @@ export function Sidebar() {
 
   useEffect(() => {
     window.sessionStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0')
+    if (collapsed) {
+      setFlyoutCompanyId(null)
+    }
   }, [collapsed])
 
   useEffect(() => {
+    return () => {
+      if (hideFlyoutTimerRef.current !== null) {
+        window.clearTimeout(hideFlyoutTimerRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return
+    }
+
     let cancelled = false
-    void fetchCompanies()
-      .then((result) => {
-        if (cancelled) {
-          return
+    void loadCompanyOptions().then((options) => {
+      if (cancelled) {
+        return
+      }
+      setCompanyOptions(options)
+      setCompanyId((current) => {
+        if (current && options.some((item) => item.value === current)) {
+          return current
         }
-        const active = result.items.filter((item) => item.status === 'active')
-        const options = active.map((item) => ({ value: item.id, label: item.name }))
-        setCompanyOptions(options)
-        setCompanyId((current) => {
-          if (current && options.some((item) => item.value === current)) {
-            return current
-          }
-          const nextId = options[0]?.value ?? ''
-          if (nextId) {
-            window.localStorage.setItem(COMPANY_STORAGE_KEY, nextId)
-          }
-          return nextId
-        })
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCompanyOptions([])
+        const nextId = options[0]?.value ?? ''
+        if (nextId) {
+          window.localStorage.setItem(COMPANY_STORAGE_KEY, nextId)
         }
+        return nextId
       })
+    })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [isHydrated])
 
   function handleToggle(id: string) {
     if (collapsed) {
@@ -314,13 +432,40 @@ export function Sidebar() {
 
   const FavoritesIcon = getUtilityIcon('favorites')
   const RecentIcon = getUtilityIcon('recent')
+  const flyoutCompany = companyOptions.find((item) => item.value === flyoutCompanyId) ?? null
+  const highlightedCompanyId = flyoutCompanyId ?? companyId
+
+  function cancelHideFlyout() {
+    if (hideFlyoutTimerRef.current !== null) {
+      window.clearTimeout(hideFlyoutTimerRef.current)
+      hideFlyoutTimerRef.current = null
+    }
+  }
+
+  function scheduleHideFlyout() {
+    cancelHideFlyout()
+    hideFlyoutTimerRef.current = window.setTimeout(() => {
+      setFlyoutCompanyId(null)
+      hideFlyoutTimerRef.current = null
+    }, 120)
+  }
+
+  function handleHoverCompany(nextCompanyId: string) {
+    cancelHideFlyout()
+    setFlyoutCompanyId(nextCompanyId)
+    setCompanyId(nextCompanyId)
+    window.localStorage.setItem(COMPANY_STORAGE_KEY, nextCompanyId)
+  }
 
   return (
-    <aside
-      className={['sidebar', collapsed ? 'sidebar--collapsed' : ''].filter(Boolean).join(' ')}
-      aria-label="Primary"
-      data-collapsed={collapsed ? 'true' : 'false'}
+    <div
+      className={['sidebar-shell', flyoutCompany ? 'sidebar-shell--flyout-open' : ''].filter(Boolean).join(' ')}
     >
+      <aside
+        className={['sidebar', collapsed ? 'sidebar--collapsed' : ''].filter(Boolean).join(' ')}
+        aria-label="Primary"
+        data-collapsed={collapsed ? 'true' : 'false'}
+      >
       <div className="sidebar__brand-row">
         <div className="sidebar__brand" title="AIOS NOVA">
           <BrandLogo />
@@ -351,31 +496,22 @@ export function Sidebar() {
 
       {!collapsed ? (
         <div className="sidebar__context">
-          <ContextSwitcher
-            label="Tenant"
-            icon={IconBuilding}
-            open={contextOpen === 'tenant'}
+          <TenantCompanyBlock
+            tenantName={DEFAULT_TENANT_NAME}
+            open={tenantOpen}
             collapsed={collapsed}
-            options={TENANT_OPTIONS.map((item) => ({ value: item, label: item }))}
-            value={tenant}
-            onToggle={() => setContextOpen((current) => (current === 'tenant' ? null : 'tenant'))}
-            onSelect={(next) => setTenant(next)}
-          />
-          <ContextSwitcher
-            label="Company"
-            icon={IconStore}
-            open={contextOpen === 'company'}
-            collapsed={collapsed}
-            options={companyOptions}
-            value={companyId}
-            disabled={companyOptions.length === 0}
-            onToggle={() => setContextOpen((current) => (current === 'company' ? null : 'company'))}
-            onSelect={(next) => {
-              setCompanyId(next)
-              if (next) {
-                window.localStorage.setItem(COMPANY_STORAGE_KEY, next)
-              }
+            companies={companyOptions}
+            highlightedCompanyId={highlightedCompanyId}
+            onToggle={() => {
+              setTenantOpen((current) => {
+                if (current) {
+                  setFlyoutCompanyId(null)
+                }
+                return !current
+              })
             }}
+            onHoverCompany={handleHoverCompany}
+            onLeaveCompanies={scheduleHideFlyout}
           />
         </div>
       ) : null}
@@ -428,6 +564,15 @@ export function Sidebar() {
           <span>{user?.email ?? ''}</span>
         </div>
       </div>
-    </aside>
+      </aside>
+
+      {flyoutCompany && !collapsed && tenantOpen ? (
+        <CompanyFlyout
+          company={flyoutCompany}
+          onMouseEnter={cancelHideFlyout}
+          onMouseLeave={scheduleHideFlyout}
+        />
+      ) : null}
+    </div>
   )
 }
