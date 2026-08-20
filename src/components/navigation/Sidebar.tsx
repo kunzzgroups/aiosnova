@@ -11,7 +11,6 @@ import {
   getLinkIcon,
   getModuleIcon,
   getSectionIcon,
-  getUtilityIcon,
   IconBuilding,
   IconChevron,
   IconDot,
@@ -449,8 +448,6 @@ export function Sidebar() {
     persistCompany(nextCompanyId)
   }
 
-  const FavoritesIcon = getUtilityIcon('favorites')
-  const RecentIcon = getUtilityIcon('recent')
   const activeCompany = companyOptions.find((item) => item.value === companyId) ?? null
 
   const selectedLevel2Id = openGroupId
@@ -519,33 +516,6 @@ export function Sidebar() {
           />
         </div>
       ) : null}
-
-      <div className="sidebar__quick">
-        <NavLink
-          to="/favorites"
-          title="Favorites"
-          className={({ isActive }) =>
-            ['sidebar__item', isActive ? 'sidebar__item--active' : ''].filter(Boolean).join(' ')
-          }
-        >
-          <span className="sidebar__icon">
-            <FavoritesIcon />
-          </span>
-          <span className="sidebar__label">Favorites</span>
-        </NavLink>
-        <NavLink
-          to="/recent"
-          title="Recent"
-          className={({ isActive }) =>
-            ['sidebar__item', isActive ? 'sidebar__item--active' : ''].filter(Boolean).join(' ')
-          }
-        >
-          <span className="sidebar__icon">
-            <RecentIcon />
-          </span>
-          <span className="sidebar__label">Recent</span>
-        </NavLink>
-      </div>
 
       {!collapsed && activeCompany ? (
         <div className="sidebar__company-context" title={activeCompany.label}>

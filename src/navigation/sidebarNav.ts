@@ -24,7 +24,7 @@ export type SidebarUtilityItem = {
   id: string
   label: string
   path?: string
-  action?: 'search' | 'tenant' | 'company' | 'favorites' | 'recent'
+  action?: 'search' | 'tenant' | 'company'
 }
 
 function slugify(label: string): string {
@@ -66,8 +66,6 @@ export const sidebarUtilities: SidebarUtilityItem[] = [
   { id: 'search', label: 'Search', action: 'search' },
   { id: 'tenant-switcher', label: 'Tenant Switcher', action: 'tenant' },
   { id: 'company-switcher', label: 'Company Switcher', action: 'company' },
-  { id: 'favorites', label: 'Favorites', action: 'favorites', path: '/favorites' },
-  { id: 'recent', label: 'Recent', action: 'recent', path: '/recent' },
 ]
 
 export const sidebarSections: SidebarSection[] = [

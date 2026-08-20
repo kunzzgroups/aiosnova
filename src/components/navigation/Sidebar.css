@@ -239,18 +239,6 @@
   cursor: not-allowed;
 }
 
-.sidebar__quick {
-  display: flex;
-  flex-direction: column;
-  gap: 0.12rem;
-  padding: 0 0.45rem 0.55rem;
-}
-
-.sidebar__quick .sidebar__item {
-  justify-content: flex-start;
-  gap: 0.65rem;
-}
-
 .sidebar__company-context {
   flex-shrink: 0;
   margin: 0 0.7rem 0.55rem;
@@ -530,10 +518,6 @@
 .sidebar--collapsed .sidebar__footer {
   justify-content: center;
   padding-top: 0.75rem;
-}
-
-.sidebar--collapsed .sidebar__quick {
-  margin-bottom: 0;
 }
 
 .sidebar-flyout {
