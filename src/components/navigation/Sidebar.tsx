@@ -97,6 +97,7 @@ function GroupCompaniesBlock({
   onToggle,
   onHoverItem,
   onLeaveItems,
+  onSelectItem,
 }: {
   open: boolean
   collapsed: boolean
@@ -105,6 +106,7 @@ function GroupCompaniesBlock({
   onToggle: () => void
   onHoverItem: (item: Level2Item, anchor: HTMLButtonElement) => void
   onLeaveItems: () => void
+  onSelectItem: (item: Level2Item) => void
 }) {
   return (
     <div className={['sidebar__context-group', open ? 'is-open' : ''].filter(Boolean).join(' ')}>
@@ -145,6 +147,7 @@ function GroupCompaniesBlock({
                       .join(' ')}
                     onMouseEnter={(event) => onHoverItem(item, event.currentTarget)}
                     onFocus={(event) => onHoverItem(item, event.currentTarget)}
+                    onClick={() => onSelectItem(item)}
                   >
                     <span className="sidebar__label">{item.label}</span>
                   </button>
@@ -479,7 +482,6 @@ export function Sidebar() {
     cancelHideFlyout()
 
     if (item.kind === 'company') {
-      persistCompany(item.id)
       setHoveredGroupId(null)
       return
     }
@@ -492,6 +494,13 @@ export function Sidebar() {
     }
 
     setHoveredGroupId(item.id)
+  }
+
+  function handleSelectLevel2(item: Level2Item) {
+    if (item.kind === 'company') {
+      persistCompany(item.id)
+      setHoveredGroupId(null)
+    }
   }
 
   function handleSelectCompanyFromGroup(nextCompanyId: string) {
@@ -574,6 +583,7 @@ export function Sidebar() {
             }}
             onHoverItem={handleHoverLevel2}
             onLeaveItems={scheduleHideFlyout}
+            onSelectItem={handleSelectLevel2}
           />
         </div>
       ) : null}
