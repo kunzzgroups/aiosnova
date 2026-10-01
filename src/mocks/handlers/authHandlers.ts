@@ -34,12 +34,27 @@ type ResetTokenRecord = {
   userId: string
   expiresAt: number
 }
+//Mock emai; features
+type MockEmail = {
+  id:string
+  to:string
+  subject:string
+  body:string
+  createdAt:string
+}
 
 const sessions = new Map<string, SessionRecord>()
 const mfaTickets = new Map<string, MfaTicketRecord>()
 const tacChallenges = new Map<string, { userId: string; expiresAt: number }>()
 const resetTokens = new Map<string, ResetTokenRecord>()
 const pendingMfaSecrets = new Map<string, string>()
+//Mock inbox features
+const mockInbox = new Map<string, MockEmail[]>()
+
+function addMockEmail(email: MockEmail){
+  const existing =mockInbox.get(email.to) ?? []
+  mockInbox.set(email.to, [email, ...existing])
+}
 
 function createToken(prefix: string) {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, '')}`
@@ -236,11 +251,31 @@ export const authHandlers = [
         userId: user.id,
         expiresAt: Date.now() + 5 * 60 * 1000,
       })
+
+      //Mock email features
+      addMockEmail({
+        id: crypto.randomUUID(),
+        to: email,
+        subject: 'Your AIOS verification code',
+        body: `Your verification code is: ${MOCK_TAC_CODE}\n\nThis code expires in 5 minutes`,
+        createdAt: Date.now(),
+      })
     }
 
     return HttpResponse.json({
       message: email ? EMAIL_OTP_SENT_MESSAGE : TAC_SENT_MESSAGE,
       demoHint: `Demo OTP: ${MOCK_TAC_CODE}`,
+    })
+  }),
+
+  http.get('/api/mock/inbox', ({request})=>{
+    const url = new URL(request.url)
+    const email = url.searchParams.get('email')?.trim().toLowerCase() ?? ''
+
+    const emails = mockInbox.get(email) ?? []
+
+    return HttpResponse.json({
+      emails,
     })
   }),
 

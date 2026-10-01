@@ -75,6 +75,22 @@ export function LoginForm() {
   const fullPhone = composeDialedPhone(dialCode, phone).full
   const canSendOtp = method === 'email' ? Boolean(email.trim()) : Boolean(phone.trim())
 
+  //Resend Tac Cooldown
+  const[resendCooldown, setResendCooldown] = useState(0)
+
+  useEffect(()=> {
+    if (resendCooldown <= 0){
+    return
+  }
+
+  const timer =setInterval(() =>{
+    setResendCooldown((current) => current-1)
+  }, 1000)
+
+  return () => clearInterval(timer)
+}, [resendCooldown])
+
+
   useEffect(() => {
     if (!dialOpen) {
       return
@@ -119,6 +135,7 @@ export function LoginForm() {
     setSendingTac(false)
     if (sent) {
       setTacSent(true)
+      setResendCooldown(60)
     }
   }
 
@@ -253,9 +270,9 @@ export function LoginForm() {
               type="button"
               className="login-form__tac-send"
               onClick={() => void sendTac()}
-              disabled={sendingTac || isSubmitting || !canSendOtp}
+              disabled={sendingTac || isSubmitting || !canSendOtp || resendCooldown > 0}
             >
-              {sendingTac ? t('sendingTac') : tacSent ? t('resendTac') : t('sendTac')}
+              {sendingTac ? t('sendingTac') :resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : tacSent ? t('resendTac') : t('sendTac')}
             </button>
           </div>
         </FormField>
