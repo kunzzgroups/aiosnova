@@ -14,7 +14,8 @@
 
 .sidebar-select__trigger {
   width: 100%;
-  min-height: 2.35rem;
+  height: var(--control-height);
+  min-height: var(--control-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -26,7 +27,7 @@
   font: inherit;
   font-size: 0.84rem;
   font-weight: 550;
-  padding: 0.4rem 0.65rem 0.4rem 0.75rem;
+  padding: 0 0.65rem 0 0.75rem;
   cursor: pointer;
   transition:
     border-color 0.15s ease,

@@ -62,6 +62,10 @@
   --font-sans: "DM Sans", "Segoe UI", sans-serif;
   --font-display: "Instrument Serif", Georgia, serif;
 
+  /* Control sizes. Every input and select trigger shares this one height so a
+     form never mixes 32/38/42px controls (UI Design System §54). */
+  --control-height: 2.15rem;
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;

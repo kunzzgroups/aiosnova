@@ -138,11 +138,6 @@ export function CompaniesPage() {
 
   return (
     <div className="identity-page">
-      <header className="identity-page__header">
-        <h1>{t('org.companies.title')}</h1>
-        <p>Tenant / Company — legal entities and workspaces (Layer 0).</p>
-      </header>
-
       <FlashToasts
         error={error}
         message={message}

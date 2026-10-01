@@ -13,6 +13,7 @@ import {
   IconCircleCheck,
   IconEye,
   IconPencil,
+  IconSearch,
   IconShield,
   IconShieldOff,
   IconTrash,
@@ -268,11 +269,6 @@ export function UsersPage() {
 
   return (
     <div className="identity-page">
-      <header className="identity-page__header">
-        <h1>{t('users.title')}</h1>
-        <p>Identity / User — platform accounts and profiles (Layer 1 · 03).</p>
-      </header>
-
       <FlashToasts
         error={error}
         message={message}
@@ -280,26 +276,21 @@ export function UsersPage() {
         onClearMessage={() => setMessage(null)}
       />
 
-      <section className="identity-panel">
-        <div className="identity-panel__title-row">
-          <h2>{t('users.directory')}</h2>
-          <Button
-            variant={showInvite ? 'secondary' : 'primary'}
-            onClick={handleToggleInvite}
-          >
-            {showInvite ? t('users.cancel') : t('users.inviteUser')}
-          </Button>
-        </div>
-        <div className="identity-directory-toolbar">
-          <TextField
-            className="identity-directory-toolbar__search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('users.searchPlaceholder')}
-            aria-label={t('users.searchAria')}
-          />
-          <div className="identity-directory-toolbar__filters">
+      <section className="identity-panel identity-panel--directory">
+        <div className="identity-panel__head">
+          <div className="identity-panel__head-tools">
+            <div className="identity-search">
+              <span className="identity-search__icon" aria-hidden>
+                <IconSearch />
+              </span>
+              <TextField
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t('users.searchPlaceholder')}
+                aria-label={t('users.searchAria')}
+              />
+            </div>
             <SidebarSelect
               id="directory-status"
               label={t('users.filterStatus')}
@@ -321,6 +312,12 @@ export function UsersPage() {
               options={MFA_FILTERS.map((value) => ({ value, label: mfaLabel(value) }))}
               onChange={setMfaFilter}
             />
+            <Button
+              variant={showInvite ? 'secondary' : 'primary'}
+              onClick={handleToggleInvite}
+            >
+              {showInvite ? t('users.cancel') : t('users.inviteUser')}
+            </Button>
           </div>
         </div>
 
@@ -394,7 +391,7 @@ export function UsersPage() {
         ) : null}
         {filteredUsers.length > 0 ? (
           <div className="identity-table-wrap">
-            <table className="identity-table identity-table--packed">
+            <table className="identity-table identity-table--packed identity-table--users">
               <thead>
                 <tr>
                   <th>{t('users.colName')}</th>
@@ -403,7 +400,6 @@ export function UsersPage() {
                   <th>{t('users.colSignIn')}</th>
                   <th>{t('users.colMfa')}</th>
                   <th>{t('users.colLastActive')}</th>
-                  <th className="identity-table__spacer" aria-hidden="true" />
                   <th className="identity-table__actions">{t('users.colActions')}</th>
                 </tr>
               </thead>
@@ -415,9 +411,7 @@ export function UsersPage() {
                         {user.displayName}
                       </Link>
                       {!isIdentityProfileComplete(user) ? (
-                        <span className="identity-status identity-status--invited identity-status--inline">
-                          Incomplete
-                        </span>
+                        <span className="identity-table__flag">Incomplete</span>
                       ) : null}
                     </td>
                     <td>{user.email}</td>
@@ -429,7 +423,6 @@ export function UsersPage() {
                     <td>{formatSignInMethod(user.signInMethod, t)}</td>
                     <td>{formatDirectoryMfa(user, t)}</td>
                     <td>{formatLastActive(user.lastActiveAt, t)}</td>
-                    <td className="identity-table__spacer" aria-hidden="true" />
                     <td className="identity-table__actions">
                       <div className="identity-inline-actions">
                         <IconButton
@@ -458,7 +451,6 @@ export function UsersPage() {
                         ) : null}
                         <IconButton
                           label={user.status === 'active' ? t('users.statusActive') : t('users.statusInactive')}
-                          variant={user.status === 'active' ? 'secondary' : 'danger'}
                           onClick={() => void handleToggleStatus(user)}
                           disabled={statusUpdatingId === user.id}
                         >

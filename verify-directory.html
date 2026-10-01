@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<title>验证：Directory 面板（真实 CSS）</title>
+<!-- 只引用项目真实样式，没有任何覆盖 -->
+<link rel="stylesheet" href="src/design-system/tokens.css" />
+<link rel="stylesheet" href="src/modules/core/identity/pages/IdentityPage.css" />
+<link rel="stylesheet" href="src/components/ui/Button.css" />
+<link rel="stylesheet" href="src/components/ui/TextField.css" />
+<link rel="stylesheet" href="src/components/navigation/SidebarSelect.css" />
+<link rel="stylesheet" href="src/components/navigation/Sidebar.css" />
+<link rel="stylesheet" href="src/components/navigation/LanguageSwitcher.css" />
+<link rel="stylesheet" href="src/modules/core/auth/components/PasswordField.css" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
+<style>
+  body { margin:0; background:var(--color-bg); color:var(--color-text); font-family:var(--font-sans); font-size:var(--text-sm); -webkit-font-smoothing:antialiased; }
+  /* .app-shell__main 的真实内边距 */
+  .fake-main { padding:var(--space-6); }
+  .ui-button--icon svg { width:1.05rem; height:1.05rem; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:14px var(--space-6); background:var(--color-bg-elevated); border-bottom:1px solid var(--color-border); }
+  .bar strong { font-size:1.15rem; letter-spacing:-.02em; }
+  .bar button { appearance:none; border:1px solid var(--color-border); background:var(--color-bg-elevated); color:var(--color-text); border-radius:999px; padding:7px 15px; font:inherit; font-weight:600; cursor:pointer; }
+  .sec { margin:0 0 10px; color:var(--color-text-muted); font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; }
+  .gap { height:26px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>Users</strong>
+  <button id="t">切换深色 / 浅色</button>
+</div>
+
+<div class="fake-main">
+
+  <p class="sec">默认状态</p>
+  <div class="identity-page">
+    <section class="identity-panel identity-panel--directory">
+      <div class="identity-panel__head">
+          <h2>Directory</h2>
+          <span class="identity-panel__count">5 users</span>
+        </div>
+        <div class="identity-panel__head-tools">
+          <div class="identity-search">
+            <span class="identity-search__icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m16.2 16.2 4.3 4.3"/></svg>
+            </span>
+            <input class="ui-text-field" type="search" placeholder="Search name or email..." />
+          </div>
+          <div class="sidebar-select"><span class="sidebar-select__label">Status</span><button class="sidebar-select__trigger"><span class="sidebar-select__value">All</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div>
+          <div class="sidebar-select"><span class="sidebar-select__label">Sign-in method</span><button class="sidebar-select__trigger"><span class="sidebar-select__value">All</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div>
+          <div class="sidebar-select"><span class="sidebar-select__label">MFA</span><button class="sidebar-select__trigger"><span class="sidebar-select__value">All</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div>
+          <button class="ui-button ui-button--primary ui-button--md">Invite User</button>
+        </div>
+      </div>
+      <div class="identity-table-wrap">
+        <table class="identity-table identity-table--packed identity-table--users" data-table></table>
+      </div>
+    </section>
+  </div>
+
+  <div class="gap"></div>
+  <p class="sec">筛选 + 邀请表单展开</p>
+  <div class="identity-page">
+    <section class="identity-panel identity-panel--directory">
+      <div class="identity-panel__head">
+          <h2>Directory</h2>
+          <span class="identity-panel__count">2 of 5</span>
+        </div>
+        <div class="identity-panel__head-tools">
+          <div class="identity-search">
+            <span class="identity-search__icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m16.2 16.2 4.3 4.3"/></svg>
+            </span>
+            <input class="ui-text-field" type="search" value="incomplete" />
+          </div>
+          <div class="sidebar-select"><span class="sidebar-select__label">Status</span><button class="sidebar-select__trigger"><span class="sidebar-select__value">All</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div>
+          <div class="sidebar-select"><span class="sidebar-select__label">Sign-in method</span><button class="sidebar-select__trigger"><span class="sidebar-select__value">All</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div>
+          <div class="sidebar-select"><span class="sidebar-select__label">MFA</span><button class="sidebar-select__trigger"><span class="sidebar-select__value">All</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div>
+          <button class="ui-button ui-button--secondary ui-button--md">Cancel</button>
+        </div>
+      </div>
+
+      <form class="identity-invite">
+        <div class="identity-invite__header">
+          <h3>Invite a user</h3>
+          <p>The account is created with a password you set here; it cannot sign in until the address is confirmed.</p>
+        </div>
+        <div class="identity-invite__grid">
+          <div class="ui-form-field"><label class="ui-form-field__label">Email</label><input class="ui-text-field" placeholder="name@company.com" /></div>
+          <div class="ui-form-field"><label class="ui-form-field__label">Company</label><div class="sidebar-select" style="width:16rem"><button class="sidebar-select__trigger"><span class="sidebar-select__value">Acme Retail</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div></div>
+          <div class="ui-form-field"><label class="ui-form-field__label">Password</label><div class="identity-invite__password"><input class="ui-text-field" type="password" placeholder="Create password" /><button class="ui-button ui-button--secondary ui-button--md">Generate</button><button class="ui-button ui-button--primary ui-button--md">Invite</button></div></div>
+        </div>
+      </form>
+
+      <div class="identity-table-wrap">
+        <table class="identity-table identity-table--packed identity-table--users" data-table="2"></table>
+      </div>
+    </section>
+  </div>
+
+  <div class="gap"></div>
+  <p class="sec">控件高度实测（真实 CSS 渲染 + 浏览器实测）</p>
+  <div class="identity-page">
+    <section class="identity-panel identity-panel--directory">
+      <div class="identity-panel__head">
+        <div class="identity-panel__head-tools">
+          <div class="identity-search"><span class="identity-search__icon" aria-hidden><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m16.2 16.2 4.3 4.3"/></svg></span><input data-measure="搜索框（带图标）" class="ui-text-field" placeholder="Search name or email..." /></div>
+          <div class="sidebar-select" data-select-shell><span class="sidebar-select__label">Status</span><button data-measure="下拉筛选框" class="sidebar-select__trigger"><span class="sidebar-select__value">All</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div>
+          <button class="ui-button ui-button--primary ui-button--md" data-measure="主按钮 Invite User">Invite User</button>
+        </div>
+      </div>
+
+      <form class="identity-invite">
+        <div class="identity-invite__header"><h3>Invite a user</h3><p>同面板内的输入框 / 下拉框：</p></div>
+        <div class="identity-invite__grid">
+          <div class="ui-form-field"><label class="ui-form-field__label">Email</label><input data-measure="邀请表单输入框" class="ui-text-field" placeholder="name@company.com" /></div>
+          <div class="ui-form-field"><label class="ui-form-field__label">Company</label><div class="sidebar-select" style="width:16rem"><button data-measure="邀请表单下拉框" class="sidebar-select__trigger"><span class="sidebar-select__value">Acme Retail</span><span class="sidebar-select__chevron"><i data-chev></i></span></button></div></div>
+          <div class="ui-form-field"><label class="ui-form-field__label">Password</label><div class="password-field"><div class="password-field__control"><input data-measure="密码框（内含眼睛按钮）" class="ui-text-field" type="password" placeholder="Create password" /><button class="password-field__toggle ui-button ui-button--ghost ui-button--icon" aria-label="Show"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div></div>
+        </div>
+      </form>
+
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:0 1.25rem 1.25rem">
+        <select data-measure="原生 select（identity-select）" class="identity-select" style="width:12rem"><option>Option A</option></select>
+        <input data-measure="原生 input（identity-input）" class="identity-input" style="width:12rem" placeholder="Native input" />
+        <div class="language-switcher" style="position:static"><button data-measure="语言下拉（header）" class="language-switcher__trigger">English <i data-chev></i></button></div>
+        <div class="sidebar__search" style="position:relative;margin:0;width:15rem;--sidebar-ink:var(--color-text);--sidebar-search-bg:var(--color-bg-muted)"><span class="sidebar__search-icon" aria-hidden><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m16.2 16.2 4.3 4.3"/></svg></span><input data-measure="侧栏搜索框" type="search" placeholder="Search..." /></div>
+      </div>
+
+      <div id="measure-out" style="padding:0 1.25rem 1.5rem"></div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+const S = (p) => `<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden>${p}</svg>`
+const I = {
+  chev: S('<path d="m6 9 6 6 6-6"/>'),
+  eye: S('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>'),
+  pencil: S('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  shield: S('<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/>'),
+  shieldOff: S('<path d="M19.4 14.6A8.4 8.4 0 0 0 19 12V6l-7-3-2.3 1"/><path d="M5 6v6c0 4.5 3 7.5 7 9 1.2-.45 2.3-1.1 3.3-1.9"/>'),
+  check: S('<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>'),
+  ban: S('<circle cx="12" cy="12" r="9"/><path d="m6.2 6.2 11.6 11.6"/>'),
+  trash: S('<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>'),
+}
+document.querySelectorAll('[data-chev]').forEach((n) => { n.innerHTML = I.chev })
+
+const users = [
+  { n:'Demo User',   e:'demo@aios.dev',        st:'Active',  si:'Password', m:'Off', la:'2026/8/18 10:32', inc:false, dis:false },
+  { n:'MFA User',    e:'mfa@aios.dev',         st:'Active',  si:'Password', m:'On',  la:'2026/8/17 16:00', inc:false, dis:false },
+  { n:'Ops Lead',    e:'ops.lead@aios.dev',    st:'Active',  si:'Password', m:'Off', la:'2026/8/15 17:10', inc:false, dis:false },
+  { n:'New Hire',    e:'newhire@aios.dev',     st:'Invited', si:'—',        m:'—',   la:'Never',           inc:true,  dis:true  },
+  { n:'Google User', e:'google.user@aios.dev', st:'Active',  si:'Google',   m:'Off', la:'Today 17:31',     inc:true,  dis:false },
+]
+
+const row = (u, i, last) => `
+  <tr>
+    <td><a class="identity-text-link" href="#">${u.n}</a>${u.inc ? '<span class="identity-table__flag">Incomplete</span>' : ''}</td>
+    <td>${u.e}</td>
+    <td class="identity-table__status"><span class="identity-status identity-status--${u.st.toLowerCase()}">${u.st}</span></td>
+    <td>${u.si}</td><td>${u.m}</td><td>${u.la}</td>
+    <td class="identity-table__actions">
+      <div class="identity-inline-actions">
+        <button class="ui-button ui-button--secondary ui-button--icon ui-icon-button" aria-label="View">${I.eye}</button>
+        <button class="ui-button ui-button--secondary ui-button--icon ui-icon-button" aria-label="Edit">${I.pencil}</button>
+        <button class="ui-button ui-button--secondary ui-button--icon ui-icon-button" aria-label="Require MFA">${I.shield}</button>
+        <button class="ui-button ui-button--secondary ui-button--icon ui-icon-button" aria-label="Disable">${u.dis ? I.ban : I.check}</button>
+        <button class="ui-button ui-button--danger ui-button--icon ui-icon-button" aria-label="Delete"${i === 0 ? '' : ''}>${I.trash}</button>
+      </div>
+    </td>
+  </tr>`
+
+document.querySelectorAll('[data-table]').forEach((table) => {
+  const limit = table.dataset.table ? Number(table.dataset.table) : users.length
+  table.innerHTML = `
+    <thead><tr>
+      <th>Name</th><th>Email</th><th class="identity-table__status">Status</th><th>Sign-in</th>
+      <th>MFA</th><th>Last active</th><th class="identity-table__actions">Actions</th>
+    </tr></thead>
+    <tbody>${users.slice(0, limit).map((u, i) => row(u, i, i === limit - 1)).join('')}</tbody>`
+})
+
+document.getElementById('t').addEventListener('click', () => {
+  document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+})
+
+/* 实测每个控件的高度 + 底边是否对齐工具栏基线 */
+function measure() {
+  const rows = [...document.querySelectorAll('[data-measure]')].map((el) => {
+    const r = el.getBoundingClientRect()
+    const bar = el.closest('.identity-panel__head-tools')
+    const barBottom = bar ? bar.getBoundingClientRect().bottom : null
+    const gap = barBottom === null ? null : barBottom - r.bottom
+    const hOk = Math.abs(r.height - 34.4) < 0.6
+    const aOk = gap === null ? null : Math.abs(gap) < 0.6
+    const align = gap === null
+      ? '<span style="color:var(--color-text-muted)">—</span>'
+      : `<span style="color:${aOk ? '#047857' : '#b45309'};font-weight:650">${aOk ? '对齐 ✓' : gap.toFixed(1) + 'px 偏差'}</span>`
+    return `<tr>
+      <td>${el.dataset.measure}</td>
+      <td style="font-variant-numeric:tabular-nums">${r.height.toFixed(1)}px</td>
+      <td style="font-variant-numeric:tabular-nums">${(r.height / 16).toFixed(2)}rem</td>
+      <td style="color:${hOk ? '#047857' : '#b45309'};font-weight:650">${hOk ? '2.15rem ✓' : '不一致'}</td>
+      <td>${align}</td>
+    </tr>`
+  })
+  document.getElementById('measure-out').innerHTML = `<table class="identity-table"><thead><tr><th>控件</th><th>实测高度</th><th>rem</th><th>高度基准</th><th>底边相对工具栏</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
+}
+if (document.fonts && document.fonts.ready) { document.fonts.ready.then(measure) } else { measure() }
+window.addEventListener('load', measure)
+</script>
+</body>
+</html>

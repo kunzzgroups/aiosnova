@@ -1,7 +1,10 @@
 .ui-text-field {
   width: 100%;
-  min-height: 2.75rem;
-  padding: 0.65rem 0.85rem;
+  /* Fixed control height: the block padding is dropped so the text can centre
+     itself, otherwise the padding alone would exceed this box. */
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding: 0 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-elevated);
