@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { IconShieldCheck, IconX } from '@/components/icons/Icons'
 import { useToastStore, type ToastItem } from '@/stores/toastStore'
 import './Toast.css'
 
 function ToastCard({ item }: { item: ToastItem }) {
+  const { t } = useTranslation()
   const dismiss = useToastStore((state) => state.dismiss)
 
   return (
@@ -14,7 +16,7 @@ function ToastCard({ item }: { item: ToastItem }) {
         <p className="ui-toast__title">{item.title}</p>
         <p className="ui-toast__description">{item.description}</p>
       </div>
-      <button type="button" className="ui-toast__close" aria-label="Dismiss" onClick={() => dismiss(item.id)}>
+      <button type="button" className="ui-toast__close" aria-label={t('common.dismiss')} onClick={() => dismiss(item.id)}>
         <IconX />
       </button>
     </div>

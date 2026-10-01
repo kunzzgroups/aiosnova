@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -26,6 +27,7 @@ import {
 import './IdentityPage.css'
 
 export function MembershipsPage() {
+  const { t } = useTranslation()
   const [memberships, setMemberships] = useState<MembershipRecord[]>([])
   const [users, setUsers] = useState<IdentityUser[]>([])
   const [organizations, setOrganizations] = useState<OrganizationNode[]>([])
@@ -99,7 +101,7 @@ export function MembershipsPage() {
       setUserId((current) => current || usersResult.items[0]?.id || '')
       setCompanyId((current) => current || meta.companies[0]?.id || '')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to load memberships.')
+      setError(err instanceof ApiError ? err.message : t('org.errLoadMemberships'))
     } finally {
       setIsLoading(false)
     }
@@ -122,10 +124,10 @@ export function MembershipsPage() {
         positionId: positionId || null,
         isPrimary,
       })
-      setMessage('Membership created.')
+      setMessage(t('org.msgMembershipCreated'))
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to create membership.')
+      setError(err instanceof ApiError ? err.message : t('org.errCreateMembership'))
     } finally {
       setIsSubmitting(false)
     }
@@ -136,7 +138,7 @@ export function MembershipsPage() {
       await updateMembership(membership.id, { status: 'ended' })
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to end membership.')
+      setError(err instanceof ApiError ? err.message : t('org.errEndMembership'))
     }
   }
 
@@ -145,14 +147,14 @@ export function MembershipsPage() {
       await updateMembership(membership.id, { isPrimary: true })
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to update membership.')
+      setError(err instanceof ApiError ? err.message : t('org.errUpdateMembership'))
     }
   }
 
   return (
     <div className="identity-page">
         <header className="identity-page__header">
-          <h1>Membership</h1>
+          <h1>{t('org.memberships.title')}</h1>
           <p>
             User relationships to Tenant / Company / Organization / Position (Layer 1 · 06). Not
             permissions.
@@ -167,12 +169,12 @@ export function MembershipsPage() {
         />
 
         <section className="identity-panel">
-          <h2>Add membership</h2>
+          <h2>{t('org.memberships.addTitle')}</h2>
           <form className="identity-form" onSubmit={(event) => void handleCreate(event)}>
-            <FormField label="User" htmlFor="mem-user">
+            <FormField label={t('org.fieldUser')} htmlFor="mem-user">
               <SidebarSelect
                 id="mem-user"
-                label="User"
+                label={t('org.fieldUser')}
                 hideLabel
                 value={userId}
                 options={userOptions}
@@ -180,10 +182,10 @@ export function MembershipsPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Company" htmlFor="mem-company">
+            <FormField label={t('org.fieldCompany')} htmlFor="mem-company">
               <SidebarSelect
                 id="mem-company"
-                label="Company"
+                label={t('org.fieldCompany')}
                 hideLabel
                 value={companyId}
                 options={companyOptions}
@@ -191,10 +193,10 @@ export function MembershipsPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Organization" htmlFor="mem-org">
+            <FormField label={t('org.fieldOrganization')} htmlFor="mem-org">
               <SidebarSelect
                 id="mem-org"
-                label="Organization"
+                label={t('org.fieldOrganization')}
                 hideLabel
                 value={organizationId}
                 options={organizationOptions}
@@ -202,10 +204,10 @@ export function MembershipsPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Position" htmlFor="mem-pos">
+            <FormField label={t('org.fieldPosition')} htmlFor="mem-pos">
               <SidebarSelect
                 id="mem-pos"
-                label="Position"
+                label={t('org.fieldPosition')}
                 hideLabel
                 value={positionId}
                 options={positionOptions}
@@ -213,10 +215,10 @@ export function MembershipsPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Primary" htmlFor="mem-primary">
+            <FormField label={t('org.fieldPrimary')} htmlFor="mem-primary">
               <SidebarSelect
                 id="mem-primary"
-                label="Primary"
+                label={t('org.fieldPrimary')}
                 hideLabel
                 value={isPrimary ? 'yes' : 'no'}
                 options={[
@@ -229,27 +231,27 @@ export function MembershipsPage() {
             </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSubmitting || !userId}>
-                {isSubmitting ? 'Saving…' : 'Add'}
+                {isSubmitting ? t('users.saving') : t('org.actionAdd')}
               </Button>
             </div>
           </form>
         </section>
 
         <section className="identity-panel">
-          <h2>Active & historical</h2>
-          {isLoading ? <p className="identity-empty">Loading…</p> : null}
+          <h2>{t('org.memberships.listTitle')}</h2>
+          {isLoading ? <p className="identity-empty">{t('users.loading')}</p> : null}
           {memberships.length > 0 ? (
             <div className="identity-table-wrap">
               <table className="identity-table">
                 <thead>
                   <tr>
-                    <th>User</th>
-                    <th>Company</th>
-                    <th>Organization</th>
-                    <th>Position</th>
-                    <th>Primary</th>
-                    <th>Status</th>
-                    <th className="identity-table__actions">Actions</th>
+                    <th>{t('org.fieldUser')}</th>
+                    <th>{t('org.fieldCompany')}</th>
+                    <th>{t('org.fieldOrganization')}</th>
+                    <th>{t('org.fieldPosition')}</th>
+                    <th>{t('org.fieldPrimary')}</th>
+                    <th>{t('org.fieldStatus')}</th>
+                    <th className="identity-table__actions">{t('users.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -274,14 +276,14 @@ export function MembershipsPage() {
                       <td>{membership.isPrimary ? 'Yes' : 'No'}</td>
                       <td>
                         <span className={`identity-status identity-status--${membership.status}`}>
-                          {formatStatusLabel(membership.status)}
+                          {formatStatusLabel(membership.status, t)}
                         </span>
                       </td>
                       <td className="identity-table__actions">
                         <div className="identity-inline-actions">
                           {membership.status === 'active' && !membership.isPrimary ? (
                             <IconButton
-                              label="Make primary"
+                              label={t('org.memberships.makePrimary')}
                               onClick={() => void handleMakePrimary(membership)}
                             >
                               <IconStar />
@@ -289,7 +291,7 @@ export function MembershipsPage() {
                           ) : null}
                           {membership.status === 'active' ? (
                             <IconButton
-                              label="End membership"
+                              label={t('org.memberships.endMembership')}
                               variant="danger"
                               onClick={() => void handleEnd(membership)}
                             >

@@ -3,22 +3,18 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
+import { useTranslation } from 'react-i18next'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import { ApiError } from '@/services/httpClient'
 import { resetPassword } from '@/modules/core/auth/services/authService'
-import {
-  isValidPassword,
-  PASSWORD_CONFIRM_PLACEHOLDER,
-  PASSWORD_CREATE_PLACEHOLDER,
-  PASSWORD_ERROR_MESSAGE,
-  PASSWORD_MISMATCH_MESSAGE,
-} from '@/modules/core/auth/utils/passwordPolicy'
+import { isValidPassword } from '@/modules/core/auth/utils/passwordPolicy'
 import './AuthForm.css'
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const token = searchParams.get('token') ?? ''
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -31,12 +27,12 @@ export function ResetPasswordPage() {
     setError(null)
 
     if (!token) {
-      setError('Reset link is invalid or expired.')
+      setError(t('auth.resetLinkInvalid'))
       return
     }
 
     if (!isValidPassword(password)) {
-      setError(PASSWORD_ERROR_MESSAGE)
+      setError(t('auth.passwordPolicyError'))
       return
     }
 
@@ -49,7 +45,7 @@ export function ResetPasswordPage() {
       await resetPassword({ token, password })
       navigate('/login')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to reset password.')
+      setError(err instanceof ApiError ? err.message : t('auth.resetFailed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -57,45 +53,45 @@ export function ResetPasswordPage() {
 
   return (
     <AuthLayout
-      title="Reset password"
-      subtitle="Choose a new password for your account."
+      title={t('auth.resetPasswordTitle')}
+      subtitle={t('auth.resetPasswordSubtitle')}
       footer={
         <p>
-          <Link to="/login">Back to sign in</Link>
+          <Link to="/login">{t('auth.backToSignIn')}</Link>
         </p>
       }
     >
       <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
         {error ? <Alert variant="error">{error}</Alert> : null}
-        {!token ? <Alert variant="error">Missing reset token. Request a new link.</Alert> : null}
-        <FormField label="New password" htmlFor="reset-password">
+        {!token ? <Alert variant="error">{t('auth.missingResetToken')}</Alert> : null}
+        <FormField label={t('auth.newPassword')} htmlFor="reset-password">
           <PasswordField
             id="reset-password"
             value={password}
             onChange={setPassword}
-            placeholder={PASSWORD_CREATE_PLACEHOLDER}
+            placeholder={t('auth.passwordCreatePlaceholder')}
             autoComplete="new-password"
             showRequirements
             disabled={isSubmitting || !token}
           />
         </FormField>
         <FormField
-          label="Confirm password"
+          label={t('auth.confirmPassword')}
           htmlFor="reset-confirm"
-          error={confirmPasswordMismatch ? PASSWORD_MISMATCH_MESSAGE : undefined}
+          error={confirmPasswordMismatch ? t('auth.passwordMismatch') : undefined}
         >
           <PasswordField
             id="reset-confirm"
             value={confirmPassword}
             onChange={setConfirmPassword}
-            placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
+            placeholder={t('auth.passwordConfirmPlaceholder')}
             autoComplete="new-password"
             hasError={confirmPasswordMismatch}
             disabled={isSubmitting || !token}
           />
         </FormField>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting || !token}>
-          {isSubmitting ? 'Updating…' : 'Update password'}
+          {isSubmitting ? t('auth.updating') : t('auth.updatePassword')}
         </Button>
       </form>
     </AuthLayout>

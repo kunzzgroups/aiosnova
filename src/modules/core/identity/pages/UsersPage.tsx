@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -19,7 +20,7 @@ import {
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
 import type { CompanyListItem } from '@/modules/core/identity/services/identityService'
-import type { IdentityUser, UserStatus } from '@/modules/core/identity/types/identity'
+import type { IdentityUser, SignInMethod, UserStatus } from '@/modules/core/identity/types/identity'
 import {
   formatDirectoryMfa,
   formatLastActive,
@@ -28,11 +29,7 @@ import {
   isIdentityProfileComplete,
 } from '@/modules/core/identity/types/identity'
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
-import {
-  isValidPassword,
-  PASSWORD_CREATE_PLACEHOLDER,
-  PASSWORD_ERROR_MESSAGE,
-} from '@/modules/core/auth/utils/passwordPolicy'
+import { isValidPassword } from '@/modules/core/auth/utils/passwordPolicy'
 import {
   createUser,
   deleteUser,
@@ -42,27 +39,11 @@ import {
 } from '@/modules/core/identity/services/identityService'
 import './IdentityPage.css'
 
-const STATUS_FILTERS = [
-  { value: 'all', label: 'All' },
-  { value: 'active', label: 'Active' },
-  { value: 'invited', label: 'Invited' },
-  { value: 'disabled', label: 'Inactive' },
-] as const
+const STATUS_FILTERS = ['all', 'active', 'invited', 'disabled'] as const
 
-const MFA_FILTERS = [
-  { value: 'all', label: 'All' },
-  { value: 'enabled', label: 'Enabled' },
-  { value: 'disabled', label: 'Disabled' },
-] as const
+const MFA_FILTERS = ['all', 'enabled', 'disabled'] as const
 
-const SIGN_IN_FILTERS = [
-  { value: 'all', label: 'All' },
-  { value: 'password', label: 'Password' },
-  { value: 'google', label: 'Google' },
-  { value: 'facebook', label: 'Facebook' },
-  { value: 'apple', label: 'Apple' },
-  { value: 'none', label: 'None' },
-] as const
+const SIGN_IN_FILTERS = ['all', 'password', 'google', 'facebook', 'apple', 'none'] as const
 
 function matchesSearch(user: IdentityUser, query: string) {
   if (!query) {
@@ -97,7 +78,25 @@ function generatePassword(length = 12) {
 }
 
 export function UsersPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
+
+  // Filter values are plain strings in the module-level constant; labels are
+  // resolved here so they follow the active locale.
+  const statusLabel = (value: string) =>
+    value === 'all' ? t('users.filterAll') : formatStatusLabel(value, t)
+  const mfaLabel = (value: string) =>
+    value === 'all'
+      ? t('users.filterAll')
+      : value === 'enabled'
+        ? t('users.mfaEnabled')
+        : t('users.mfaDisabled')
+  const signInLabel = (value: string) =>
+    value === 'all'
+      ? t('users.filterAll')
+      : value === 'none'
+        ? t('users.methodNone')
+        : formatSignInMethod(value as SignInMethod, t)
   const sessionUser = useAuthStore((state) => state.user)
   const [users, setUsers] = useState<IdentityUser[]>([])
   const [companies, setCompanies] = useState<CompanyListItem[]>([])
@@ -128,7 +127,7 @@ export function UsersPage() {
       setCompanies(activeCompanies)
       setCompanyId((current) => current || activeCompanies[0]?.id || '')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to load users.')
+      setError(err instanceof ApiError ? err.message : t('users.errLoad'))
     } finally {
       setIsLoading(false)
     }
@@ -196,11 +195,11 @@ export function UsersPage() {
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!companyId) {
-      setError('Select a company for this invite.')
+      setError(t('users.errSelectCompany'))
       return
     }
     if (!isValidPassword(password)) {
-      setError(PASSWORD_ERROR_MESSAGE)
+      setError(t('auth.passwordPolicyError'))
       return
     }
     setIsSubmitting(true)
@@ -215,10 +214,10 @@ export function UsersPage() {
       })
       resetInviteForm()
       setShowInvite(false)
-      setMessage('User invited.')
+      setMessage(t('users.msgInvited'))
       await loadUsers()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to create user.')
+      setError(err instanceof ApiError ? err.message : t('users.errCreate'))
     } finally {
       setIsSubmitting(false)
     }
@@ -233,7 +232,7 @@ export function UsersPage() {
       const updated = await updateUser(user.id, { status: nextStatus })
       setUsers((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to update user.')
+      setError(err instanceof ApiError ? err.message : t('users.errUpdate'))
     } finally {
       setStatusUpdatingId(null)
     }
@@ -241,7 +240,7 @@ export function UsersPage() {
 
   function requestDelete(user: IdentityUser) {
     if (sessionUser?.id === user.id) {
-      setError('You cannot delete your own account.')
+      setError(t('users.deleteSelf'))
       return
     }
     setError(null)
@@ -259,9 +258,9 @@ export function UsersPage() {
       await deleteUser(pendingDelete.id)
       setUsers((current) => current.filter((item) => item.id !== pendingDelete.id))
       setPendingDelete(null)
-      setMessage('User deleted.')
+      setMessage(t('users.msgDeleted'))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to delete user.')
+      setError(err instanceof ApiError ? err.message : t('users.errDelete'))
     } finally {
       setDeletingId(null)
     }
@@ -270,7 +269,7 @@ export function UsersPage() {
   return (
     <div className="identity-page">
       <header className="identity-page__header">
-        <h1>Users</h1>
+        <h1>{t('users.title')}</h1>
         <p>Identity / User — platform accounts and profiles (Layer 1 · 03).</p>
       </header>
 
@@ -283,12 +282,12 @@ export function UsersPage() {
 
       <section className="identity-panel">
         <div className="identity-panel__title-row">
-          <h2>Directory</h2>
+          <h2>{t('users.directory')}</h2>
           <Button
             variant={showInvite ? 'secondary' : 'primary'}
             onClick={handleToggleInvite}
           >
-            {showInvite ? 'Cancel' : 'Invite User'}
+            {showInvite ? t('users.cancel') : t('users.inviteUser')}
           </Button>
         </div>
         <div className="identity-directory-toolbar">
@@ -297,29 +296,29 @@ export function UsersPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name or email..."
-            aria-label="Search name or email"
+            placeholder={t('users.searchPlaceholder')}
+            aria-label={t('users.searchAria')}
           />
           <div className="identity-directory-toolbar__filters">
             <SidebarSelect
               id="directory-status"
-              label="Status"
+              label={t('users.filterStatus')}
               value={statusFilter}
-              options={[...STATUS_FILTERS]}
+              options={STATUS_FILTERS.map((value) => ({ value, label: statusLabel(value) }))}
               onChange={setStatusFilter}
             />
             <SidebarSelect
               id="directory-signin"
-              label="Sign-in method"
+              label={t('users.filterSignInMethod')}
               value={signInFilter}
-              options={[...SIGN_IN_FILTERS]}
+              options={SIGN_IN_FILTERS.map((value) => ({ value, label: signInLabel(value) }))}
               onChange={setSignInFilter}
             />
             <SidebarSelect
               id="directory-mfa"
-              label="MFA"
+              label={t('users.filterMfa')}
               value={mfaFilter}
-              options={[...MFA_FILTERS]}
+              options={MFA_FILTERS.map((value) => ({ value, label: mfaLabel(value) }))}
               onChange={setMfaFilter}
             />
           </div>
@@ -328,11 +327,11 @@ export function UsersPage() {
         {showInvite ? (
           <form className="identity-invite" onSubmit={(event) => void handleCreate(event)}>
             <div className="identity-invite__header">
-              <h3>Invite user</h3>
-              <p>Enter an email, choose a company, and set a password or generate one.</p>
+              <h3>{t('users.inviteTitle')}</h3>
+              <p>{t('users.inviteHint')}</p>
             </div>
             <div className="identity-invite__grid">
-              <FormField label="Email" htmlFor="user-email">
+              <FormField label={t('users.fieldEmail')} htmlFor="user-email">
                 <TextField
                   id="user-email"
                   type="email"
@@ -343,29 +342,29 @@ export function UsersPage() {
                   autoComplete="off"
                 />
               </FormField>
-              <FormField label="Company" htmlFor="user-company">
+              <FormField label={t('users.fieldCompany')} htmlFor="user-company">
                 <SidebarSelect
                   id="user-company"
-                  label="Company"
+                  label={t('users.fieldCompany')}
                   hideLabel
                   value={companyId}
                   options={
                     companies.length === 0
-                      ? [{ value: '', label: 'No active companies' }]
+                      ? [{ value: '', label: t('users.noActiveCompanies') }]
                       : companies.map((company) => ({ value: company.id, label: company.name }))
                   }
                   onChange={setCompanyId}
                   disabled={isSubmitting || companies.length === 0}
                 />
               </FormField>
-              <FormField label="Password" htmlFor="user-password">
+              <FormField label={t('users.fieldPassword')} htmlFor="user-password">
                 <div className="identity-invite__password">
                   <PasswordField
                     id="user-password"
                     value={password}
                     onChange={setPassword}
                     autoComplete="new-password"
-                    placeholder={PASSWORD_CREATE_PLACEHOLDER}
+                    placeholder={t('auth.passwordCreatePlaceholder')}
                     showRequirements
                     disabled={isSubmitting}
                     revealed={passwordRevealed}
@@ -380,7 +379,7 @@ export function UsersPage() {
                     Generate
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Saving…' : 'Invite'}
+                    {isSubmitting ? t('users.saving') : t('users.invite')}
                   </Button>
                 </div>
               </FormField>
@@ -388,24 +387,24 @@ export function UsersPage() {
           </form>
         ) : null}
 
-        {isLoading ? <p className="identity-empty">Loading…</p> : null}
-        {!isLoading && users.length === 0 ? <p className="identity-empty">No users yet.</p> : null}
+        {isLoading ? <p className="identity-empty">{t('users.loading')}</p> : null}
+        {!isLoading && users.length === 0 ? <p className="identity-empty">{t('users.empty')}</p> : null}
         {!isLoading && users.length > 0 && filteredUsers.length === 0 ? (
-          <p className="identity-empty">No users match these filters.</p>
+          <p className="identity-empty">{t('users.emptyFiltered')}</p>
         ) : null}
         {filteredUsers.length > 0 ? (
           <div className="identity-table-wrap">
             <table className="identity-table identity-table--packed">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th className="identity-table__status">Status</th>
-                  <th>Sign-in</th>
-                  <th>MFA</th>
-                  <th>Last active</th>
+                  <th>{t('users.colName')}</th>
+                  <th>{t('users.colEmail')}</th>
+                  <th className="identity-table__status">{t('users.colStatus')}</th>
+                  <th>{t('users.colSignIn')}</th>
+                  <th>{t('users.colMfa')}</th>
+                  <th>{t('users.colLastActive')}</th>
                   <th className="identity-table__spacer" aria-hidden="true" />
-                  <th className="identity-table__actions">Actions</th>
+                  <th className="identity-table__actions">{t('users.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,30 +423,30 @@ export function UsersPage() {
                     <td>{user.email}</td>
                     <td className="identity-table__status">
                       <span className={`identity-status identity-status--${user.status}`}>
-                        {formatStatusLabel(user.status)}
+                        {formatStatusLabel(user.status, t)}
                       </span>
                     </td>
-                    <td>{formatSignInMethod(user.signInMethod)}</td>
-                    <td>{formatDirectoryMfa(user)}</td>
-                    <td>{formatLastActive(user.lastActiveAt)}</td>
+                    <td>{formatSignInMethod(user.signInMethod, t)}</td>
+                    <td>{formatDirectoryMfa(user, t)}</td>
+                    <td>{formatLastActive(user.lastActiveAt, t)}</td>
                     <td className="identity-table__spacer" aria-hidden="true" />
                     <td className="identity-table__actions">
                       <div className="identity-inline-actions">
                         <IconButton
-                          label="View"
+                          label={t('users.actionView')}
                           onClick={() => navigate(`/system/core/users/${user.id}`)}
                         >
                           <IconEye />
                         </IconButton>
                         <IconButton
-                          label="Edit"
+                          label={t('users.actionEdit')}
                           onClick={() => navigate(`/system/core/users/${user.id}?edit=1`)}
                         >
                           <IconPencil />
                         </IconButton>
                         {user.signInMethod ? (
                           <IconButton
-                            label={user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
+                            label={user.mfaEnabled ? t('users.actionResetMfa') : t('users.actionRequireMfa')}
                             onClick={() =>
                               navigate(
                                 `/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`,
@@ -458,7 +457,7 @@ export function UsersPage() {
                           </IconButton>
                         ) : null}
                         <IconButton
-                          label={user.status === 'active' ? 'Active' : 'Inactive'}
+                          label={user.status === 'active' ? t('users.statusActive') : t('users.statusInactive')}
                           variant={user.status === 'active' ? 'secondary' : 'danger'}
                           onClick={() => void handleToggleStatus(user)}
                           disabled={statusUpdatingId === user.id}
@@ -466,7 +465,7 @@ export function UsersPage() {
                           {user.status === 'active' ? <IconCircleCheck /> : <IconBan />}
                         </IconButton>
                         <IconButton
-                          label={sessionUser?.id === user.id ? 'You cannot delete your own account' : 'Delete'}
+                          label={sessionUser?.id === user.id ? t('users.deleteSelf') : t('users.actionDelete')}
                           variant="danger"
                           onClick={() => requestDelete(user)}
                           disabled={deletingId === user.id || sessionUser?.id === user.id}
@@ -485,7 +484,7 @@ export function UsersPage() {
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}
-        title="Delete this user?"
+        title={t('users.deleteTitle')}
         description={
           pendingDelete ? (
             <>
@@ -497,7 +496,7 @@ export function UsersPage() {
             </>
           ) : null
         }
-        confirmLabel="Delete user"
+        confirmLabel={t('users.deleteConfirm')}
         busy={Boolean(deletingId)}
         onConfirm={() => void handleConfirmDelete()}
         onCancel={() => {

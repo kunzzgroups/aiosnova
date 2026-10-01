@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -19,12 +20,14 @@ import './IdentityPage.css'
 
 type OrgTreeNode = OrganizationNode & { children: OrgTreeNode[] }
 
-const ORG_TYPE_OPTIONS = [
-  { value: 'division', label: 'Division' },
-  { value: 'department', label: 'Department' },
-  { value: 'team', label: 'Team' },
-  { value: 'other', label: 'Other' },
-] as const
+const ORG_TYPE_KEYS: Record<string, string> = {
+  division: 'org.organization.typeDivision',
+  department: 'org.organization.typeDepartment',
+  team: 'org.organization.typeTeam',
+  other: 'org.organization.typeOther',
+}
+
+const ORG_TYPE_OPTIONS = ['division', 'department', 'team', 'other'] as const
 
 function buildTree(items: OrganizationNode[]): OrgTreeNode[] {
   const map = new Map<string, OrgTreeNode>()
@@ -62,6 +65,8 @@ function OrganizationBranch({
   onToggleStatus: (node: OrganizationNode) => void
   onDelete: (node: OrganizationNode) => void
 }) {
+  const { t } = useTranslation()
+
   if (nodes.length === 0) {
     return null
   }
@@ -75,22 +80,22 @@ function OrganizationBranch({
               <strong>
                 {node.name}{' '}
                 <span className={`identity-status identity-status--${node.status}`}>
-                  {formatStatusLabel(node.status)}
+                  {formatStatusLabel(node.status, t)}
                 </span>
               </strong>
               <span>
-                {node.code} · {node.type}
+                {node.code} · {t(ORG_TYPE_KEYS[node.type] ?? node.type)}
               </span>
             </div>
             <div className="identity-inline-actions">
               <IconButton
-                label={node.status === 'active' ? 'Active' : 'Inactive'}
+                label={node.status === 'active' ? t('users.statusActive') : t('users.statusInactive')}
                 variant={node.status === 'active' ? 'secondary' : 'danger'}
                 onClick={() => onToggleStatus(node)}
               >
                 {node.status === 'active' ? <IconCircleCheck /> : <IconBan />}
               </IconButton>
-              <IconButton label="Delete" variant="danger" onClick={() => onDelete(node)}>
+              <IconButton label={t('users.actionDelete')} variant="danger" onClick={() => onDelete(node)}>
                 <IconTrash />
               </IconButton>
             </div>
@@ -103,6 +108,7 @@ function OrganizationBranch({
 }
 
 export function OrganizationPage() {
+  const { t } = useTranslation()
   const [items, setItems] = useState<OrganizationNode[]>([])
   const [parentId, setParentId] = useState('')
   const [code, setCode] = useState('')
@@ -129,7 +135,7 @@ export function OrganizationPage() {
       const result = await fetchOrganizations()
       setItems(result.items)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to load organizations.')
+      setError(err instanceof ApiError ? err.message : t('org.errLoadOrganizations'))
     } finally {
       setIsLoading(false)
     }
@@ -161,10 +167,10 @@ export function OrganizationPage() {
       })
       setCode('')
       setName('')
-      setMessage('Organization created.')
+      setMessage(t('org.msgOrganizationCreated'))
       setItems((current) => [...current, created])
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to create organization.')
+      setError(err instanceof ApiError ? err.message : t('org.errCreateOrganization'))
     } finally {
       setIsSubmitting(false)
     }
@@ -178,7 +184,7 @@ export function OrganizationPage() {
       })
       setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to update organization.')
+      setError(err instanceof ApiError ? err.message : t('org.errUpdateOrganization'))
     }
   }
 
@@ -189,16 +195,16 @@ export function OrganizationPage() {
       await deleteOrganization(node.id)
       setItems((current) => current.filter((item) => item.id !== node.id))
       setParentId((current) => (current === node.id ? '' : current))
-      setMessage('Organization deleted.')
+      setMessage(t('org.msgOrganizationDeleted'))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to delete organization.')
+      setError(err instanceof ApiError ? err.message : t('org.errDeleteOrganization'))
     }
   }
 
   return (
     <div className="identity-page">
         <header className="identity-page__header">
-          <h1>Organization</h1>
+          <h1>{t('org.organization.title')}</h1>
           <p>Organization tree — divisions, departments, and teams (Layer 1 · 04).</p>
         </header>
 
@@ -210,12 +216,12 @@ export function OrganizationPage() {
         />
 
         <section className="identity-panel">
-          <h2>Add node</h2>
+          <h2>{t('org.organization.addNode')}</h2>
           <form className="identity-form" onSubmit={(event) => void handleCreate(event)}>
-            <FormField label="Parent" htmlFor="org-parent">
+            <FormField label={t('org.fieldParent')} htmlFor="org-parent">
               <SidebarSelect
                 id="org-parent"
-                label="Parent"
+                label={t('org.fieldParent')}
                 hideLabel
                 value={parentId}
                 options={parentOptions}
@@ -223,7 +229,7 @@ export function OrganizationPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Code" htmlFor="org-code">
+            <FormField label={t('org.fieldCode')} htmlFor="org-code">
               <TextField
                 id="org-code"
                 value={code}
@@ -232,7 +238,7 @@ export function OrganizationPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Name" htmlFor="org-name">
+            <FormField label={t('org.fieldName')} htmlFor="org-name">
               <TextField
                 id="org-name"
                 value={name}
@@ -241,29 +247,31 @@ export function OrganizationPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Type" htmlFor="org-type">
+            <FormField label={t('org.fieldType')} htmlFor="org-type">
               <SidebarSelect
                 id="org-type"
-                label="Type"
+                label={t('org.fieldType')}
                 hideLabel
                 value={type}
-                options={[...ORG_TYPE_OPTIONS]}
+                options={ORG_TYPE_OPTIONS.map((value) => ({ value, label: t(ORG_TYPE_KEYS[value]) }))}
                 onChange={(value) => setType(value as OrganizationNode['type'])}
                 disabled={isSubmitting}
               />
             </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : 'Add'}
+                {isSubmitting ? t('users.saving') : t('org.actionAdd')}
               </Button>
             </div>
           </form>
         </section>
 
         <section className="identity-panel">
-          <h2>Tree</h2>
-          {isLoading ? <p className="identity-empty">Loading…</p> : null}
-          {!isLoading && tree.length === 0 ? <p className="identity-empty">No organizations.</p> : null}
+          <h2>{t('org.organization.tree')}</h2>
+          {isLoading ? <p className="identity-empty">{t('users.loading')}</p> : null}
+          {!isLoading && tree.length === 0 ? (
+            <p className="identity-empty">{t('org.organization.empty')}</p>
+          ) : null}
           <OrganizationBranch
             nodes={tree}
             onToggleStatus={(node) => void handleToggleStatus(node)}

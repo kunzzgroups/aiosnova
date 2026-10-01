@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from '@/app/App'
 import { hydrateSession } from '@/modules/core/auth/services/authService'
+import '@/i18n'
 import { applyTheme, useThemeStore } from '@/stores/themeStore'
 import '@/design-system/global.css'
 

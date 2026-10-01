@@ -1,4 +1,7 @@
 .top-tabs {
+  /* Below .app-shell__header so the header's popovers win. */
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   background: color-mix(in srgb, var(--color-bg-elevated) 88%, transparent);
   border-bottom: 1px solid var(--color-border);

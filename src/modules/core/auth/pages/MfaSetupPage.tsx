@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Alert } from '@/components/ui/Alert'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
@@ -16,6 +17,7 @@ import './MfaSetupPage.css'
 
 export function MfaSetupPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const sessionUser = useAuthStore((state) => state.user)
   const userId = searchParams.get('userId') || sessionUser?.id || ''
@@ -176,7 +178,7 @@ export function MfaSetupPage() {
     <div className="mfa-setup">
       <header className="mfa-setup__header">
         <div>
-          <h1>Manage MFA</h1>
+          <h1>{t('shell.manageMfa')}</h1>
           <p className="mfa-setup__subtitle">
             Add this account to an authenticator app, then enter the 6-digit MFA code.
             {user ? (
@@ -192,7 +194,7 @@ export function MfaSetupPage() {
         </Button>
       </header>
 
-      {isLoading ? <p>Preparing setup…</p> : null}
+      {isLoading ? <p>{t('auth.preparingSetup')}</p> : null}
       <FlashToasts
         error={error}
         message={message}
@@ -208,8 +210,8 @@ export function MfaSetupPage() {
 
       {recoveryCodes ? (
         <div className="mfa-setup__done">
-          <h2>Recovery codes</h2>
-          <p>Store these recovery codes securely. Each code can be used once.</p>
+          <h2>{t('auth.recoveryCodes')}</h2>
+          <p>{t('auth.recoveryCodesHint')}</p>
           <ul className="mfa-setup__codes">
             {recoveryCodes.map((item) => (
               <li key={item}>{item}</li>
@@ -223,8 +225,8 @@ export function MfaSetupPage() {
 
       {mfaEnabled && !recoveryCodes && !resetMode ? (
         <form className="auth-form" onSubmit={(event) => void handleDisable(event)}>
-          <Alert variant="info">Enter the current authenticator code to turn MFA off. Demo code: 123456</Alert>
-          <FormField label="MFA code" htmlFor="mfa-disable-code">
+          <Alert variant="info">{t('auth.disableMfaHint')}</Alert>
+          <FormField label={t('auth.mfaCode')} htmlFor="mfa-disable-code">
             <MfaCodeInput
               id="mfa-disable-code"
               value={code}
@@ -247,7 +249,7 @@ export function MfaSetupPage() {
             <br />
             Demo MFA code: 123456
           </Alert>
-          <FormField label="MFA code" htmlFor="mfa-setup-code">
+          <FormField label={t('auth.mfaCode')} htmlFor="mfa-setup-code">
             <MfaCodeInput
               id="mfa-setup-code"
               value={code}

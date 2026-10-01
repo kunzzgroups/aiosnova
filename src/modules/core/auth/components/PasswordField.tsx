@@ -1,4 +1,5 @@
 import { useState, type ClipboardEvent, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/TextField'
 import { PasswordRequirements } from '@/modules/core/auth/components/PasswordRequirements'
@@ -65,6 +66,7 @@ export function PasswordField({
   onRevealedChange,
   showRequirements = false,
 }: PasswordFieldProps) {
+  const { t } = useTranslation()
   const [uncontrolledRevealed, setUncontrolledRevealed] = useState(false)
   const isRevealed = revealed ?? uncontrolledRevealed
 
@@ -131,8 +133,8 @@ export function PasswordField({
           variant="ghost"
           className="password-field__toggle"
           onClick={() => setIsRevealed(!isRevealed)}
-          aria-label={isRevealed ? 'Hide password' : 'Show password'}
-          title={isRevealed ? 'Hide password' : 'Show password'}
+          aria-label={isRevealed ? t('auth.hidePassword') : t('auth.showPassword')}
+          title={isRevealed ? t('auth.hidePassword') : t('auth.showPassword')}
         >
           {isRevealed ? <IconEyeOff /> : <IconEye />}
         </Button>

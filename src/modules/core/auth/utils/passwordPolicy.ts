@@ -21,11 +21,12 @@ const HAS_SPECIAL = /[^A-Za-z0-9]/
 
 export type PasswordCheckId = 'length' | 'upper' | 'lower' | 'symbol'
 
-export const PASSWORD_CHECKS: { id: PasswordCheckId; label: string }[] = [
-  { id: 'length', label: '6+ chars' },
-  { id: 'upper', label: 'A-Z' },
-  { id: 'lower', label: 'a-z' },
-  { id: 'symbol', label: 'Symbol' },
+/** Labels live in the i18n dictionary (`auth.passwordCheck*`), keyed by id. */
+export const PASSWORD_CHECKS: { id: PasswordCheckId }[] = [
+  { id: 'length' },
+  { id: 'upper' },
+  { id: 'lower' },
+  { id: 'symbol' },
 ]
 
 export function getPasswordChecks(password: string) {

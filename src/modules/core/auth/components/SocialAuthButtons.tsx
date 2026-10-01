@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError } from '@/services/httpClient'
 import { completeOAuth, type OAuthProvider } from '@/modules/core/auth/services/authService'
-import { useAuthCopy } from '@/modules/core/auth/i18n/authCopy'
+import { useTranslation } from 'react-i18next'
 import { postAuthPath } from '@/modules/core/auth/types/auth'
 import './SocialAuthButtons.css'
 
@@ -42,7 +42,7 @@ function AppleGlyph() {
 }
 
 export function SocialAuthButtons() {
-  const { t } = useAuthCopy()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [loadingProvider, setLoadingProvider] = useState<OAuthProvider | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -52,8 +52,8 @@ export function SocialAuthButtons() {
     label: string
     icon: () => ReactElement
   }> = [
-    { id: 'google', label: t('continueWithGoogle'), icon: GoogleGlyph },
-    { id: 'apple', label: t('continueWithApple'), icon: AppleGlyph },
+    { id: 'google', label: t('auth.continueWithGoogle'), icon: GoogleGlyph },
+    { id: 'apple', label: t('auth.continueWithApple'), icon: AppleGlyph },
   ]
 
   async function handleClick(provider: OAuthProvider) {
@@ -65,7 +65,7 @@ export function SocialAuthButtons() {
       navigate(postAuthPath(), { replace: true })
     } catch (err) {
       const message =
-        err instanceof ApiError ? err.message : `Unable to start ${provider} sign-in.`
+        err instanceof ApiError ? err.message : t('auth.oauthStartFailed', { provider })
       setError(message)
     } finally {
       setLoadingProvider(null)
@@ -74,7 +74,7 @@ export function SocialAuthButtons() {
 
   return (
     <div className="social-auth">
-      <div className="social-auth__row" role="group" aria-label="Social sign-in">
+      <div className="social-auth__row" role="group" aria-label={t('auth.socialSignIn')}>
         {providers.map((provider) => {
           const Icon = provider.icon
           const isLoading = loadingProvider === provider.id

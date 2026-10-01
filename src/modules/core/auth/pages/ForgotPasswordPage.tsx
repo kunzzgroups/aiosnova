@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { AuthLayout } from '@/layouts/AuthLayout'
-import { useAuthCopy } from '@/modules/core/auth/i18n/authCopy'
+import { useTranslation } from 'react-i18next'
 import { ApiError } from '@/services/httpClient'
 import { forgotPassword } from '@/modules/core/auth/services/authService'
 import './AuthForm.css'
 
 export function ForgotPasswordPage() {
-  const { t } = useAuthCopy()
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [demoToken, setDemoToken] = useState<string | null>(null)
@@ -41,12 +41,12 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      title={t('forgotTitle')}
-      subtitle={t('forgotSubtitle')}
+      title={t('auth.forgotTitle')}
+      subtitle={t('auth.forgotSubtitle')}
       hideIcon
       footer={
         <p>
-          {t('rememberedIt')} <Link to="/login">{t('backToSignIn')}</Link>
+          {t('auth.rememberedIt')} <Link to="/login">{t('auth.backToSignIn')}</Link>
         </p>
       }
     >
@@ -59,11 +59,11 @@ export function ForgotPasswordPage() {
         />
         {demoToken ? (
           <Alert variant="info">
-            {t('demoResetLink')}{' '}
-            <Link to={`/reset-password?token=${encodeURIComponent(demoToken)}`}>{t('continueToReset')}</Link>
+            {t('auth.demoResetLink')}{' '}
+            <Link to={`/reset-password?token=${encodeURIComponent(demoToken)}`}>{t('auth.continueToReset')}</Link>
           </Alert>
         ) : null}
-        <FormField label={t('email')} htmlFor="forgot-email">
+        <FormField label={t('auth.email')} htmlFor="forgot-email">
           <TextField
             id="forgot-email"
             type="email"
@@ -75,7 +75,7 @@ export function ForgotPasswordPage() {
           />
         </FormField>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
-          {isSubmitting ? t('sending') : t('sendResetLink')}
+          {isSubmitting ? t('auth.sending') : t('auth.sendResetLink')}
         </Button>
       </form>
     </AuthLayout>
