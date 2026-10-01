@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -17,6 +18,7 @@ import {
 import './IdentityPage.css'
 
 export function CompanyDetailPage() {
+  const { t } = useTranslation()
   const { companyId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -42,7 +44,7 @@ export function CompanyDetailPage() {
       setMembers(result.members)
       setName(result.company.name)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to load company.')
+      setError(err instanceof ApiError ? err.message : t('org.errLoadCompany'))
     } finally {
       setIsLoading(false)
     }
@@ -72,9 +74,9 @@ export function CompanyDetailPage() {
       const updated = await updateCompany(company.id, { name })
       setCompany(updated)
       setIsEditing(false)
-      setMessage('Company updated.')
+      setMessage(t('org.msgCompanyUpdated'))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to update company.')
+      setError(err instanceof ApiError ? err.message : t('org.errUpdateCompany'))
     } finally {
       setIsSaving(false)
     }
@@ -91,14 +93,14 @@ export function CompanyDetailPage() {
       const updated = await updateCompany(company.id, { status: nextStatus })
       setCompany(updated)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to update company.')
+      setError(err instanceof ApiError ? err.message : t('org.errUpdateCompany'))
     }
   }
 
   if (isLoading) {
     return (
       <div className="identity-page">
-        <p className="identity-empty">Loading…</p>
+        <p className="identity-empty">{t('users.loading')}</p>
       </div>
     )
   }
@@ -117,8 +119,8 @@ export function CompanyDetailPage() {
   return (
     <div className="identity-page">
       <header className="identity-page__header identity-page__header--row identity-page__header--toolbar">
-        <nav className="identity-breadcrumb" aria-label="Breadcrumb">
-          <Link to="/system/core/companies">Companies</Link>
+        <nav className="identity-breadcrumb" aria-label={t('users.breadcrumb')}>
+          <Link to="/system/core/companies">{t('org.companies.title')}</Link>
           <span aria-hidden="true"> / </span>
           <h1>{company.name}</h1>
         </nav>
@@ -136,7 +138,7 @@ export function CompanyDetailPage() {
 
       <section className="identity-panel">
         <div className="identity-panel__title-row">
-          <h2>Company</h2>
+          <h2>{t('org.company.title')}</h2>
           <div className="identity-inline-actions">
             {!isEditing ? (
               <Button variant="secondary" onClick={() => setIsEditing(true)}>
@@ -144,7 +146,7 @@ export function CompanyDetailPage() {
               </Button>
             ) : null}
             <IconButton
-              label={company.status === 'active' ? 'Active' : 'Inactive'}
+              label={company.status === 'active' ? t('users.statusActive') : t('users.statusInactive')}
               variant={company.status === 'active' ? 'secondary' : 'danger'}
               onClick={() => void handleToggleStatus()}
             >
@@ -155,10 +157,10 @@ export function CompanyDetailPage() {
 
         {isEditing ? (
           <form className="identity-form identity-form--stack" onSubmit={(event) => void handleSave(event)}>
-            <FormField label="Code" htmlFor="detail-company-code">
+            <FormField label={t('org.fieldCode')} htmlFor="detail-company-code">
               <TextField id="detail-company-code" value={company.code} readOnly />
             </FormField>
-            <FormField label="Name" htmlFor="detail-company-name">
+            <FormField label={t('org.fieldName')} htmlFor="detail-company-name">
               <TextField
                 id="detail-company-name"
                 value={name}
@@ -169,7 +171,7 @@ export function CompanyDetailPage() {
             </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Save'}
+                {isSaving ? t('users.saving') : t('users.save')}
               </Button>
               <Button
                 type="button"
@@ -186,19 +188,19 @@ export function CompanyDetailPage() {
         ) : (
           <div className="identity-profile-tiles">
             <div className="identity-profile-tile">
-              <span>Code</span>
+              <span>{t('org.colCode')}</span>
               <strong>{company.code}</strong>
             </div>
             <div className="identity-profile-tile">
-              <span>Status</span>
-              <strong>{formatStatusLabel(company.status)}</strong>
+              <span>{t('org.fieldStatus')}</span>
+              <strong>{formatStatusLabel(company.status, t)}</strong>
             </div>
             <div className="identity-profile-tile">
-              <span>Members</span>
+              <span>{t('org.colMembers')}</span>
               <strong>{company.memberCount}</strong>
             </div>
             <div className="identity-profile-tile">
-              <span>Tenant</span>
+              <span>{t('org.colTenant')}</span>
               <strong>{company.tenantId}</strong>
             </div>
           </div>
@@ -206,20 +208,20 @@ export function CompanyDetailPage() {
       </section>
 
       <section className="identity-panel">
-        <h2>Members</h2>
+        <h2>{t('org.colMembers')}</h2>
         {members.length === 0 ? (
-          <p className="identity-empty">No members in this company yet. Invite a user and select this company.</p>
+          <p className="identity-empty">{t('org.company.noMembers')}</p>
         ) : (
           <div className="identity-table-wrap">
             <table className="identity-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>User status</th>
-                  <th>Membership</th>
-                  <th>Organization</th>
-                  <th>Position</th>
+                  <th>{t('org.colName')}</th>
+                  <th>{t('org.colEmail')}</th>
+                  <th>{t('org.colUserStatus')}</th>
+                  <th>{t('org.colMembership')}</th>
+                  <th>{t('org.fieldOrganization')}</th>
+                  <th>{t('org.fieldPosition')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,12 +240,12 @@ export function CompanyDetailPage() {
                     <td>{member.email}</td>
                     <td>
                       <span className={`identity-status identity-status--${member.userStatus}`}>
-                        {formatStatusLabel(member.userStatus)}
+                        {formatStatusLabel(member.userStatus, t)}
                       </span>
                     </td>
                     <td>
                       <span className={`identity-status identity-status--${member.status}`}>
-                        {formatStatusLabel(member.status)}
+                        {formatStatusLabel(member.status, t)}
                       </span>
                     </td>
                     <td>{member.organizationName ?? '—'}</td>

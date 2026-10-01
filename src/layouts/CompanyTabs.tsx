@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { findCompanyGroup, useCompanyStore } from '@/stores/companyStore'
 import './TopTabs.css'
 
@@ -13,6 +14,7 @@ export function CompanyTabs() {
   const companyId = useCompanyStore((state) => state.companyId)
   const previewCompanyId = useCompanyStore((state) => state.previewCompanyId)
   const setCompany = useCompanyStore((state) => state.setCompany)
+  const { t } = useTranslation()
 
   const group = useMemo(
     () => findCompanyGroup(groups, previewCompanyId ?? companyId),
@@ -35,7 +37,7 @@ export function CompanyTabs() {
   }
 
   return (
-    <nav className="top-tabs" aria-label={group.name}>
+    <nav className="top-tabs" aria-label={t('sidebar.companiesInGroup', { group: group.name })}>
       <div className="top-tabs__inner">
         {members.map((company) => {
           const active = company.value === companyId

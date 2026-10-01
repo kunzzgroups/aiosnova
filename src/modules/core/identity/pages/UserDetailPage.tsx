@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -23,9 +24,7 @@ import {
 import { PasswordField } from '@/modules/core/auth/components/PasswordField'
 import {
   isValidPassword,
-  NEW_PASSWORD_ERROR_MESSAGE,
   PASSWORD_CONFIRM_PLACEHOLDER,
-  PASSWORD_CREATE_PLACEHOLDER,
   PASSWORD_CURRENT_PLACEHOLDER,
   PASSWORD_MISMATCH_MESSAGE,
 } from '@/modules/core/auth/utils/passwordPolicy'
@@ -48,6 +47,7 @@ function profileInitials(user: IdentityUser) {
 }
 
 export function UserDetailPage() {
+  const { t } = useTranslation()
   const { userId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -87,7 +87,7 @@ export function UserDetailPage() {
       setMemberships(result.memberships)
       applyProfileForm(result.user)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to load user.')
+      setError(err instanceof ApiError ? err.message : t('users.errLoadUser'))
       setUser(null)
     } finally {
       setIsLoading(false)
@@ -150,9 +150,9 @@ export function UserDetailPage() {
       applyProfileForm(updated)
       syncSessionIfSelf(updated)
       setIsEditing(false)
-      setMessage('Profile saved.')
+      setMessage(t('users.msgProfileSaved'))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to save profile.')
+      setError(err instanceof ApiError ? err.message : t('users.errSaveProfile'))
     } finally {
       setIsSaving(false)
     }
@@ -175,15 +175,15 @@ export function UserDetailPage() {
     try {
       const updated = await updateUser(user.id, { status: nextStatus })
       setUser(updated)
-      setMessage(nextStatus === 'disabled' ? 'User disabled.' : 'User activated.')
+      setMessage(nextStatus === 'disabled' ? t('users.msgUserDisabled') : t('users.msgUserActivated'))
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to update status.')
+      setError(err instanceof ApiError ? err.message : t('users.errUpdateStatus'))
     }
   }
 
   function requestDelete() {
     if (isSelf) {
-      setError('You cannot delete your own account.')
+      setError(t('users.deleteSelf'))
       return
     }
     setError(null)
@@ -201,7 +201,7 @@ export function UserDetailPage() {
       await deleteUser(user.id)
       navigate('/system/core/users')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to delete user.')
+      setError(err instanceof ApiError ? err.message : t('users.errDelete'))
       setIsDeleting(false)
     }
   }
@@ -209,7 +209,7 @@ export function UserDetailPage() {
   async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!isValidPassword(newPassword)) {
-      setError(NEW_PASSWORD_ERROR_MESSAGE)
+      setError(t('auth.newPasswordPolicyError'))
       return
     }
     if (newPassword !== confirmPassword) {
@@ -226,7 +226,7 @@ export function UserDetailPage() {
       setConfirmPassword('')
       setShowPasswordForm(false)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to change password.')
+      setError(err instanceof ApiError ? err.message : t('users.errChangePassword'))
     } finally {
       setIsSaving(false)
     }
@@ -235,7 +235,7 @@ export function UserDetailPage() {
   if (isLoading) {
     return (
       <div className="identity-page">
-        <p className="identity-empty">Loading…</p>
+        <p className="identity-empty">{t('users.loading')}</p>
       </div>
     )
   }
@@ -254,8 +254,8 @@ export function UserDetailPage() {
   return (
     <div className="identity-page">
       <header className="identity-page__header identity-page__header--row identity-page__header--toolbar">
-        <nav className="identity-breadcrumb" aria-label="Breadcrumb">
-          <Link to="/system/core/users">Users</Link>
+        <nav className="identity-breadcrumb" aria-label={t('users.breadcrumb')}>
+          <Link to="/system/core/users">{t('users.title')}</Link>
           <span aria-hidden="true"> / </span>
           <h1>{user.displayName}</h1>
         </nav>
@@ -273,7 +273,7 @@ export function UserDetailPage() {
 
       <section className="identity-panel">
         <div className="identity-panel__title-row">
-          <h2>Profile</h2>
+          <h2>{t('users.profile')}</h2>
           <div className="identity-inline-actions">
             {!isEditing ? (
               <Button variant="secondary" onClick={() => setIsEditing(true)}>
@@ -282,7 +282,7 @@ export function UserDetailPage() {
             ) : (
               <>
                 <Button type="submit" form="profile-edit-form" disabled={isSaving}>
-                  {isSaving ? 'Saving…' : 'Save'}
+                  {isSaving ? t('users.saving') : t('users.save')}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
                   Cancel
@@ -297,24 +297,24 @@ export function UserDetailPage() {
                   setError(null)
                 }}
               >
-                {showPasswordForm ? 'Hide Change Password' : 'Change Password'}
+                {showPasswordForm ? t('users.hideChangePassword') : t('users.changePassword')}
               </Button>
             ) : null}
             <IconButton
-              label={user.mfaEnabled ? 'Reset MFA' : 'Require MFA'}
+              label={user.mfaEnabled ? t('users.actionResetMfa') : t('users.actionRequireMfa')}
               onClick={() => navigate(`/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`)}
             >
               {user.mfaEnabled ? <IconShieldOff /> : <IconShield />}
             </IconButton>
             <IconButton
-              label={user.status === 'active' ? 'Active' : 'Inactive'}
+              label={user.status === 'active' ? t('users.statusActive') : t('users.statusInactive')}
               variant={user.status === 'active' ? 'secondary' : 'danger'}
               onClick={() => void handleToggleStatus()}
             >
               {user.status === 'active' ? <IconCircleCheck /> : <IconBan />}
             </IconButton>
             <IconButton
-              label={isSelf ? 'You cannot delete your own account' : 'Delete'}
+              label={isSelf ? t('users.deleteSelf') : t('users.actionDelete')}
               variant="danger"
               onClick={requestDelete}
               disabled={isSelf}
@@ -343,12 +343,12 @@ export function UserDetailPage() {
               </div>
               <div className="identity-profile-hero__pills">
                 <span className={`identity-status identity-status--${user.status}`}>
-                  {formatStatusLabel(user.status)}
+                  {formatStatusLabel(user.status, t)}
                 </span>
                 {isIdentityProfileComplete({ fullName, phone }) ? (
-                  <span className="identity-status identity-status--active">Complete</span>
+                  <span className="identity-status identity-status--active">{t('users.complete')}</span>
                 ) : (
-                  <span className="identity-status identity-status--invited">Incomplete</span>
+                  <span className="identity-status identity-status--invited">{t('users.incomplete')}</span>
                 )}
                 <span className={`identity-status ${user.mfaEnabled ? 'identity-status--active' : 'identity-status--invited'}`}>
                   MFA {user.mfaEnabled ? 'On' : 'Off'}
@@ -358,7 +358,7 @@ export function UserDetailPage() {
 
             <div className="identity-profile-tiles">
               <label className="identity-profile-tile" htmlFor="detail-name">
-                <span>Display name</span>
+                <span>{t('users.fieldDisplayName')}</span>
                 <TextField
                   id="detail-name"
                   className="identity-profile-tile__input"
@@ -369,7 +369,7 @@ export function UserDetailPage() {
                 />
               </label>
               <label className="identity-profile-tile" htmlFor="detail-full">
-                <span>Full name</span>
+                <span>{t('users.fieldFullName')}</span>
                 <TextField
                   id="detail-full"
                   className="identity-profile-tile__input"
@@ -380,7 +380,7 @@ export function UserDetailPage() {
                 />
               </label>
               <label className="identity-profile-tile" htmlFor="detail-email">
-                <span>Email</span>
+                <span>{t('users.fieldEmail')}</span>
                 <TextField
                   id="detail-email"
                   className="identity-profile-tile__input"
@@ -392,7 +392,7 @@ export function UserDetailPage() {
                 />
               </label>
               <label className="identity-profile-tile" htmlFor="detail-phone">
-                <span>Phone</span>
+                <span>{t('users.fieldPhone')}</span>
                 <TextField
                   id="detail-phone"
                   className="identity-profile-tile__input"
@@ -404,7 +404,7 @@ export function UserDetailPage() {
                 />
               </label>
               <div className="identity-profile-tile">
-                <span>Created</span>
+                <span>{t('users.fieldCreated')}</span>
                 <strong>{new Date(user.createdAt).toLocaleString()}</strong>
               </div>
             </div>
@@ -424,12 +424,12 @@ export function UserDetailPage() {
               </div>
               <div className="identity-profile-hero__pills">
                 <span className={`identity-status identity-status--${user.status}`}>
-                  {formatStatusLabel(user.status)}
+                  {formatStatusLabel(user.status, t)}
                 </span>
                 {isIdentityProfileComplete(user) ? (
-                  <span className="identity-status identity-status--active">Complete</span>
+                  <span className="identity-status identity-status--active">{t('users.complete')}</span>
                 ) : (
-                  <span className="identity-status identity-status--invited">Incomplete</span>
+                  <span className="identity-status identity-status--invited">{t('users.incomplete')}</span>
                 )}
                 <span className={`identity-status ${user.mfaEnabled ? 'identity-status--active' : 'identity-status--invited'}`}>
                   MFA {user.mfaEnabled ? 'On' : 'Off'}
@@ -439,23 +439,23 @@ export function UserDetailPage() {
 
             <div className="identity-profile-tiles">
               <div className="identity-profile-tile">
-                <span>Display name</span>
+                <span>{t('users.fieldDisplayName')}</span>
                 <strong>{user.displayName}</strong>
               </div>
               <div className="identity-profile-tile">
-                <span>Full name</span>
+                <span>{t('users.fieldFullName')}</span>
                 <strong>{user.fullName || '—'}</strong>
               </div>
               <div className="identity-profile-tile">
-                <span>Email</span>
+                <span>{t('users.fieldEmail')}</span>
                 <strong>{user.email}</strong>
               </div>
               <div className="identity-profile-tile">
-                <span>Phone</span>
+                <span>{t('users.fieldPhone')}</span>
                 <strong>{user.phone || '—'}</strong>
               </div>
               <div className="identity-profile-tile">
-                <span>Created</span>
+                <span>{t('users.fieldCreated')}</span>
                 <strong>{new Date(user.createdAt).toLocaleString()}</strong>
               </div>
             </div>
@@ -467,7 +467,7 @@ export function UserDetailPage() {
             className="identity-form identity-profile-password"
             onSubmit={(event) => void handleChangePassword(event)}
           >
-            <FormField label="Current password" htmlFor="current-password">
+            <FormField label={t('users.fieldCurrentPassword')} htmlFor="current-password">
               <PasswordField
                 id="current-password"
                 value={currentPassword}
@@ -477,19 +477,19 @@ export function UserDetailPage() {
                 disabled={isSaving}
               />
             </FormField>
-            <FormField label="New password" htmlFor="new-password">
+            <FormField label={t('users.fieldNewPassword')} htmlFor="new-password">
               <PasswordField
                 id="new-password"
                 value={newPassword}
                 onChange={setNewPassword}
-                placeholder={PASSWORD_CREATE_PLACEHOLDER}
+                placeholder={t('auth.passwordCreatePlaceholder')}
                 autoComplete="new-password"
                 showRequirements
                 disabled={isSaving}
               />
             </FormField>
             <FormField
-              label="Confirm new password"
+              label={t('users.fieldConfirmNewPassword')}
               htmlFor="confirm-password"
               error={confirmPasswordMismatch ? PASSWORD_MISMATCH_MESSAGE : undefined}
             >
@@ -505,7 +505,7 @@ export function UserDetailPage() {
             </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Updating…' : 'Update password'}
+                {isSaving ? t('users.updating') : t('users.updatePassword')}
               </Button>
             </div>
           </form>
@@ -514,23 +514,23 @@ export function UserDetailPage() {
 
       <section className="identity-panel">
         <div className="identity-panel__title-row">
-          <h2>Memberships</h2>
+          <h2>{t('users.memberships')}</h2>
           <Link className="identity-text-link" to="/system/core/membership">
             Open memberships
           </Link>
         </div>
         {memberships.length === 0 ? (
-          <p className="identity-empty">No memberships for this user.</p>
+          <p className="identity-empty">{t('users.noMemberships')}</p>
         ) : (
           <div className="identity-table-wrap">
             <table className="identity-table">
               <thead>
                 <tr>
-                  <th>Company</th>
-                  <th>Organization</th>
-                  <th>Position</th>
-                  <th>Primary</th>
-                  <th>Status</th>
+                  <th>{t('users.colCompany')}</th>
+                  <th>{t('users.colOrganization')}</th>
+                  <th>{t('users.colPosition')}</th>
+                  <th>{t('users.colPrimary')}</th>
+                  <th>{t('users.colStatus')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -542,7 +542,7 @@ export function UserDetailPage() {
                     <td>{item.isPrimary ? 'Yes' : 'No'}</td>
                     <td>
                       <span className={`identity-status identity-status--${item.status}`}>
-                        {formatStatusLabel(item.status)}
+                        {formatStatusLabel(item.status, t)}
                       </span>
                     </td>
                   </tr>
@@ -555,7 +555,7 @@ export function UserDetailPage() {
 
       <ConfirmDialog
         open={showDeleteConfirm}
-        title="Delete this user?"
+        title={t('users.deleteTitle')}
         description={
           <>
             This will permanently remove{' '}
@@ -565,7 +565,7 @@ export function UserDetailPage() {
             and their memberships.
           </>
         }
-        confirmLabel="Delete user"
+        confirmLabel={t('users.deleteConfirm')}
         busy={isDeleting}
         onConfirm={() => void handleConfirmDelete()}
         onCancel={() => {

@@ -17,6 +17,10 @@
 }
 
 .app-shell__header {
+  /* Stacked above the top-tabs strips so header popovers (language menu) are
+     not painted underneath them. */
+  position: relative;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;

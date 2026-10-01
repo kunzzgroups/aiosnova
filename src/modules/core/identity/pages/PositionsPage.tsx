@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -16,6 +17,7 @@ import {
 import './IdentityPage.css'
 
 export function PositionsPage() {
+  const { t } = useTranslation()
   const [items, setItems] = useState<PositionRecord[]>([])
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
@@ -32,7 +34,7 @@ export function PositionsPage() {
       const result = await fetchPositions()
       setItems(result.items)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to load positions.')
+      setError(err instanceof ApiError ? err.message : t('org.errLoadPositions'))
     } finally {
       setIsLoading(false)
     }
@@ -52,10 +54,10 @@ export function PositionsPage() {
       setCode('')
       setName('')
       setDescription('')
-      setMessage('Position created.')
+      setMessage(t('org.msgPositionCreated'))
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to create position.')
+      setError(err instanceof ApiError ? err.message : t('org.errCreatePosition'))
     } finally {
       setIsSubmitting(false)
     }
@@ -68,14 +70,14 @@ export function PositionsPage() {
       })
       await load()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to update position.')
+      setError(err instanceof ApiError ? err.message : t('org.errUpdatePosition'))
     }
   }
 
   return (
     <div className="identity-page">
         <header className="identity-page__header">
-          <h1>Position</h1>
+          <h1>{t('org.positions.title')}</h1>
           <p>Job positions — reusable titles, not roles (Layer 1 · 05).</p>
         </header>
 
@@ -87,9 +89,9 @@ export function PositionsPage() {
         />
 
         <section className="identity-panel">
-          <h2>Add position</h2>
+          <h2>{t('org.positions.addTitle')}</h2>
           <form className="identity-form" onSubmit={(event) => void handleCreate(event)}>
-            <FormField label="Code" htmlFor="pos-code">
+            <FormField label={t('org.fieldCode')} htmlFor="pos-code">
               <TextField
                 id="pos-code"
                 value={code}
@@ -98,7 +100,7 @@ export function PositionsPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Name" htmlFor="pos-name">
+            <FormField label={t('org.fieldName')} htmlFor="pos-name">
               <TextField
                 id="pos-name"
                 value={name}
@@ -107,7 +109,7 @@ export function PositionsPage() {
                 disabled={isSubmitting}
               />
             </FormField>
-            <FormField label="Description" htmlFor="pos-desc">
+            <FormField label={t('org.fieldDescription')} htmlFor="pos-desc">
               <TextField
                 id="pos-desc"
                 value={description}
@@ -117,25 +119,25 @@ export function PositionsPage() {
             </FormField>
             <div className="identity-form__actions">
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : 'Add'}
+                {isSubmitting ? t('users.saving') : t('org.actionAdd')}
               </Button>
             </div>
           </form>
         </section>
 
         <section className="identity-panel">
-          <h2>Catalog</h2>
-          {isLoading ? <p className="identity-empty">Loading…</p> : null}
+          <h2>{t('org.positions.catalog')}</h2>
+          {isLoading ? <p className="identity-empty">{t('users.loading')}</p> : null}
           {items.length > 0 ? (
             <div className="identity-table-wrap">
               <table className="identity-table">
                 <thead>
                   <tr>
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Status</th>
-                    <th className="identity-table__actions">Actions</th>
+                    <th>{t('org.colCode')}</th>
+                    <th>{t('org.colName')}</th>
+                    <th>{t('org.fieldDescription')}</th>
+                    <th>{t('org.fieldStatus')}</th>
+                    <th className="identity-table__actions">{t('users.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -146,13 +148,13 @@ export function PositionsPage() {
                       <td>{item.description || '—'}</td>
                       <td>
                         <span className={`identity-status identity-status--${item.status}`}>
-                          {formatStatusLabel(item.status)}
+                          {formatStatusLabel(item.status, t)}
                         </span>
                       </td>
                       <td className="identity-table__actions">
                         <div className="identity-inline-actions">
                           <IconButton
-                            label={item.status === 'active' ? 'Active' : 'Inactive'}
+                            label={item.status === 'active' ? t('users.statusActive') : t('users.statusInactive')}
                             variant={item.status === 'active' ? 'secondary' : 'danger'}
                             onClick={() => void handleToggleStatus(item)}
                           >

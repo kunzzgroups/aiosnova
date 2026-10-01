@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Alert } from '@/components/ui/Alert'
 import { ApiError } from '@/services/httpClient'
 import { completeOAuth, type OAuthProvider } from '@/modules/core/auth/services/authService'
@@ -13,6 +14,7 @@ function isOAuthProvider(value: string | undefined): value is OAuthProvider {
 
 export function OAuthCallbackPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { provider } = useParams<{ provider: string }>()
   const [error, setError] = useState<string | null>(null)
   const label = provider ? provider[0]!.toUpperCase() + provider.slice(1) : 'OAuth'
@@ -22,7 +24,7 @@ export function OAuthCallbackPage() {
 
     async function complete() {
       if (!isOAuthProvider(provider)) {
-        setError('Unsupported sign-in provider.')
+        setError(t('auth.oauthUnsupportedProvider'))
         return
       }
 
@@ -33,7 +35,7 @@ export function OAuthCallbackPage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : `${label} sign-in failed.`)
+          setError(err instanceof ApiError ? err.message : t('auth.oauthFailed', { provider: label }))
         }
       }
     }
@@ -51,7 +53,7 @@ export function OAuthCallbackPage() {
   return (
     <div className="auth-loading">
       <Alert variant="error">
-        {error} <Link to="/login">Back to login</Link>
+        {error} <Link to="/login">{t('auth.backToLogin')}</Link>
       </Alert>
     </div>
   )

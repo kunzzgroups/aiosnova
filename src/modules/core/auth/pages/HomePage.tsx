@@ -1,29 +1,31 @@
+import { useTranslation } from 'react-i18next'
 import { useSession } from '@/modules/core/auth/hooks/useSession'
 import './HomePage.css'
 
 export function HomePage() {
+  const { t } = useTranslation()
   const { user } = useSession()
 
   return (
     <section className="home-page">
-      <h1>Welcome, {user?.name}</h1>
-      <p>You are signed in to AIOS with a mock authenticated session.</p>
+      <h1>{t('home.welcome', { name: user?.name ?? '' })}</h1>
+      <p>{t('home.mockSession')}</p>
       <dl className="home-page__meta">
         <div>
-          <dt>Email</dt>
+          <dt>{t('home.email')}</dt>
           <dd>{user?.email}</dd>
         </div>
         <div>
-          <dt>MFA</dt>
-          <dd>{user?.mfaEnabled ? 'Enabled' : 'Disabled'}</dd>
+          <dt>{t('home.mfa')}</dt>
+          <dd>{user?.mfaEnabled ? t('home.enabled') : t('home.disabled')}</dd>
         </div>
         <div>
-          <dt>Access token</dt>
-          <dd>Stored in memory only (not localStorage)</dd>
+          <dt>{t('home.accessToken')}</dt>
+          <dd>{t('home.accessTokenValue')}</dd>
         </div>
         <div>
-          <dt>Refresh</dt>
-          <dd>HttpOnly cookie via MSW + CSRF header on refresh/logout</dd>
+          <dt>{t('home.refresh')}</dt>
+          <dd>{t('home.refreshValue')}</dd>
         </div>
       </dl>
     </section>

@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next'
+
 export type UserStatus = 'active' | 'disabled' | 'invited'
 
 export type SignInMethod = 'password' | 'otp' | 'google' | 'facebook' | 'apple'
@@ -26,37 +28,44 @@ export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 
   return user.fullName.trim().length > 0 && user.phone.trim().length > 0
 }
 
-export function formatStatusLabel(status: string) {
+export function formatStatusLabel(status: string, t: TFunction) {
   if (!status) {
     return status
   }
+  if (status === 'active') {
+    return t('users.statusActive')
+  }
+  if (status === 'invited') {
+    return t('users.statusInvited')
+  }
   if (status === 'disabled') {
-    return 'Inactive'
+    return t('users.statusInactive')
   }
   return `${status.charAt(0).toUpperCase()}${status.slice(1)}`
 }
 
-export function formatSignInMethod(method: SignInMethod | null) {
+export function formatSignInMethod(method: SignInMethod | null, t: TFunction) {
   if (!method) {
     return '—'
   }
   if (method === 'password') {
-    return 'Password'
+    return t('users.methodPassword')
   }
   if (method === 'otp') {
-    return 'OTP'
+    return t('users.methodOtp')
   }
+  // Provider names (Google, Apple, Facebook) are brands and stay as-is.
   return `${method.charAt(0).toUpperCase()}${method.slice(1)}`
 }
 
-export function formatLastActive(value: string | null) {
+export function formatLastActive(value: string | null, t: TFunction) {
   if (!value) {
-    return 'Never'
+    return t('users.lastActiveNever')
   }
 
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
-    return 'Never'
+    return t('users.lastActiveNever')
   }
   const timeLabel = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
@@ -66,19 +75,22 @@ export function formatLastActive(value: string | null) {
   const diffDays = Math.round((startOfToday.getTime() - startOfValue.getTime()) / 86_400_000)
 
   if (diffDays === 0) {
-    return `Today ${timeLabel}`
+    return t('users.lastActiveToday', { time: timeLabel })
   }
   if (diffDays === 1) {
-    return `Yesterday ${timeLabel}`
+    return t('users.lastActiveYesterday', { time: timeLabel })
   }
   return `${date.toLocaleDateString()} ${timeLabel}`
 }
 
-export function formatDirectoryMfa(user: Pick<IdentityUser, 'signInMethod' | 'mfaEnabled'>) {
+export function formatDirectoryMfa(
+  user: Pick<IdentityUser, 'signInMethod' | 'mfaEnabled'>,
+  t: TFunction,
+) {
   if (!user.signInMethod) {
     return '—'
   }
-  return user.mfaEnabled ? 'On' : 'Off'
+  return user.mfaEnabled ? t('users.mfaOn') : t('users.mfaOff')
 }
 
 export const PROFILE_LANGUAGES = [

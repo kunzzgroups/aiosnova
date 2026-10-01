@@ -15,6 +15,8 @@ import {
   IconLogout,
   IconSearch,
 } from '@/components/navigation/SidebarIcons'
+import { useTranslation } from 'react-i18next'
+import { useNavLabel } from '@/i18n/useNavLabel'
 import { useAuthStore } from '@/stores/authStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { logout } from '@/modules/core/auth/services/authService'
@@ -23,7 +25,6 @@ import type { CompanyRecord } from '@/modules/core/identity/types/identity'
 import type { CompanyGroupRecord } from '@/mocks/data/identity'
 import './Sidebar.css'
 
-const GROUP_COMPANIES_LABEL = 'GROUP COMPANIES'
 const COLLAPSED_STORAGE_KEY = 'aios.sidebar.collapsed'
 
 /**
@@ -110,6 +111,8 @@ function GroupCompaniesBlock({
   onOpen: (anchor: HTMLButtonElement) => void
   onLeave: () => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <div className={['sidebar__context-group', open ? 'is-open' : ''].filter(Boolean).join(' ')}>
       <button
@@ -118,7 +121,7 @@ function GroupCompaniesBlock({
         aria-haspopup="true"
         aria-expanded={open}
         data-group-panel="true"
-        title={GROUP_COMPANIES_LABEL}
+        title={t('sidebar.groupCompanies')}
         onMouseEnter={(event) => onOpen(event.currentTarget)}
         onMouseLeave={onLeave}
         onFocus={(event) => onOpen(event.currentTarget)}
@@ -128,7 +131,7 @@ function GroupCompaniesBlock({
           <span className="sidebar__icon">
             <IconBuilding />
           </span>
-          <span className="sidebar__label">{GROUP_COMPANIES_LABEL}</span>
+          <span className="sidebar__label">{t('sidebar.groupCompanies')}</span>
         </span>
         <span className="sidebar__expander" aria-hidden>
           <IconChevron />
@@ -155,10 +158,12 @@ function GroupCompaniesPanel({
   onMouseEnter: () => void
   onMouseLeave: () => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <aside
       className="sidebar-flyout sidebar-flyout--groups"
-      aria-label={GROUP_COMPANIES_LABEL}
+      aria-label={t('sidebar.groupCompanies')}
       style={{ top }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -167,12 +172,12 @@ function GroupCompaniesPanel({
         <section className="sidebar-flyout__section">
           <header className="sidebar-flyout__section-head">
             <IconBuilding />
-            <span>{GROUP_COMPANIES_LABEL}</span>
+            <span>{t('sidebar.groupCompanies')}</span>
           </header>
           <ul className="sidebar-flyout__list">
             {items.length === 0 ? (
               <li>
-                <span className="sidebar__context-empty">No groups or companies</span>
+                <span className="sidebar__context-empty">{t('sidebar.noGroups')}</span>
               </li>
             ) : (
               items.map((item) => {
@@ -225,12 +230,13 @@ function SectionModulesFlyout({
 }) {
   const location = useLocation()
   const SectionIcon = getSectionIcon(section.id)
+  const navLabel = useNavLabel()
   const activeModuleId = findModuleByPath(location.pathname)?.module.id ?? null
 
   return (
     <aside
       className="sidebar-flyout sidebar-flyout--modules"
-      aria-label={section.label}
+      aria-label={navLabel(section)}
       style={{ top }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -239,7 +245,7 @@ function SectionModulesFlyout({
         <section className="sidebar-flyout__section">
           <header className="sidebar-flyout__section-head">
             <SectionIcon />
-            <span>{section.label}</span>
+            <span>{navLabel(section)}</span>
           </header>
           <ul className="sidebar-flyout__list">
             {section.children.map((node) => {
@@ -247,7 +253,7 @@ function SectionModulesFlyout({
                 return (
                   <li key={node.id}>
                     <NavLink to={node.path} className="sidebar-flyout__link" onClick={onNavigate}>
-                      <span className="sidebar-flyout__link-label">{node.label}</span>
+                      <span className="sidebar-flyout__link-label">{navLabel(node)}</span>
                     </NavLink>
                   </li>
                 )
@@ -265,7 +271,7 @@ function SectionModulesFlyout({
                       <span className="sidebar-flyout__link-icon">
                         <ModuleIcon />
                       </span>
-                      <span className="sidebar-flyout__link-label">{node.label}</span>
+                      <span className="sidebar-flyout__link-label">{navLabel(node)}</span>
                     </span>
                   </li>
                 )
@@ -286,7 +292,7 @@ function SectionModulesFlyout({
                     <span className="sidebar-flyout__link-icon">
                       <ModuleIcon />
                     </span>
-                    <span className="sidebar-flyout__link-label">{node.label}</span>
+                    <span className="sidebar-flyout__link-label">{navLabel(node)}</span>
                   </NavLink>
                 </li>
               )
@@ -327,6 +333,7 @@ function SectionBlock({
   onExpand: () => void
 }) {
   const SectionIcon = getSectionIcon(section.id)
+  const navLabel = useNavLabel()
   const location = useLocation()
 
   if (collapsed) {
@@ -335,7 +342,7 @@ function SectionBlock({
         <button
           type="button"
           className="sidebar__item sidebar__section-icon-only"
-          aria-label={section.label}
+          aria-label={navLabel(section)}
           onClick={onExpand}
           onMouseEnter={(event) => hover.onEnter(event.currentTarget)}
           onMouseLeave={hover.onLeave}
@@ -366,7 +373,7 @@ function SectionBlock({
       <section className="sidebar__section">
         <NavLink
           to={alreadyInside ? location.pathname : firstPage.path}
-          title={section.label}
+          title={navLabel(section)}
           onClick={(event) => {
             // Already there: don't push a duplicate history entry.
             if (alreadyInside) {
@@ -381,7 +388,7 @@ function SectionBlock({
             <span className="sidebar__icon">
               <SectionIcon />
             </span>
-            <span className="sidebar__label">{section.label}</span>
+            <span className="sidebar__label">{navLabel(section)}</span>
           </span>
         </NavLink>
       </section>
@@ -397,7 +404,7 @@ function SectionBlock({
           .join(' ')}
         aria-haspopup="true"
         aria-expanded={flyout.open}
-        title={section.label}
+        title={navLabel(section)}
         data-section-flyout="true"
         onMouseEnter={(event) => flyout.onEnter(event.currentTarget)}
         onMouseLeave={flyout.onLeave}
@@ -408,7 +415,7 @@ function SectionBlock({
           <span className="sidebar__icon">
             <SectionIcon />
           </span>
-          <span className="sidebar__label">{section.label}</span>
+          <span className="sidebar__label">{navLabel(section)}</span>
         </span>
         <span className="sidebar__expander" aria-hidden>
           <IconChevron />
@@ -441,6 +448,8 @@ export function Sidebar() {
   const shellRef = useRef<HTMLDivElement>(null)
 
   const sections = useMemo(() => filterSidebarSections(query), [query])
+  const { t } = useTranslation()
+  const navLabel = useNavLabel()
   const currentSectionId = useMemo(
     () => findModuleByPath(location.pathname)?.section.id ?? null,
     [location.pathname],
@@ -622,7 +631,7 @@ export function Sidebar() {
       setFlyoutSectionId(null)
       setCompaniesPanelOpen(false)
       measureAnchor(anchor)
-      setIconTipLabel(section.label)
+      setIconTipLabel(navLabel(section))
       return
     }
     handleOpenSectionFlyout(section, anchor)
@@ -664,7 +673,7 @@ export function Sidebar() {
     >
       <aside
         className={['sidebar', collapsed ? 'sidebar--collapsed' : ''].filter(Boolean).join(' ')}
-        aria-label="Primary"
+        aria-label={t('shell.primaryNav')}
         data-collapsed={collapsed ? 'true' : 'false'}
         data-company-id={companyId || undefined}
       >
@@ -675,8 +684,8 @@ export function Sidebar() {
         <button
           type="button"
           className="sidebar__collapse-toggle"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? t('shell.expandSidebar') : t('shell.collapseSidebar')}
+          title={collapsed ? t('shell.expandSidebar') : t('shell.collapseSidebar')}
           onClick={() => setCollapsed((value) => !value)}
         >
           <IconChevron />
@@ -691,14 +700,14 @@ export function Sidebar() {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search..."
-          aria-label="Search navigation"
+          placeholder={t('sidebar.search')}
+          aria-label={t('sidebar.searchAria')}
         />
       </div>
 
       {!collapsed && activeCompany ? (
         <div className="sidebar__company-context" title={activeCompany.label}>
-          <span className="sidebar__company-context-label">Active company</span>
+          <span className="sidebar__company-context-label">{t('sidebar.activeCompany')}</span>
           <strong className="sidebar__company-context-name">{activeCompany.label}</strong>
         </div>
       ) : null}
@@ -718,7 +727,7 @@ export function Sidebar() {
           <button
             type="button"
             className="sidebar__item sidebar__section-icon-only"
-            aria-label={GROUP_COMPANIES_LABEL}
+            aria-label={t('sidebar.groupCompanies')}
             aria-haspopup="true"
             aria-expanded={companiesPanelOpen}
             data-group-panel="true"
@@ -760,14 +769,14 @@ export function Sidebar() {
           {initials}
         </div>
         <div className="sidebar__user">
-          <strong>{user?.name ?? 'User'}</strong>
+          <strong>{user?.name ?? t('sidebar.fallbackUser')}</strong>
           <span>{user?.email ?? ''}</span>
         </div>
         <button
           type="button"
           className="sidebar__logout"
-          aria-label="Log out"
-          title="Log out"
+          aria-label={t('sidebar.logout')}
+          title={t('sidebar.logout')}
           onClick={() => void handleLogout()}
         >
           <IconLogout />

@@ -3,7 +3,7 @@ import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
-import { useAuthCopy } from '@/modules/core/auth/i18n/authCopy'
+import { useTranslation } from 'react-i18next'
 import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { useLogin } from '@/modules/core/auth/hooks/useLogin'
 import { readRememberedLogin } from '@/modules/core/auth/utils/rememberedLogin'
@@ -58,7 +58,7 @@ function MalaysiaFlagIcon() {
 
 export function LoginForm() {
   const { handleRequestTac, handleVerifyTac, isSubmitting, error, setError, setMessage } = useLogin()
-  const { t } = useAuthCopy()
+  const { t } = useTranslation()
   const [remembered] = useState(readRememberedLogin)
   const [method, setMethod] = useState<LoginMethod>('email')
   const [email, setEmail] = useState(remembered?.email ?? '')
@@ -133,7 +133,7 @@ export function LoginForm() {
 
   return (
     <div className="login-form">
-      <div className="login-form__methods" role="tablist" aria-label="Sign-in method">
+      <div className="login-form__methods" role="tablist" aria-label={t('auth.signInMethod')}>
         <button
           type="button"
           role="tab"
@@ -141,7 +141,7 @@ export function LoginForm() {
           className={['login-form__method', method === 'email' ? 'is-active' : ''].filter(Boolean).join(' ')}
           onClick={() => switchMethod('email')}
         >
-          {t('emailLogin')}
+          {t('auth.emailLogin')}
         </button>
         <button
           type="button"
@@ -150,20 +150,20 @@ export function LoginForm() {
           className={['login-form__method', method === 'phone' ? 'is-active' : ''].filter(Boolean).join(' ')}
           onClick={() => switchMethod('phone')}
         >
-          {t('phoneLogin')}
+          {t('auth.phoneLogin')}
         </button>
       </div>
 
       <form className="login-form__form" onSubmit={(event) => void handleSubmit(event)}>
         {error ? <Alert variant="error">{error}</Alert> : null}
         {method === 'email' ? (
-          <FormField label={t('email')} htmlFor="login-email">
+          <FormField label={t('auth.email')} htmlFor="login-email">
             <TextField
               id="login-email"
               name="email"
               type="email"
               autoComplete="email"
-              placeholder={t('enterEmail')}
+              placeholder={t('auth.enterEmail')}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -171,13 +171,13 @@ export function LoginForm() {
             />
           </FormField>
         ) : (
-          <FormField label={t('phone')} htmlFor="login-phone">
+          <FormField label={t('auth.phone')} htmlFor="login-phone">
             <div className="login-form__phone">
               <div className="login-form__dial" ref={dialRef}>
                 <button
                   type="button"
                   className={['login-form__dial-trigger', dialOpen ? 'is-open' : ''].filter(Boolean).join(' ')}
-                  aria-label={t('countryCode')}
+                  aria-label={t('auth.countryCode')}
                   aria-haspopup="listbox"
                   aria-expanded={dialOpen}
                   aria-controls={dialListId}
@@ -193,7 +193,7 @@ export function LoginForm() {
                   </span>
                 </button>
                 {dialOpen ? (
-                  <ul className="login-form__dial-menu" id={dialListId} role="listbox" aria-label={t('countryCode')}>
+                  <ul className="login-form__dial-menu" id={dialListId} role="listbox" aria-label={t('auth.countryCode')}>
                     {PHONE_DIAL_CODES.map((option) => {
                       const selected = option.prefix === dialCode
                       return (
@@ -227,7 +227,7 @@ export function LoginForm() {
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel-national"
-                placeholder={t('enterPhone')}
+                placeholder={t('auth.enterPhone')}
                 value={phone}
                 onChange={(event) => setPhone(composeDialedPhone(dialCode, event.target.value).local)}
                 required
@@ -236,14 +236,14 @@ export function LoginForm() {
             </div>
           </FormField>
         )}
-        <FormField label={method === 'email' ? t('emailCode') : t('tac')} htmlFor="login-tac">
+        <FormField label={method === 'email' ? t('auth.emailCode') : t('auth.tac')} htmlFor="login-tac">
           <div className="login-form__tac">
             <TextField
               id="login-tac"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
-              placeholder={method === 'email' ? t('enterEmailCode') : t('enterTac')}
+              placeholder={method === 'email' ? t('auth.enterEmailCode') : t('auth.enterTac')}
               value={tac}
               onChange={(event) => setTac(event.target.value.replace(/\D/g, '').slice(0, 6))}
               required
@@ -255,17 +255,17 @@ export function LoginForm() {
               onClick={() => void sendTac()}
               disabled={sendingTac || isSubmitting || !canSendOtp}
             >
-              {sendingTac ? t('sendingTac') : tacSent ? t('resendTac') : t('sendTac')}
+              {sendingTac ? t('auth.sendingTac') : tacSent ? t('auth.resendTac') : t('auth.sendTac')}
             </button>
           </div>
         </FormField>
         <Button type="submit" fullWidth size="lg" disabled={isSubmitting}>
-          {isSubmitting ? t('signingIn') : t('signInButton')}
+          {isSubmitting ? t('auth.signingIn') : t('auth.signInButton')}
         </Button>
       </form>
 
       <div className="login-form__divider">
-        <span>{t('orSignInWith')}</span>
+        <span>{t('auth.orSignInWith')}</span>
       </div>
       <SocialAuthButtons />
     </div>

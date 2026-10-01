@@ -1,22 +1,26 @@
-import {
-  getPasswordChecks,
-  PASSWORD_CHECKS,
-  PASSWORD_MEETS_REQUIREMENTS,
-  PASSWORD_RULE_HINT,
-} from '@/modules/core/auth/utils/passwordPolicy'
+import { useTranslation } from 'react-i18next'
+import { getPasswordChecks, PASSWORD_CHECKS } from '@/modules/core/auth/utils/passwordPolicy'
 import './PasswordRequirements.css'
+
+const PASSWORD_CHECK_KEYS: Record<string, string> = {
+  length: 'auth.passwordCheckLength',
+  upper: 'auth.passwordCheckUpper',
+  lower: 'auth.passwordCheckLower',
+  symbol: 'auth.passwordCheckSymbol',
+}
 
 type PasswordRequirementsProps = {
   value: string
 }
 
 export function PasswordRequirements({ value }: PasswordRequirementsProps) {
+  const { t } = useTranslation()
   const password = value ?? ''
   const checks = getPasswordChecks(password)
   const allMet = checks.length && checks.upper && checks.lower && checks.symbol
 
   if (password.length === 0) {
-    return <p className="password-requirements password-requirements--idle">{PASSWORD_RULE_HINT}</p>
+    return <p className="password-requirements password-requirements--idle">{t('auth.passwordRuleHint')}</p>
   }
 
   if (allMet) {
@@ -25,7 +29,7 @@ export function PasswordRequirements({ value }: PasswordRequirementsProps) {
         <span className="password-requirements__mark is-met" aria-hidden>
           ✓
         </span>
-        {PASSWORD_MEETS_REQUIREMENTS}
+        {t('auth.passwordMeetsRequirements')}
       </p>
     )
   }
@@ -42,7 +46,7 @@ export function PasswordRequirements({ value }: PasswordRequirementsProps) {
             <span className="password-requirements__mark" aria-hidden>
               {met ? '✓' : '○'}
             </span>
-            {item.label}
+            {t(PASSWORD_CHECK_KEYS[item.id])}
           </li>
         )
       })}

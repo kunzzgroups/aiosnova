@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { APP_LOCALE_OPTIONS, type AppLocale, useLocaleStore } from '@/stores/localeStore'
 import './LanguageSwitcher.css'
 
@@ -25,6 +26,7 @@ function IconChevron() {
 }
 
 export function LanguageSwitcher() {
+  const { t } = useTranslation()
   const locale = useLocaleStore((state) => state.locale)
   const setLocale = useLocaleStore((state) => state.setLocale)
   const [open, setOpen] = useState(false)
@@ -65,7 +67,7 @@ export function LanguageSwitcher() {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        aria-label="Language"
+        aria-label={t('language.label')}
         onClick={() => setOpen((current) => !current)}
       >
         <span className="language-switcher__globe">
@@ -78,7 +80,7 @@ export function LanguageSwitcher() {
       </button>
 
       {open ? (
-        <ul className="language-switcher__menu" id={listId} role="listbox" aria-label="Language">
+        <ul className="language-switcher__menu" id={listId} role="listbox" aria-label={t('language.label')}>
           {APP_LOCALE_OPTIONS.map((option) => {
             const selectedOption = option.value === locale
             return (
