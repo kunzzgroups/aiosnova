@@ -1,16 +1,11 @@
 export const auth: Record<string, string> = {
+  'auth.signInWithEmailTitle': '使用邮箱登录',
+
   // migrated from the former authCopy.ts
-  'auth.emailLogin': '邮箱',
-  'auth.phoneLogin': '手机',
   'auth.email': '邮箱',
-  'auth.phone': '手机号码',
   'auth.enterEmail': '请输入邮箱',
-  'auth.countryCode': '区号',
-  'auth.enterPhone': '例如 12-345 0001',
   'auth.emailCode': '邮箱验证码',
   'auth.enterEmailCode': '请输入 6 位邮箱验证码',
-  'auth.tac': '短信验证码',
-  'auth.enterTac': '请输入 6 位短信验证码',
   'auth.sendTac': '发送 OTP',
   'auth.sendingTac': '发送中…',
   'auth.resendTac': '重新发送 OTP',
@@ -29,7 +24,6 @@ export const auth: Record<string, string> = {
   'auth.continueToReset': '继续重置',
 
   // aria labels
-  'auth.signInMethod': '登录方式',
   'auth.socialSignIn': '第三方登录',
 
   // OAuth

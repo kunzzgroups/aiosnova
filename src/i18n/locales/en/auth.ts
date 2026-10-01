@@ -1,16 +1,11 @@
 export const auth: Record<string, string> = {
+  'auth.signInWithEmailTitle': 'Sign in With Email',
+
   // migrated from the former authCopy.ts
-  'auth.emailLogin': 'Email',
-  'auth.phoneLogin': 'Mobile',
   'auth.email': 'Email',
-  'auth.phone': 'Phone number',
   'auth.enterEmail': 'Enter your email',
-  'auth.countryCode': 'Country code',
-  'auth.enterPhone': 'e.g. 12-345 0001',
   'auth.emailCode': 'Email Code',
   'auth.enterEmailCode': 'Enter 6-digit Email Code',
-  'auth.tac': 'SMS Code',
-  'auth.enterTac': 'Enter 6-digit SMS Code',
   'auth.sendTac': 'Send OTP',
   'auth.sendingTac': 'Sending OTP…',
   'auth.resendTac': 'Resend OTP',
@@ -29,7 +24,6 @@ export const auth: Record<string, string> = {
   'auth.continueToReset': 'Continue to reset',
 
   // aria labels
-  'auth.signInMethod': 'Sign-in method',
   'auth.socialSignIn': 'Social sign-in',
 
   // OAuth

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
@@ -7,115 +7,32 @@ import { useTranslation } from 'react-i18next'
 import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { useLogin } from '@/modules/core/auth/hooks/useLogin'
 import { readRememberedLogin } from '@/modules/core/auth/utils/rememberedLogin'
-import {
-  DEFAULT_PHONE_DIAL_CODE,
-  PHONE_DIAL_CODES,
-  composeDialedPhone,
-} from '@/modules/core/auth/utils/phoneDialCodes'
 import './LoginForm.css'
 
-type LoginMethod = 'email' | 'phone'
-
-function IconChevron() {
-  return (
-    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden>
-      <path d="M4 6.2 8 10l4-3.8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function MalaysiaFlagIcon() {
-  const clipId = useId()
-  const stripe = 24 / 14
-
-  return (
-    <svg className="login-form__dial-flag" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-      <clipPath id={clipId}>
-        <circle cx="12" cy="12" r="12" />
-      </clipPath>
-      <g clipPath={`url(#${clipId})`}>
-        {Array.from({ length: 14 }, (_, index) => (
-          <rect
-            key={index}
-            x="0"
-            y={index * stripe}
-            width="24"
-            height={stripe + 0.05}
-            fill={index % 2 === 0 ? '#CC0001' : '#FFFFFF'}
-          />
-        ))}
-        <rect x="0" y="0" width="12.2" height={stripe * 8} fill="#010066" />
-        <circle cx="6.15" cy={stripe * 4} r="3.15" fill="#FFCC00" />
-        <circle cx="7.2" cy={stripe * 4} r="2.5" fill="#010066" />
-        <polygon
-          fill="#FFCC00"
-          points="9.05,5.05 9.45,6.2 10.7,6.2 9.7,6.95 10.05,8.15 9.05,7.4 8.05,8.15 8.4,6.95 7.4,6.2 8.65,6.2"
-        />
-      </g>
-    </svg>
-  )
-}
-
+/**
+ * Email sign-in only.
+ *
+ * The mobile flow (method tabs + dial-code picker + phone OTP) was removed.
+ * The service layer still accepts an optional `phone` payload in
+ * `authService.requestLoginTac` - that is the API contract and is kept.
+ */
 export function LoginForm() {
-  const { handleRequestTac, handleVerifyTac, isSubmitting, error, setError, setMessage } = useLogin()
+  const { handleRequestTac, handleVerifyTac, isSubmitting, error } = useLogin()
   const { t } = useTranslation()
   const [remembered] = useState(readRememberedLogin)
-  const [method, setMethod] = useState<LoginMethod>('email')
   const [email, setEmail] = useState(remembered?.email ?? '')
-  const [dialCode, setDialCode] = useState(DEFAULT_PHONE_DIAL_CODE.prefix)
-  const [dialOpen, setDialOpen] = useState(false)
-  const [phone, setPhone] = useState('')
   const [tac, setTac] = useState('')
   const [tacSent, setTacSent] = useState(false)
   const [sendingTac, setSendingTac] = useState(false)
-  const dialRef = useRef<HTMLDivElement>(null)
-  const dialListId = useId()
-  const selectedDial = PHONE_DIAL_CODES.find((item) => item.prefix === dialCode) ?? DEFAULT_PHONE_DIAL_CODE
 
-  const fullPhone = composeDialedPhone(dialCode, phone).full
-  const canSendOtp = method === 'email' ? Boolean(email.trim()) : Boolean(phone.trim())
-
-  useEffect(() => {
-    if (!dialOpen) {
-      return
-    }
-
-    function handlePointerDown(event: MouseEvent) {
-      if (!dialRef.current?.contains(event.target as Node)) {
-        setDialOpen(false)
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setDialOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [dialOpen])
-
-  function switchMethod(next: LoginMethod) {
-    setDialOpen(false)
-    setMethod(next)
-    setError(null)
-    setMessage(null)
-    setTac('')
-    setTacSent(false)
-  }
+  const canSendOtp = Boolean(email.trim())
 
   async function sendTac() {
     if (!canSendOtp || sendingTac || isSubmitting) {
       return
     }
     setSendingTac(true)
-    const sent =
-      method === 'email' ? await handleRequestTac({ email }) : await handleRequestTac({ phone: fullPhone })
+    const sent = await handleRequestTac({ email })
     setSendingTac(false)
     if (sent) {
       setTacSent(true)
@@ -124,126 +41,34 @@ export function LoginForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (method === 'email') {
-      await handleVerifyTac({ email, code: tac })
-      return
-    }
-    await handleVerifyTac({ phone: fullPhone, code: tac })
+    await handleVerifyTac({ email, code: tac })
   }
 
   return (
     <div className="login-form">
-      <div className="login-form__methods" role="tablist" aria-label={t('auth.signInMethod')}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={method === 'email'}
-          className={['login-form__method', method === 'email' ? 'is-active' : ''].filter(Boolean).join(' ')}
-          onClick={() => switchMethod('email')}
-        >
-          {t('auth.emailLogin')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={method === 'phone'}
-          className={['login-form__method', method === 'phone' ? 'is-active' : ''].filter(Boolean).join(' ')}
-          onClick={() => switchMethod('phone')}
-        >
-          {t('auth.phoneLogin')}
-        </button>
-      </div>
-
       <form className="login-form__form" onSubmit={(event) => void handleSubmit(event)}>
         {error ? <Alert variant="error">{error}</Alert> : null}
-        {method === 'email' ? (
-          <FormField label={t('auth.email')} htmlFor="login-email">
-            <TextField
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder={t('auth.enterEmail')}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              disabled={isSubmitting}
-            />
-          </FormField>
-        ) : (
-          <FormField label={t('auth.phone')} htmlFor="login-phone">
-            <div className="login-form__phone">
-              <div className="login-form__dial" ref={dialRef}>
-                <button
-                  type="button"
-                  className={['login-form__dial-trigger', dialOpen ? 'is-open' : ''].filter(Boolean).join(' ')}
-                  aria-label={t('auth.countryCode')}
-                  aria-haspopup="listbox"
-                  aria-expanded={dialOpen}
-                  aria-controls={dialListId}
-                  disabled={isSubmitting}
-                  onClick={() => setDialOpen((current) => !current)}
-                >
-                  <span className="login-form__dial-trigger-label">
-                    {selectedDial.id === 'my' ? <MalaysiaFlagIcon /> : null}
-                    <span>{selectedDial.label}</span>
-                  </span>
-                  <span className="login-form__dial-chevron" aria-hidden>
-                    <IconChevron />
-                  </span>
-                </button>
-                {dialOpen ? (
-                  <ul className="login-form__dial-menu" id={dialListId} role="listbox" aria-label={t('auth.countryCode')}>
-                    {PHONE_DIAL_CODES.map((option) => {
-                      const selected = option.prefix === dialCode
-                      return (
-                        <li key={option.id} role="presentation">
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={selected}
-                            className={['login-form__dial-option', selected ? 'is-selected' : '']
-                              .filter(Boolean)
-                              .join(' ')}
-                            onClick={() => {
-                              setDialCode(option.prefix)
-                              setDialOpen(false)
-                            }}
-                          >
-                            <span className="login-form__dial-option-label">
-                              {option.id === 'my' ? <MalaysiaFlagIcon /> : null}
-                              <span>{option.label}</span>
-                            </span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                ) : null}
-              </div>
-              <TextField
-                id="login-phone"
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel-national"
-                placeholder={t('auth.enterPhone')}
-                value={phone}
-                onChange={(event) => setPhone(composeDialedPhone(dialCode, event.target.value).local)}
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-          </FormField>
-        )}
-        <FormField label={method === 'email' ? t('auth.emailCode') : t('auth.tac')} htmlFor="login-tac">
+        <FormField label={t('auth.email')} htmlFor="login-email">
+          <TextField
+            id="login-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder={t('auth.enterEmail')}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            disabled={isSubmitting}
+          />
+        </FormField>
+        <FormField label={t('auth.emailCode')} htmlFor="login-tac">
           <div className="login-form__tac">
             <TextField
               id="login-tac"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
-              placeholder={method === 'email' ? t('auth.enterEmailCode') : t('auth.enterTac')}
+              placeholder={t('auth.enterEmailCode')}
               value={tac}
               onChange={(event) => setTac(event.target.value.replace(/\D/g, '').slice(0, 6))}
               required
