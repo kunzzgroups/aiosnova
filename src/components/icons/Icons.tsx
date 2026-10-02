@@ -217,3 +217,73 @@ export function IconChevronDown(props: IconProps) {
     </IconSvg>
   )
 }
+
+export function IconCopy(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <rect x="8" y="8" width="14" height="14" rx="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </IconSvg>
+  )
+}
+
+export function IconRefresh(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+    </IconSvg>
+  )
+}
+
+export function IconThumbUp(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </IconSvg>
+  )
+}
+
+export function IconThumbDown(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M17 14V2" />
+      <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />
+    </IconSvg>
+  )
+}
+
+export function IconFolder(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M3.5 6.5h6l1.6 2h9.4v9.5H3.5z" />
+    </IconSvg>
+  )
+}
+
+export function IconPanelLeft(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+    </IconSvg>
+  )
+}
+
+export function IconPanelRight(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M15 3v18" />
+    </IconSvg>
+  )
+}
+
+export function IconStop(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <rect x="7" y="7" width="10" height="10" rx="2" />
+    </IconSvg>
+  )
+}

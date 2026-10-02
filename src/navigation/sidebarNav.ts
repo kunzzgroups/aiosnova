@@ -490,6 +490,37 @@ export function findModuleByPath(pathname: string): ModuleMatch | null {
   return null
 }
 
+/**
+ * Deepest nav link owning a path - i.e. the page the user is on. Used for the
+ * workspace header title, so it always reads exactly like the sidebar entry
+ * ("Users", "AI Assistant") instead of a generic label.
+ *
+ * Longest match wins, so a detail route such as `/system/core/users/:id` still
+ * resolves to the list link it belongs to rather than a shorter prefix.
+ */
+export function findNavItemByPath(pathname: string): SidebarLink | null {
+  let best: SidebarLink | null = null
+
+  function visit(nodes: SidebarNode[]) {
+    for (const node of nodes) {
+      if (node.kind === 'group') {
+        visit(node.children)
+        continue
+      }
+      const matches = pathname === node.path || pathname.startsWith(`${node.path}/`)
+      if (matches && (best === null || node.path.length > best.path.length)) {
+        best = node
+      }
+    }
+  }
+
+  for (const section of sidebarSections) {
+    visit(section.children)
+  }
+
+  return best
+}
+
 export function filterSidebarSections(query: string): SidebarSection[] {
   const normalized = query.trim().toLowerCase()
   if (!normalized) {

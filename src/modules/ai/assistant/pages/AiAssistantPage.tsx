@@ -1,25 +1,39 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  IconAlertTriangle,
   IconChevronDown,
+  IconCircleCheck,
   IconClock,
+  IconCopy,
   IconExternalLink,
+  IconPanelLeft,
+  IconPanelRight,
   IconPaperclip,
   IconPin,
   IconPlus,
+  IconRefresh,
   IconSearch,
   IconSend,
   IconSpark,
+  IconStop,
+  IconThumbDown,
+  IconThumbUp,
 } from '@/components/icons/Icons'
+import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { TextField } from '@/components/ui/TextField'
 import { useCompanyStore } from '@/stores/companyStore'
 import {
+  assistantScopes,
   assistantSuggestions,
   assistantThreads,
   buildDemoTurn,
+  buildUnansweredTurn,
+  detectDemoReplyState,
   type AssistantSource,
   type AssistantThread,
   type AssistantTurn,
+  type ScopeId,
   type SourceType,
   type ThreadGroup,
 } from '../data/assistantDemo'
@@ -28,6 +42,32 @@ import './AiAssistantPage.css'
 /** How long the stand-in "assistant is working" state lasts. */
 const DEMO_REPLY_DELAY_MS = 1100
 
+/** Which side rails the reader has folded away. Session-scoped, like the sidebar. */
+const PANELS_STORAGE_KEY = 'aios.ai.panels'
+
+type PanelState = { history: boolean; evidence: boolean }
+
+function readPanelState(): PanelState {
+  // Nothing stored yet: fold both rails on a narrow window, where they would be
+  // overlays instead of columns.
+  const narrow = window.matchMedia('(max-width: 1180px)').matches
+  const fallback: PanelState = { history: narrow, evidence: narrow }
+  try {
+    const raw = window.sessionStorage.getItem(PANELS_STORAGE_KEY)
+    if (!raw) {
+      return fallback
+    }
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) {
+      return fallback
+    }
+    const value = parsed as Partial<PanelState>
+    return { history: value.history === true, evidence: value.evidence === true }
+  } catch {
+    return fallback
+  }
+}
+
 const GROUP_ORDER: ThreadGroup[] = ['today', 'yesterday', 'earlier']
 
 const SOURCE_LABEL_KEY: Record<SourceType, string> = {
@@ -35,6 +75,24 @@ const SOURCE_LABEL_KEY: Record<SourceType, string> = {
   invoice: 'ai.assistant.typeInvoice',
   policy: 'ai.assistant.typePolicy',
   record: 'ai.assistant.typeRecord',
+}
+
+const SCOPE_LABEL_KEY: Record<ScopeId, string> = {
+  all: 'ai.assistant.scopeAll',
+  contract: 'ai.assistant.typeContract',
+  invoice: 'ai.assistant.typeInvoice',
+  policy: 'ai.assistant.typePolicy',
+  record: 'ai.assistant.typeRecord',
+}
+
+/** Plain text of an answer, for the copy action (emphasis markers stripped). */
+function answerText(turn: AssistantTurn): string {
+  const strip = (value: string) => value.replace(/\*\*/g, '')
+  return [
+    strip(turn.answer.lead),
+    ...turn.answer.facts.map((fact) => `${fact.label}: ${fact.value}`),
+    strip(turn.answer.tail),
+  ].join('\n')
 }
 
 /**
@@ -50,6 +108,9 @@ function rich(text: string): ReactNode[] {
 function toggleId(ids: string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]
 }
+
+/** A question that is waiting on a retry, and how to re-ask it. */
+type PendingReply = { question: string; mode: 'append' | 'replace' }
 
 /**
  * AI Assistant: three panes - chats grouped by time, the conversation, and the
@@ -74,11 +135,29 @@ export function AiAssistantPage() {
   )
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState('')
-  const [groundedOnly, setGroundedOnly] = useState(true)
   const [openTraceIds, setOpenTraceIds] = useState<string[]>([])
   const [openSourceIds, setOpenSourceIds] = useState<string[]>([])
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
+  /**
+   * Answer the evidence rail is showing. `null` means "follow the newest one"; a
+   * turn id means the reader pointed at an earlier answer and the rail followed.
+   */
+  const [evidenceTurnId, setEvidenceTurnId] = useState<string | null>(null)
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
+  const [scopeId, setScopeId] = useState<ScopeId>('all')
+  const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>({})
+  const [copiedTurnId, setCopiedTurnId] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<PanelState>(readPanelState)
+  /** Viewport where the side rails become overlays instead of columns. */
+  const [compact, setCompact] = useState(() =>
+    window.matchMedia('(max-width: 1180px)').matches,
+  )
+  /** Question whose request failed, plus how to retry it. */
+  const [errorQuestion, setErrorQuestion] = useState<PendingReply | null>(null)
+  /** Question whose generation the reader stopped, plus how to retry it. */
+  const [interrupted, setInterrupted] = useState<PendingReply | null>(null)
+  /** Whether the in-flight reply appends a turn or replaces the last one. */
+  const pendingModeRef = useRef<'append' | 'replace'>('append')
   const replyTimer = useRef<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -86,8 +165,25 @@ export function AiAssistantPage() {
   const activeThread = threads.find((thread) => thread.id === activeThreadId) ?? null
   const turns = activeThread?.turns ?? []
   const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null
-  const sources = lastTurn?.sources ?? []
+  /** The turn the evidence rail mirrors: the hovered one, else the newest. */
+  const evidenceTurn = (evidenceTurnId ? turns.find((turn) => turn.id === evidenceTurnId) : null) ?? lastTurn
+  const evidenceIsEarlier = Boolean(evidenceTurn && lastTurn && evidenceTurn.id !== lastTurn.id)
+  const sources = evidenceTurn?.sources ?? []
   const allSourcesOpen = sources.length > 0 && openSourceIds.length === sources.length
+
+  /** Announcement for the hidden live region; keeps SR users in the loop. */
+  const announcement =
+    pendingQuestion !== null
+      ? t('ai.assistant.liveSearching')
+      : errorQuestion !== null
+        ? t('ai.assistant.liveError')
+        : interrupted !== null
+          ? t('ai.assistant.liveStopped')
+          : lastTurn
+            ? lastTurn.sources.length === 0
+              ? t('ai.assistant.liveNotFound')
+              : t('ai.assistant.liveAnswered', { count: lastTurn.sources.length })
+            : ''
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -111,6 +207,45 @@ export function AiAssistantPage() {
     }
   }, [])
 
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(collapsed))
+    } catch {
+      /* storage unavailable - folding still works for this session */
+    }
+  }, [collapsed])
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1180px)')
+    const handle = () => setCompact(query.matches)
+    query.addEventListener('change', handle)
+    return () => query.removeEventListener('change', handle)
+  }, [])
+
+  // Grows the composer with the draft, up to the CSS max-height.
+  useEffect(() => {
+    const node = inputRef.current
+    if (!node) {
+      return
+    }
+    node.style.height = 'auto'
+    node.style.height = `${node.scrollHeight}px`
+  }, [draft])
+
+  // Escape dismisses an overlay rail on a narrow window.
+  useEffect(() => {
+    if (!compact || (collapsed.history && collapsed.evidence)) {
+      return
+    }
+    function handleKey(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setCollapsed({ history: true, evidence: true })
+      }
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [compact, collapsed])
+
   // Keep the newest turn in view as the transcript grows.
   useEffect(() => {
     const node = scrollRef.current
@@ -118,6 +253,16 @@ export function AiAssistantPage() {
       node.scrollTop = node.scrollHeight
     }
   }, [activeThreadId, turns.length, pendingQuestion])
+
+  // Brought into view after the rail has re-rendered for the right turn.
+  useEffect(() => {
+    if (!activeSourceId) {
+      return
+    }
+    document
+      .getElementById(`ai-source-evidence-${activeSourceId}`)
+      ?.scrollIntoView({ block: 'center' })
+  }, [activeSourceId, evidenceTurnId])
 
   function cancelPendingReply() {
     if (replyTimer.current !== null) {
@@ -131,22 +276,138 @@ export function AiAssistantPage() {
     cancelPendingReply()
     setActiveThreadId(threadId)
     setActiveSourceId(null)
+    setEvidenceTurnId(null)
   }
 
   function startNewThread() {
     cancelPendingReply()
     setActiveThreadId(null)
+    setActiveSourceId(null)
+    setEvidenceTurnId(null)
     setDraft('')
     inputRef.current?.focus()
   }
 
+  /**
+   * Point the rail at a source. The rail follows the turn that owns it, so an
+   * earlier answer's citation pulls the rail back to that answer first.
+   */
   function focusSource(sourceId: string, turnId: string) {
+    // Following a citation is an explicit request to see it, so a folded rail opens.
+    setCollapsed((current) => (current.evidence ? { ...current, evidence: false } : current))
+    setEvidenceTurnId(turnId)
     setActiveSourceId(sourceId)
     setOpenTraceIds((ids) => (ids.includes(turnId) ? ids : [...ids, turnId]))
     setOpenSourceIds((ids) => (ids.includes(sourceId) ? ids : [...ids, sourceId]))
-    // The evidence rail copy is the one to scroll to; the trace row above the
-    // composer shares the source id, so the scope is part of the DOM id.
-    document.getElementById(`ai-source-evidence-${sourceId}`)?.scrollIntoView({ block: 'center' })
+  }
+
+  /**
+   * What the reply is attributed to. `model` stays undefined until the assistant
+   * service reports one - see `assistantModels` for that seam.
+   */
+  function replyMeta() {
+    return {
+      scope: scopeId === 'all' ? undefined : t(SCOPE_LABEL_KEY[scopeId]),
+    }
+  }
+
+  function copyAnswer(turn: AssistantTurn) {
+    void navigator.clipboard?.writeText(answerText(turn)).then(
+      () => {
+        setCopiedTurnId(turn.id)
+        window.setTimeout(() => setCopiedTurnId((current) => (current === turn.id ? null : current)), 1600)
+      },
+      () => undefined,
+    )
+  }
+
+  /**
+   * The single "ask the assistant" path, shared by send / regenerate / retry.
+   *
+   * The timed replay below is the only place a real streamed call belongs; the
+   * three outcomes it can produce (answer, no match, failure) are all rendered.
+   */
+  function requestReply(threadId: string, question: string, mode: 'append' | 'replace') {
+    pendingModeRef.current = mode
+    setPendingQuestion(question)
+    setErrorQuestion(null)
+    setInterrupted(null)
+    const outcome = detectDemoReplyState(question)
+
+    replyTimer.current = window.setTimeout(() => {
+      replyTimer.current = null
+      setPendingQuestion(null)
+
+      if (outcome === 'error') {
+        setErrorQuestion({ question, mode })
+        return
+      }
+
+      const turn =
+        outcome === 'unanswered'
+          ? buildUnansweredTurn(question, `turn-${Date.now()}`, replyMeta())
+          : buildDemoTurn(question, `turn-${Date.now()}`, replyMeta())
+
+      setThreads((current) =>
+        current.map((thread) => {
+          if (thread.id !== threadId) {
+            return thread
+          }
+          const turns =
+            mode === 'replace' && thread.turns.length > 0
+              ? [...thread.turns.slice(0, -1), turn]
+              : [...thread.turns, turn]
+          return { ...thread, turns }
+        }),
+      )
+    }, DEMO_REPLY_DELAY_MS)
+  }
+
+  /** Regenerate = ask the same question again, replacing its answer. */
+  function regenerate(turn: AssistantTurn) {
+    if (pendingQuestion !== null || activeThreadId === null) {
+      return
+    }
+    requestReply(activeThreadId, turn.question, 'replace')
+  }
+
+  /** Stop the in-flight reply. The question stays with a "stopped" line. */
+  function stopReply() {
+    if (pendingQuestion === null) {
+      return
+    }
+    if (replyTimer.current !== null) {
+      window.clearTimeout(replyTimer.current)
+      replyTimer.current = null
+    }
+    setInterrupted({ question: pendingQuestion, mode: pendingModeRef.current })
+    setPendingQuestion(null)
+  }
+
+  /**
+   * Fold/unfold a side rail. On a narrow window the rails are overlays, so only
+   * one can be open at a time - opening one folds the other.
+   */
+  function togglePanel(which: 'history' | 'evidence') {
+    setCollapsed((current) => {
+      const next = { ...current, [which]: !current[which] }
+      if (compact && !next[which]) {
+        next[which === 'history' ? 'evidence' : 'history'] = true
+      }
+      return next
+    })
+  }
+
+  function toggleFeedback(turnId: string, value: 'up' | 'down') {
+    setFeedback((current) => {
+      const next = { ...current }
+      if (next[turnId] === value) {
+        delete next[turnId]
+      } else {
+        next[turnId] = value
+      }
+      return next
+    })
   }
 
   function submit() {
@@ -170,20 +431,9 @@ export function AiAssistantPage() {
 
     setDraft('')
     setActiveSourceId(null)
-    setPendingQuestion(question)
-
-    // Stand-in for the assistant call: with no service to talk to, the answer is
-    // replayed from the demo data. Swap this for the real (streamed) call.
-    replyTimer.current = window.setTimeout(() => {
-      const turn = buildDemoTurn(question, `turn-${Date.now()}`)
-      setThreads((current) =>
-        current.map((thread) =>
-          thread.id === threadId ? { ...thread, turns: [...thread.turns, turn] } : thread,
-        ),
-      )
-      setPendingQuestion(null)
-      replyTimer.current = null
-    }, DEMO_REPLY_DELAY_MS)
+    // A new answer is the newest one, so the rail goes back to following it.
+    setEvidenceTurnId(null)
+    requestReply(threadId, question, 'append')
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -277,78 +527,116 @@ export function AiAssistantPage() {
     turnId: string
     open: boolean
     steps: ReactNode
-    body: ReactNode
+    /** `null` = nothing to unfold (still searching, or no sources matched). */
+    body: ReactNode | null
     waiting?: boolean
   }) {
-    return (
-      <div className="ai-trace">
-        <button
-          type="button"
-          className="ai-trace__head"
-          aria-expanded={options.open}
-          onClick={() => setOpenTraceIds((ids) => toggleId(ids, options.turnId))}
-        >
-          <span
-            className={['ai-trace__dot', options.waiting ? 'ai-trace__dot--pending' : '']
-              .filter(Boolean)
-              .join(' ')}
-          />
-          <span className="ai-trace__steps">{options.steps}</span>
+    const canExpand = options.body !== null
+    const traceHead = (
+      <>
+        <span
+          className={['ai-trace__dot', options.waiting ? 'ai-trace__dot--pending' : '']
+            .filter(Boolean)
+            .join(' ')}
+        />
+        <span className="ai-trace__steps">{options.steps}</span>
+        {canExpand ? (
           <span className="ai-trace__chev">
             <IconChevronDown />
           </span>
-        </button>
-        {options.open ? <div className="ai-trace__body">{options.body}</div> : null}
+        ) : null}
+      </>
+    )
+
+    return (
+      <div className="ai-trace">
+        {canExpand ? (
+          <button
+            type="button"
+            className="ai-trace__head"
+            aria-expanded={options.open}
+            onClick={() => setOpenTraceIds((ids) => toggleId(ids, options.turnId))}
+          >
+            {traceHead}
+          </button>
+        ) : (
+          <div className="ai-trace__head">{traceHead}</div>
+        )}
+        {canExpand && options.open ? <div className="ai-trace__body">{options.body}</div> : null}
       </div>
     )
   }
 
-  function renderAnswer(turn: AssistantTurn) {
+  function renderAnswer(turn: AssistantTurn, isLast: boolean) {
     const open = openTraceIds.includes(turn.id)
     const { answer } = turn
+    // No sources means the search ran and matched nothing: answering anyway is
+    // exactly what a grounded assistant must not do.
+    const noMatch = turn.sources.length === 0
     return (
       <div className="ai-msg">
         <span className="ai-msg__who">
           <span className="ai-msg__mark">
             <IconSpark />
           </span>
-          {t('ai.assistant.byAssistant', { count: turn.sources.length })}
+          {answer.model
+            ? t('ai.assistant.byAssistantModel', {
+                model: answer.model,
+                count: turn.sources.length,
+              })
+            : t('ai.assistant.byAssistant', { count: turn.sources.length })}
         </span>
-        <div className="ai-prose">
-          <p>{rich(answer.lead)}</p>
-          <div className="ai-kv">
-            {answer.facts.map((fact) => (
-              <span className="ai-kv__cell" key={fact.label}>
-                <span className="ai-kv__k">{fact.label}</span>
-                <span className="ai-kv__v">{fact.value}</span>
-              </span>
-            ))}
-          </div>
-          <p>
-            {rich(answer.tail)}
-            <span className="ai-cites">
-              {answer.cites.map((cite) => {
-                const source = turn.sources[cite - 1]
-                if (!source) {
-                  return null
-                }
-                return (
-                  <button
-                    key={cite}
-                    type="button"
-                    className={['ai-cite', activeSourceId === source.id ? 'is-active' : '']
-                      .filter(Boolean)
-                      .join(' ')}
-                    aria-label={t('ai.assistant.openSource', { index: cite })}
-                    onClick={() => focusSource(source.id, turn.id)}
-                  >
-                    {cite}
-                  </button>
-                )
+        {noMatch ? (
+          <div className="ai-notfound">
+            <h3>{t('ai.assistant.notFoundTitle')}</h3>
+            <p>
+              {t('ai.assistant.notFoundBody', {
+                count: answer.trace.scanned,
+                scope: answer.trace.scope ?? t('ai.assistant.scopeAll'),
               })}
-            </span>
-          </p>
-        </div>
+            </p>
+            <ul>
+              <li>{t('ai.assistant.notFoundHintScope')}</li>
+              <li>{t('ai.assistant.notFoundHintRephrase')}</li>
+            </ul>
+          </div>
+        ) : (
+          <div className="ai-prose">
+            <p>{rich(answer.lead)}</p>
+            <div className="ai-kv">
+              {answer.facts.map((fact) => (
+                <span className="ai-kv__cell" key={fact.label}>
+                  <span className="ai-kv__k">{fact.label}</span>
+                  <span className="ai-kv__v">{fact.value}</span>
+                </span>
+              ))}
+            </div>
+            <p>
+              {rich(answer.tail)}
+              <span className="ai-cites">
+                {answer.cites.map((cite) => {
+                  const source = turn.sources[cite - 1]
+                  if (!source) {
+                    return null
+                  }
+                  return (
+                    <button
+                      key={cite}
+                      type="button"
+                      className={['ai-cite', activeSourceId === source.id ? 'is-active' : '']
+                        .filter(Boolean)
+                        .join(' ')}
+                      aria-label={t('ai.assistant.openSource', { index: cite })}
+                      onClick={() => focusSource(source.id, turn.id)}
+                    >
+                      {cite}
+                    </button>
+                  )
+                })}
+              </span>
+            </p>
+          </div>
+        )}
         {renderTrace({
           turnId: turn.id,
           open,
@@ -361,19 +649,89 @@ export function AiAssistantPage() {
               {t('ai.assistant.traceCited', { count: turn.sources.length })}
               <span className="ai-trace__arrow">→</span>
               {t('ai.assistant.traceSeconds', { count: answer.trace.seconds })}
+              {answer.trace.scope ? (
+                <>
+                  <span className="ai-trace__arrow">·</span>
+                  {t('ai.assistant.traceScope', { scope: answer.trace.scope })}
+                </>
+              ) : null}
             </>
           ),
-          body: turn.sources.map((source, index) => renderSource(source, index, 'trace')),
+          body:
+            turn.sources.length === 0
+              ? null
+              : turn.sources.map((source, index) => renderSource(source, index, 'trace')),
         })}
+        {/* Answer-level actions live on the newest answer only. */}
+        {isLast ? (
+          <div className="ai-actions">
+            {/* Nothing to copy on a no-match reply. */}
+            {turn.sources.length > 0 ? (
+              <button type="button" className="ai-quiet" onClick={() => copyAnswer(turn)}>
+                {copiedTurnId === turn.id ? <IconCircleCheck /> : <IconCopy />}
+                {copiedTurnId === turn.id ? t('ai.assistant.copied') : t('ai.assistant.copy')}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="ai-quiet"
+              disabled={pendingQuestion !== null}
+              onClick={() => regenerate(turn)}
+            >
+              <IconRefresh />
+              {t('ai.assistant.regenerate')}
+            </button>
+            <span className="ai-actions__sep" aria-hidden />
+            <button
+              type="button"
+              className={['ai-quiet', feedback[turn.id] === 'up' ? 'is-on' : '']
+                .filter(Boolean)
+                .join(' ')}
+              aria-pressed={feedback[turn.id] === 'up'}
+              aria-label={t('ai.assistant.helpful')}
+              title={t('ai.assistant.helpful')}
+              onClick={() => toggleFeedback(turn.id, 'up')}
+            >
+              <IconThumbUp />
+            </button>
+            <button
+              type="button"
+              className={['ai-quiet', feedback[turn.id] === 'down' ? 'is-on' : '']
+                .filter(Boolean)
+                .join(' ')}
+              aria-pressed={feedback[turn.id] === 'down'}
+              aria-label={t('ai.assistant.notHelpful')}
+              title={t('ai.assistant.notHelpful')}
+              onClick={() => toggleFeedback(turn.id, 'down')}
+            >
+              <IconThumbDown />
+            </button>
+          </div>
+        ) : null}
       </div>
     )
   }
 
-  const hasTranscript = turns.length > 0 || pendingQuestion !== null
+  const hasTranscript =
+    turns.length > 0 ||
+    pendingQuestion !== null ||
+    interrupted !== null ||
+    errorQuestion !== null
 
   return (
     <div className="ai-page">
       <div className="ai-workspace">
+        {/* Narrow windows show the rails as overlays, so they need a dismiss
+            target that is not the toggle itself. */}
+        {compact && (!collapsed.history || !collapsed.evidence) ? (
+          <button
+            type="button"
+            className="ai-backdrop"
+            aria-label={t('ai.assistant.closePanels')}
+            onClick={() => setCollapsed({ history: true, evidence: true })}
+          />
+        ) : null}
+        {collapsed.history ? null : (
         <aside className="ai-history">
           <div className="ai-rail-head">
             <span className="ai-rail-title">{t('ai.assistant.history')}</span>
@@ -416,9 +774,22 @@ export function AiAssistantPage() {
             ))}
           </div>
         </aside>
+        )}
 
         <section className="ai-chat">
           <div className="ai-chat__bar">
+            <button
+              type="button"
+              className="ai-quiet ai-quiet--icon"
+              aria-pressed={!collapsed.history}
+              aria-label={
+                collapsed.history ? t('ai.assistant.showHistory') : t('ai.assistant.hideHistory')
+              }
+              title={collapsed.history ? t('ai.assistant.showHistory') : t('ai.assistant.hideHistory')}
+              onClick={() => togglePanel('history')}
+            >
+              <IconPanelLeft />
+            </button>
             <h2 className="ai-chat__title">
               {activeThread?.title ?? t('ai.assistant.newThreadTitle')}
             </h2>
@@ -435,15 +806,43 @@ export function AiAssistantPage() {
                   {t('ai.assistant.evidenceCount', { count: sources.length })}
                 </span>
               ) : null}
+              <button
+                type="button"
+                className="ai-quiet ai-quiet--icon"
+                aria-pressed={!collapsed.evidence}
+                aria-label={
+                  collapsed.evidence
+                    ? t('ai.assistant.showEvidence')
+                    : t('ai.assistant.hideEvidence')
+                }
+                title={
+                  collapsed.evidence
+                    ? t('ai.assistant.showEvidence')
+                    : t('ai.assistant.hideEvidence')
+                }
+                onClick={() => togglePanel('evidence')}
+              >
+                <IconPanelRight />
+              </button>
             </div>
           </div>
 
-          <div className="ai-chat__scroll" ref={scrollRef}>
+          <div className="ai-chat__scroll" ref={scrollRef} aria-busy={pendingQuestion !== null}>
+            {/* Screen readers get the same state changes sighted users see. */}
+            <p className="ai-sr-only" role="status" aria-live="polite">
+              {announcement}
+            </p>
             <div className="ai-chat__col">
-              {turns.map((turn) => (
+              {turns.map((turn, index) => (
                 <Fragment key={turn.id}>
                   <div className="ai-msg--user">{turn.question}</div>
-                  {renderAnswer(turn)}
+                  {/* Pointing at an answer (mouse or keyboard) moves the rail. */}
+                  <div
+                    onMouseEnter={() => setEvidenceTurnId(turn.id)}
+                    onFocusCapture={() => setEvidenceTurnId(turn.id)}
+                  >
+                    {renderAnswer(turn, index === turns.length - 1)}
+                  </div>
                 </Fragment>
               ))}
 
@@ -458,6 +857,59 @@ export function AiAssistantPage() {
                       steps: t('ai.assistant.tracePending'),
                       body: null,
                     })}
+                  </div>
+                </>
+              ) : null}
+
+              {interrupted !== null ? (
+                <>
+                  <div className="ai-msg--user">{interrupted.question}</div>
+                  <div className="ai-msg">
+                    <span className="ai-stopped">
+                      <IconStop />
+                      {t('ai.assistant.stopped')}
+                    </span>
+                    <div className="ai-actions">
+                      <button
+                        type="button"
+                        className="ai-quiet"
+                        onClick={() =>
+                          activeThreadId &&
+                          requestReply(activeThreadId, interrupted.question, interrupted.mode)
+                        }
+                      >
+                        <IconRefresh />
+                        {t('ai.assistant.retry')}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
+              {errorQuestion !== null ? (
+                <>
+                  <div className="ai-msg--user">{errorQuestion.question}</div>
+                  <div className="ai-msg">
+                    <div className="ai-error" role="alert">
+                      <span className="ai-error__mark">
+                        <IconAlertTriangle />
+                      </span>
+                      <div>
+                        <h3>{t('ai.assistant.errorTitle')}</h3>
+                        <p>{t('ai.assistant.errorBody')}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="ai-quiet ai-quiet--push"
+                        onClick={() =>
+                          activeThreadId &&
+                          requestReply(activeThreadId, errorQuestion.question, errorQuestion.mode)
+                        }
+                      >
+                        <IconRefresh />
+                        {t('ai.assistant.retry')}
+                      </button>
+                    </div>
                   </div>
                 </>
               ) : null}
@@ -503,6 +955,31 @@ export function AiAssistantPage() {
                 aria-label={t('ai.assistant.composerPlaceholder')}
               />
               <div className="ai-composer__foot">
+                {/* Model picker seam: the button is the integration point, there is
+                    no catalogue behind it yet (see `assistantModels`). */}
+                <button
+                  type="button"
+                  className="ai-chip-toggle"
+                  disabled
+                  title={t('ai.assistant.notWired')}
+                  aria-label={t('ai.assistant.model')}
+                >
+                  {t('ai.assistant.model')}
+                  <IconChevronDown />
+                </button>
+                <SidebarSelect
+                  id="ai-scope"
+                  label={t('ai.assistant.sourcesScope')}
+                  hideLabel
+                  value={scopeId}
+                  options={assistantScopes.map((scope) => ({
+                    value: scope,
+                    label: t(SCOPE_LABEL_KEY[scope]),
+                  }))}
+                  onChange={(value) => setScopeId(value as ScopeId)}
+                  className="ai-pill-select"
+                />
+                <span className="ai-composer__spacer" />
                 <button
                   type="button"
                   className="ai-quiet"
@@ -512,29 +989,33 @@ export function AiAssistantPage() {
                   <IconPaperclip />
                   {t('ai.assistant.attach')}
                 </button>
-                <button
-                  type="button"
-                  className={['ai-chip-toggle', groundedOnly ? 'is-on' : ''].filter(Boolean).join(' ')}
-                  aria-pressed={groundedOnly}
-                  onClick={() => setGroundedOnly((value) => !value)}
-                >
-                  {t('ai.assistant.groundedOnly')}
-                </button>
-                <span className="ai-composer__spacer" />
-                <button
-                  type="button"
-                  className="ai-send"
-                  aria-label={t('ai.assistant.send')}
-                  disabled={draft.trim().length === 0 || pendingQuestion !== null}
-                  onClick={submit}
-                >
-                  <IconSend />
-                </button>
+                {pendingQuestion !== null ? (
+                  <button
+                    type="button"
+                    className="ai-send ai-send--stop"
+                    aria-label={t('ai.assistant.stop')}
+                    title={t('ai.assistant.stop')}
+                    onClick={stopReply}
+                  >
+                    <IconStop />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ai-send"
+                    aria-label={t('ai.assistant.send')}
+                    disabled={draft.trim().length === 0}
+                    onClick={submit}
+                  >
+                    <IconSend />
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </section>
 
+        {collapsed.evidence ? null : (
         <aside className="ai-evidence">
           <div className="ai-rail-head">
             <span className="ai-rail-title">{t('ai.assistant.evidence')}</span>
@@ -551,6 +1032,21 @@ export function AiAssistantPage() {
               </button>
             ) : null}
           </div>
+          {evidenceIsEarlier && evidenceTurn ? (
+            <div className="ai-evidence__note">
+              <IconClock />
+              <span className="ai-evidence__note-text">
+                {t('ai.assistant.evidenceEarlier', { question: evidenceTurn.question })}
+              </span>
+              <button
+                type="button"
+                className="ai-quiet ai-quiet--push"
+                onClick={() => setEvidenceTurnId(null)}
+              >
+                {t('ai.assistant.backToLatest')}
+              </button>
+            </div>
+          ) : null}
           <div className="ai-evidence__list">
             {sources.length === 0 ? (
               <p className="ai-history__empty">{t('ai.assistant.evidenceEmpty')}</p>
@@ -564,6 +1060,7 @@ export function AiAssistantPage() {
             </div>
           ) : null}
         </aside>
+        )}
       </div>
     </div>
   )

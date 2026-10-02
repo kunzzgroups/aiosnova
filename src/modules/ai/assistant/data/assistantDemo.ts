@@ -33,8 +33,31 @@ export type AssistantAnswer = {
   tail: string
   /** 1-based indexes into `sources`, rendered as the inline citation chips. */
   cites: number[]
-  trace: { scanned: number; matched: number; seconds: number }
+  /**
+   * Model that produced the answer. Optional on purpose: no model catalogue is
+   * wired up yet, and the transcript only shows what it is told. Set it from
+   * the real service and the header line switches to `Assistant · <model> · …`.
+   */
+  model?: string
+  trace: { scanned: number; matched: number; seconds: number; /** scope label used for the search, when it was not "everything". */ scope?: string }
 }
+
+/**
+ * Model picker seam.
+ *
+ * The composer renders a model button (see AiAssistantPage) but there is no
+ * catalogue behind it: whatever the assistant service reports becomes the model
+ * label. Wiring it up = own this list, pass it to the button, call the service.
+ * Deliberately empty so nothing pretends to be a real model.
+ */
+export type AssistantModelOption = { id: string; label: string }
+
+export const assistantModels: AssistantModelOption[] = []
+
+/** Which part of the company's indexed sources a question may search. */
+export type ScopeId = 'all' | SourceType
+
+export const assistantScopes: ScopeId[] = ['all', 'contract', 'invoice', 'policy', 'record']
 
 export type AssistantTurn = {
   id: string
@@ -320,16 +343,70 @@ export const assistantSuggestions: string[] = [
 ]
 
 /**
- * Reply replayed for anything you type. Deliberately the same answer as the
- * first demo thread, so the UI states (trace, citations, evidence rail) are all
- * exercised without pretending there is a model behind it yet.
+ * Demo-only question triggers, so every reply state can be reviewed while no
+ * assistant service exists. A question containing one of these words produces
+ * that state instead of an answer. Delete together with the demo data.
  */
-export function buildDemoTurn(question: string, turnId: string): AssistantTurn {
+export const demoReplyTriggers = {
+  unanswered: ['no answer', 'not found'],
+  error: ['network', 'timeout'],
+}
+
+export type DemoReplyState = 'answered' | 'unanswered' | 'error'
+
+export function detectDemoReplyState(question: string): DemoReplyState {
+  const needle = question.toLowerCase()
+  if (demoReplyTriggers.error.some((token) => needle.includes(token))) {
+    return 'error'
+  }
+  if (demoReplyTriggers.unanswered.some((token) => needle.includes(token))) {
+    return 'unanswered'
+  }
+  return 'answered'
+}
+
+/** A search that ran and matched nothing - renders as the "no match" reply. */
+export function buildUnansweredTurn(
+  question: string,
+  turnId: string,
+  meta?: { model?: string; scope?: string },
+): AssistantTurn {
   const template = assistantThreads[0].turns[0]
   return {
     id: turnId,
     question,
-    answer: template.answer,
+    answer: {
+      lead: '',
+      facts: [],
+      tail: '',
+      cites: [],
+      model: meta?.model,
+      trace: { scanned: template.answer.trace.scanned, matched: 0, seconds: 1.7, scope: meta?.scope },
+    },
+    sources: [],
+  }
+}
+
+/**
+ * Reply replayed for anything you type. Deliberately the same answer as the
+ * first demo thread, so the UI states (trace, citations, evidence rail) are all
+ * exercised without pretending there is a model behind it yet.
+ */
+export function buildDemoTurn(
+  question: string,
+  turnId: string,
+  meta?: { model?: string; scope?: string },
+): AssistantTurn {
+  const template = assistantThreads[0].turns[0]
+  return {
+    id: turnId,
+    question,
+    answer: {
+      ...template.answer,
+      // Undefined until an assistant service reports which model answered.
+      model: meta?.model,
+      trace: { ...template.answer.trace, scope: meta?.scope },
+    },
     sources: template.sources,
   }
 }
