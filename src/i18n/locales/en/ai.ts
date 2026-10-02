@@ -86,5 +86,10 @@ export const ai: Record<string, string> = {
   'ai.assistant.emptyTitle': 'Ask about contracts, invoices, policies or people',
   'ai.assistant.emptyHint':
     'Every answer cites the company, the file or record, and the section it came from.',
-  'ai.assistant.suggestions': 'Try one of these',
+
+  // No assistant service is wired up yet, so nothing is invented in its place.
+  'ai.assistant.notConnectedTitle': 'Assistant service not connected',
+  'ai.assistant.notConnectedBody':
+    'The screen is ready - once a service answers, this is where the cited reply appears.',
+  'ai.assistant.liveNotConnected': 'No assistant service connected',
 }

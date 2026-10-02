@@ -23,24 +23,22 @@ import {
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { TextField } from '@/components/ui/TextField'
 import { useCompanyStore } from '@/stores/companyStore'
-import {
-  assistantScopes,
-  assistantSuggestions,
-  assistantThreads,
-  buildDemoTurn,
-  buildUnansweredTurn,
-  detectDemoReplyState,
-  type AssistantSource,
-  type AssistantThread,
-  type AssistantTurn,
-  type ScopeId,
-  type SourceType,
-  type ThreadGroup,
-} from '../data/assistantDemo'
+import { assistantScopes, type ScopeId } from '../data/assistantOptions'
+import type {
+  AssistantSource,
+  AssistantThread,
+  AssistantTurn,
+  SourceType,
+  ThreadGroup,
+} from '../types/assistant'
 import './AiAssistantPage.css'
 
-/** How long the stand-in "assistant is working" state lasts. */
-const DEMO_REPLY_DELAY_MS = 1100
+/**
+ * How long the "assistant is working" state is shown before the page reports
+ * that no service is connected. Keeps the pending state reviewable; a real
+ * streamed call replaces it.
+ */
+const SERVICE_STUB_DELAY_MS = 900
 
 /** Which side rails the reader has folded away. Session-scoped, like the sidebar. */
 const PANELS_STORAGE_KEY = 'aios.ai.panels'
@@ -120,8 +118,8 @@ type PendingReply = { question: string; mode: 'append' | 'replace' }
  * (GROUP COMPANIES) and is only *shown* here, because every answer is scoped to
  * it.
  *
- * Content comes from `data/assistantDemo` - there is no assistant service yet,
- * see `buildDemoTurn`.
+ * No content is bundled: threads start empty and a question resolves to the
+ * "no service connected" state until `requestReply` calls a real service.
  */
 export function AiAssistantPage() {
   const { t } = useTranslation()
@@ -129,10 +127,8 @@ export function AiAssistantPage() {
   const companies = useCompanyStore((state) => state.companies)
   const companyLabel = companies.find((item) => item.value === companyId)?.label ?? null
 
-  const [threads, setThreads] = useState<AssistantThread[]>(assistantThreads)
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(
-    assistantThreads[0]?.id ?? null,
-  )
+  const [threads, setThreads] = useState<AssistantThread[]>([])
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState('')
   const [openTraceIds, setOpenTraceIds] = useState<string[]>([])
@@ -156,6 +152,8 @@ export function AiAssistantPage() {
   const [errorQuestion, setErrorQuestion] = useState<PendingReply | null>(null)
   /** Question whose generation the reader stopped, plus how to retry it. */
   const [interrupted, setInterrupted] = useState<PendingReply | null>(null)
+  /** Question that has no answer because no assistant service is connected. */
+  const [notConnected, setNotConnected] = useState<PendingReply | null>(null)
   /** Whether the in-flight reply appends a turn or replaces the last one. */
   const pendingModeRef = useRef<'append' | 'replace'>('append')
   const replyTimer = useRef<number | null>(null)
@@ -179,11 +177,13 @@ export function AiAssistantPage() {
         ? t('ai.assistant.liveError')
         : interrupted !== null
           ? t('ai.assistant.liveStopped')
-          : lastTurn
-            ? lastTurn.sources.length === 0
-              ? t('ai.assistant.liveNotFound')
-              : t('ai.assistant.liveAnswered', { count: lastTurn.sources.length })
-            : ''
+          : notConnected !== null
+            ? t('ai.assistant.liveNotConnected')
+            : lastTurn
+              ? lastTurn.sources.length === 0
+                ? t('ai.assistant.liveNotFound')
+                : t('ai.assistant.liveAnswered', { count: lastTurn.sources.length })
+              : ''
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -301,16 +301,6 @@ export function AiAssistantPage() {
     setOpenSourceIds((ids) => (ids.includes(sourceId) ? ids : [...ids, sourceId]))
   }
 
-  /**
-   * What the reply is attributed to. `model` stays undefined until the assistant
-   * service reports one - see `assistantModels` for that seam.
-   */
-  function replyMeta() {
-    return {
-      scope: scopeId === 'all' ? undefined : t(SCOPE_LABEL_KEY[scopeId]),
-    }
-  }
-
   function copyAnswer(turn: AssistantTurn) {
     void navigator.clipboard?.writeText(answerText(turn)).then(
       () => {
@@ -324,43 +314,26 @@ export function AiAssistantPage() {
   /**
    * The single "ask the assistant" path, shared by send / regenerate / retry.
    *
-   * The timed replay below is the only place a real streamed call belongs; the
-   * three outcomes it can produce (answer, no match, failure) are all rendered.
+   * INTEGRATION POINT. Replace the stub below with the real (streamed) call and
+   * the existing rendering takes over: append a `turn` for an answer, set
+   * `setErrorQuestion(...)` when the request fails, and leave `notConnected`
+   * unset. The no-match state needs no extra work - a turn with an empty
+   * `sources` array renders as it.
    */
-  function requestReply(threadId: string, question: string, mode: 'append' | 'replace') {
+  function requestReply(_threadId: string, question: string, mode: 'append' | 'replace') {
+    // `_threadId` is unused by the stub; the real call appends its turn there.
     pendingModeRef.current = mode
     setPendingQuestion(question)
     setErrorQuestion(null)
     setInterrupted(null)
-    const outcome = detectDemoReplyState(question)
+    setNotConnected(null)
 
+    // Stub: nothing is connected yet, so report that instead of inventing content.
     replyTimer.current = window.setTimeout(() => {
       replyTimer.current = null
       setPendingQuestion(null)
-
-      if (outcome === 'error') {
-        setErrorQuestion({ question, mode })
-        return
-      }
-
-      const turn =
-        outcome === 'unanswered'
-          ? buildUnansweredTurn(question, `turn-${Date.now()}`, replyMeta())
-          : buildDemoTurn(question, `turn-${Date.now()}`, replyMeta())
-
-      setThreads((current) =>
-        current.map((thread) => {
-          if (thread.id !== threadId) {
-            return thread
-          }
-          const turns =
-            mode === 'replace' && thread.turns.length > 0
-              ? [...thread.turns.slice(0, -1), turn]
-              : [...thread.turns, turn]
-          return { ...thread, turns }
-        }),
-      )
-    }, DEMO_REPLY_DELAY_MS)
+      setNotConnected({ question, mode })
+    }, SERVICE_STUB_DELAY_MS)
   }
 
   /** Regenerate = ask the same question again, replacing its answer. */
@@ -382,6 +355,23 @@ export function AiAssistantPage() {
     }
     setInterrupted({ question: pendingQuestion, mode: pendingModeRef.current })
     setPendingQuestion(null)
+  }
+
+  /** Threads are created by asking something; there is no bundled content. */
+  function createThread(question: string): string {
+    const threadId = `thread-${Date.now()}`
+    setThreads((current) => [
+      {
+        id: threadId,
+        title: question,
+        group: 'today',
+        updated: t('ai.assistant.justNow'),
+        turns: [],
+      },
+      ...current,
+    ])
+    setActiveThreadId(threadId)
+    return threadId
   }
 
   /**
@@ -416,18 +406,7 @@ export function AiAssistantPage() {
       return
     }
 
-    const threadId = activeThreadId ?? `thread-${Date.now()}`
-    if (!activeThreadId) {
-      const thread: AssistantThread = {
-        id: threadId,
-        title: question,
-        group: 'today',
-        updated: t('ai.assistant.justNow'),
-        turns: [],
-      }
-      setThreads((current) => [thread, ...current])
-      setActiveThreadId(threadId)
-    }
+    const threadId = activeThreadId ?? createThread(question)
 
     setDraft('')
     setActiveSourceId(null)
@@ -716,7 +695,8 @@ export function AiAssistantPage() {
     turns.length > 0 ||
     pendingQuestion !== null ||
     interrupted !== null ||
-    errorQuestion !== null
+    errorQuestion !== null ||
+    notConnected !== null
 
   return (
     <div className="ai-page">
@@ -886,6 +866,18 @@ export function AiAssistantPage() {
                 </>
               ) : null}
 
+              {notConnected !== null ? (
+                <>
+                  <div className="ai-msg--user">{notConnected.question}</div>
+                  <div className="ai-msg">
+                    <div className="ai-notconnected">
+                      <h3>{t('ai.assistant.notConnectedTitle')}</h3>
+                      <p>{t('ai.assistant.notConnectedBody')}</p>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
               {errorQuestion !== null ? (
                 <>
                   <div className="ai-msg--user">{errorQuestion.question}</div>
@@ -921,22 +913,6 @@ export function AiAssistantPage() {
                   </span>
                   <h2>{t('ai.assistant.emptyTitle')}</h2>
                   <p>{t('ai.assistant.emptyHint')}</p>
-                  <div className="ai-empty__suggestions">
-                    <span className="ai-group-label">{t('ai.assistant.suggestions')}</span>
-                    {assistantSuggestions.map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        className="ai-suggestion"
-                        onClick={() => {
-                          setDraft(suggestion)
-                          inputRef.current?.focus()
-                        }}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               ) : null}
             </div>

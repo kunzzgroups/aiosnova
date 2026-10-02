@@ -1181,3 +1181,25 @@
 .ai-composer__input {
   overflow-y: auto;
 }
+
+/* Neutral notice shown in place of an answer while no service is connected. */
+.ai-notconnected {
+  padding: 0.8rem 0.95rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.ai-notconnected h3 {
+  margin: 0 0 0.3rem;
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
+  color: var(--color-text-muted);
+}
+
+.ai-notconnected p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}

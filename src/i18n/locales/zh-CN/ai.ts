@@ -84,5 +84,9 @@ export const ai: Record<string, string> = {
 
   'ai.assistant.emptyTitle': '可以问合同、发票、政策或人员',
   'ai.assistant.emptyHint': '每条回答都会标注它出自哪个公司、哪份文件或记录、哪一节。',
-  'ai.assistant.suggestions': '试试这些',
+
+  // 助手服务尚未接入，不用虚构内容填空。
+  'ai.assistant.notConnectedTitle': '助手服务尚未接入',
+  'ai.assistant.notConnectedBody': '界面已就绪 —— 接入服务并返回结果后，这里会显示带引用的回答。',
+  'ai.assistant.liveNotConnected': '助手服务尚未接入',
 }
