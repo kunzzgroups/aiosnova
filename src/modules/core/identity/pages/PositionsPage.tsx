@@ -76,6 +76,11 @@ export function PositionsPage() {
 
   return (
     <div className="identity-page">
+        <header className="identity-page__header">
+          <h1>{t('org.positions.title')}</h1>
+          <p>Job positions — reusable titles, not roles (Layer 1 · 05).</p>
+        </header>
+
         <FlashToasts
           error={error}
           message={message}

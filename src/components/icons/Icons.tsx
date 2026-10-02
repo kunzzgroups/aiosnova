@@ -21,15 +21,6 @@ export function IconSvg({ children, ...props }: IconProps & { children: ReactNod
   )
 }
 
-export function IconSearch(props: IconProps) {
-  return (
-    <IconSvg {...props}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m16.2 16.2 4.3 4.3" />
-    </IconSvg>
-  )
-}
-
 export function IconEye(props: IconProps) {
   return (
     <IconSvg {...props}>

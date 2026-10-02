@@ -136,15 +136,14 @@
 
 .sidebar__search input {
   width: 100%;
-  height: var(--control-height);
-  min-height: var(--control-height);
+  min-height: 2.3rem;
   border: 1px solid transparent;
   border-radius: 999px;
   background: var(--sidebar-search-bg);
   color: var(--sidebar-ink);
   font: inherit;
   font-size: 0.84rem;
-  padding: 0 0.75rem 0 2.15rem;
+  padding: 0.5rem 0.75rem 0.5rem 2.15rem;
   outline: none;
 }
 

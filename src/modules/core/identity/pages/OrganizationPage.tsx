@@ -203,6 +203,11 @@ export function OrganizationPage() {
 
   return (
     <div className="identity-page">
+        <header className="identity-page__header">
+          <h1>{t('org.organization.title')}</h1>
+          <p>Organization tree — divisions, departments, and teams (Layer 1 · 04).</p>
+        </header>
+
         <FlashToasts
           error={error}
           message={message}

@@ -35,12 +35,9 @@
   backdrop-filter: blur(10px);
 }
 
-/* Now the current page name (see AppShell), not a static label - sized like the
-   page headings it mirrors. */
 .app-shell__header-title {
-  font-size: var(--text-2xl);
+  font-size: var(--text-sm);
   font-weight: 650;
-  line-height: 1.2;
   color: var(--color-text-muted);
 }
 

@@ -153,6 +153,14 @@ export function MembershipsPage() {
 
   return (
     <div className="identity-page">
+        <header className="identity-page__header">
+          <h1>{t('org.memberships.title')}</h1>
+          <p>
+            User relationships to Tenant / Company / Organization / Position (Layer 1 · 06). Not
+            permissions.
+          </p>
+        </header>
+
         <FlashToasts
           error={error}
           message={message}

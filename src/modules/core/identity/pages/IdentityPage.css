@@ -234,9 +234,8 @@
 }
 
 .identity-profile-tile__input {
-  height: var(--control-height);
-  min-height: var(--control-height);
-  padding: 0 0.55rem;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.55rem;
   font-size: 0.92rem;
   font-weight: 650;
   background: #fff;
@@ -296,6 +295,7 @@
 }
 
 .identity-directory-toolbar .sidebar-select__trigger {
+  min-height: 2.75rem;
   border-color: var(--color-border);
   border-radius: var(--radius-md);
 }
@@ -343,6 +343,7 @@
 }
 
 .identity-invite .sidebar-select__trigger {
+  min-height: 2.75rem;
   border-color: var(--color-border);
   border-radius: var(--radius-md);
 }
@@ -402,7 +403,8 @@
 }
 
 .identity-form .sidebar-select__trigger {
-  padding: 0 0.85rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
   border-color: var(--color-border);
   border-radius: var(--radius-md);
   font-size: inherit;
@@ -579,195 +581,11 @@
 .identity-select,
 .identity-input {
   width: 100%;
-  height: var(--control-height);
-  min-height: var(--control-height);
-  padding: 0 0.75rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-elevated);
   color: var(--color-text);
   font: inherit;
-}
-
-/* ---------------------------------------------------------------------------
-   Directory panel head (Users): title + count + search + filters + primary
-   action on one row, with the table directly underneath. Replaces the old
-   "title row -> toolbar -> table" stack of three.
-   --------------------------------------------------------------------------- */
-
-.identity-panel--directory {
-  padding: 0;
-}
-
-.identity-panel__head {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-  padding: 0.95rem 1.25rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.identity-panel__head-tools {
-  display: flex;
-  /* flex-end, not center: each select is label-above-box, so centring the stacks
-     would float the label-less search box ~5px higher than the select boxes.
-     Bottom-aligning puts every box on one line. */
-  align-items: flex-end;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-
-/* Buttons sitting in the same row as inputs/selects take the control height
-   too, otherwise the primary action towers over the boxes it belongs to. */
-.identity-panel--directory .identity-panel__head-tools .ui-button {
-  height: var(--control-height);
-  min-height: var(--control-height);
-  font-size: var(--text-sm);
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.identity-panel--directory .identity-panel__head-tools .sidebar-select {
-  width: 9.5rem;
-}
-
-.identity-panel--directory .identity-panel__head-tools .sidebar-select__label {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-/* Search field with a leading magnifier. */
-.identity-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 15rem;
-  max-width: 100%;
-}
-
-.identity-search__icon {
-  position: absolute;
-  left: 0.7rem;
-  display: grid;
-  place-items: center;
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
-
-.identity-search__icon svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.identity-search .ui-text-field {
-  padding-left: 2.1rem;
-}
-
-/* The invite form and the empty/loading lines sit inside a padding-less panel. */
-.identity-panel--directory .identity-invite {
-  margin: 1rem 1.25rem;
-}
-
-.identity-panel--directory .identity-empty {
-  padding: 0.85rem 1.25rem 1.1rem;
-}
-
-/* ---------------------------------------------------------------------------
-   Users table: uniform row height, lighter action cluster, no spacer column.
-   --------------------------------------------------------------------------- */
-
-.identity-table--users th,
-.identity-table--users td {
-  padding: 0.5rem 0.75rem;
-  vertical-align: middle;
-}
-
-.identity-table--users th:first-child,
-.identity-table--users td:first-child {
-  padding-left: 1.25rem;
-}
-
-.identity-table--users th:last-child,
-.identity-table--users td:last-child {
-  padding-right: 1.25rem;
-}
-
-/* Keep the row rhythm flat: a pill in the name cell used to make those rows
-   taller than the rest. */
-.identity-table__flag {
-  margin-left: 0.45rem;
-  font-size: 0.6875rem;
-  font-weight: 650;
-  color: var(--color-warning);
-  white-space: nowrap;
-}
-
-.identity-table--users tbody tr {
-  transition: background 0.12s ease;
-}
-
-.identity-table--users tbody tr:hover {
-  background: color-mix(in srgb, var(--color-bg-muted) 55%, transparent);
-}
-
-.identity-table--users th.identity-table__actions,
-.identity-table--users td.identity-table__actions {
-  text-align: right;
-}
-
-.identity-table--users .identity-inline-actions .ui-button {
-  width: 2.2rem;
-  min-width: 2.2rem;
-  min-height: 2.2rem;
-  background: transparent;
-  border-color: transparent;
-  color: var(--color-text-muted);
-}
-
-.identity-table--users .identity-inline-actions .ui-button:hover:not(:disabled) {
-  background: var(--color-bg-muted);
-  color: var(--color-text);
-}
-
-/* The cluster only outlines itself on the row you are actually on. */
-.identity-table--users tbody tr:hover .identity-inline-actions .ui-button:not(:disabled) {
-  border-color: var(--color-border);
-  background: var(--color-bg-elevated);
-}
-
-/* Exactly one red thing left: delete. Tinted, not solid. */
-.identity-table--users .identity-inline-actions .ui-button--danger {
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-  border-color: transparent;
-  color: var(--color-danger);
-}
-
-.identity-table--users .identity-inline-actions .ui-button--danger:hover:not(:disabled) {
-  background: var(--color-danger);
-  border-color: transparent;
-  color: #fff;
-}
-
-.identity-table--users .identity-inline-actions .ui-button--danger:disabled {
-  background: transparent;
-  color: var(--color-text-muted);
-}
-
-/* Row-hover outranks the plain danger rules above (the generic hover rule is
-   more specific), so the delete tint has to be re-stated for the hovered row. */
-.identity-table--users tbody tr:hover .identity-inline-actions .ui-button--danger:not(:disabled) {
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-  border-color: transparent;
-  color: var(--color-danger);
-}
-
-.identity-table--users tbody tr:hover .identity-inline-actions .ui-button--danger:hover:not(:disabled) {
-  background: var(--color-danger);
-  border-color: transparent;
-  color: #fff;
 }
