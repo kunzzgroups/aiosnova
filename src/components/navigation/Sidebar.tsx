@@ -4,6 +4,7 @@ import {
   filterSidebarSections,
   findModuleByPath,
   type SidebarLink,
+  type SidebarNode,
   type SidebarSection,
 } from '@/navigation/sidebarNav'
 import { BrandLogo } from '@/components/brand/BrandLogo'
@@ -40,6 +41,28 @@ const POPOVER_HIDE_DELAY_MS = 320
  */
 function hasModuleChoice(section: SidebarSection): boolean {
   return section.children.filter((node) => node.kind === 'group').length > 1
+}
+
+/**
+ * First page inside a section, depth first. The collapsed rail sends a click on
+ * a section icon straight here, so a collapsed sidebar is still a way to move
+ * around rather than only a way to re-open itself.
+ */
+function firstLinkInSection(section: SidebarSection): SidebarLink | null {
+  function visit(nodes: SidebarNode[]): SidebarLink | null {
+    for (const node of nodes) {
+      if (node.kind === 'link') {
+        return node
+      }
+      const nested = visit(node.children)
+      if (nested) {
+        return nested
+      }
+    }
+    return null
+  }
+
+  return visit(section.children)
 }
 
 type CompanyOption = { value: string; label: string }
@@ -321,13 +344,15 @@ function SectionBlock({
   collapsed: boolean
   flyout: {
     open: boolean
-    onEnter: (anchor: HTMLButtonElement) => void
+    // HTMLElement, not HTMLButtonElement: in the collapsed rail the same row is
+    // a NavLink, and the flyout only needs its position.
+    onEnter: (anchor: HTMLElement) => void
     onLeave: () => void
-    onActivate: (anchor: HTMLButtonElement) => void
+    onActivate: (anchor: HTMLElement) => void
   }
   /** Collapsed rail: hovering an icon asks the parent for its name panel/tip. */
   hover: {
-    onEnter: (anchor: HTMLButtonElement) => void
+    onEnter: (anchor: HTMLElement) => void
     onLeave: () => void
   }
   onExpand: () => void
@@ -337,13 +362,47 @@ function SectionBlock({
   const location = useLocation()
 
   if (collapsed) {
+    const entry = firstLinkInSection(section)
+    const insideSection = findModuleByPath(location.pathname)?.section.id === section.id
+
+    // Section without pages: nothing to navigate to, so keep the old behaviour.
+    if (!entry) {
+      return (
+        <section className="sidebar__section">
+          <button
+            type="button"
+            className="sidebar__item sidebar__section-icon-only"
+            aria-label={navLabel(section)}
+            onClick={onExpand}
+            onMouseEnter={(event) => hover.onEnter(event.currentTarget)}
+            onMouseLeave={hover.onLeave}
+            onFocus={(event) => hover.onEnter(event.currentTarget)}
+          >
+            <span className="sidebar__icon">
+              <SectionIcon />
+            </span>
+          </button>
+        </section>
+      )
+    }
+
     return (
       <section className="sidebar__section">
-        <button
-          type="button"
-          className="sidebar__item sidebar__section-icon-only"
+        {/* Collapsed rail: the icon is a link, not an expander. Hovering still
+            opens the module panel for picking a specific page. */}
+        <NavLink
+          to={insideSection ? location.pathname : entry.path}
+          className={['sidebar__item', 'sidebar__section-icon-only', insideSection ? 'is-active' : '']
+            .filter(Boolean)
+            .join(' ')}
           aria-label={navLabel(section)}
-          onClick={onExpand}
+          onClick={(event) => {
+            // Already somewhere inside this section: don't push a history entry
+            // (and don't jump back to the section's first page).
+            if (insideSection) {
+              event.preventDefault()
+            }
+          }}
           onMouseEnter={(event) => hover.onEnter(event.currentTarget)}
           onMouseLeave={hover.onLeave}
           onFocus={(event) => hover.onEnter(event.currentTarget)}
@@ -351,7 +410,7 @@ function SectionBlock({
           <span className="sidebar__icon">
             <SectionIcon />
           </span>
-        </button>
+        </NavLink>
       </section>
     )
   }
@@ -643,7 +702,7 @@ export function Sidebar() {
     setPreviewCompany(item.companies[0]?.value ?? null)
   }
 
-  function handleOpenCompaniesPanel(anchor: HTMLButtonElement) {
+  function handleOpenCompaniesPanel(anchor: HTMLElement) {
     cancelHideFlyout()
     setHoveredGroupId(null)
     setFlyoutSectionId(null)
@@ -652,7 +711,7 @@ export function Sidebar() {
     setCompaniesPanelOpen(true)
   }
 
-  function handleOpenSectionFlyout(section: SidebarSection, anchor: HTMLButtonElement) {
+  function handleOpenSectionFlyout(section: SidebarSection, anchor: HTMLElement) {
     cancelHideFlyout()
     setHoveredGroupId(null)
     setIconTipLabel(null)
@@ -663,7 +722,7 @@ export function Sidebar() {
   }
 
   /** Collapsed rail: sections with modules show the panel, the rest a name tip. */
-  function handleHoverRailIcon(section: SidebarSection, anchor: HTMLButtonElement) {
+  function handleHoverRailIcon(section: SidebarSection, anchor: HTMLElement) {
     if (collapsed && !hasModuleChoice(section)) {
       cancelHideFlyout()
       setHoveredGroupId(null)
