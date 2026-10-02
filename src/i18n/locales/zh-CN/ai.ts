@@ -1,0 +1,48 @@
+export const ai: Record<string, string> = {
+  // AI Assistant screen
+  'ai.assistant.history': '会话',
+  'ai.assistant.newThread': '新会话',
+  'ai.assistant.newThreadTitle': '新会话',
+  'ai.assistant.searchThreads': '搜索会话',
+  'ai.assistant.pinned': '置顶',
+  'ai.assistant.today': '今天',
+  'ai.assistant.yesterday': '昨天',
+  'ai.assistant.earlier': '更早',
+  'ai.assistant.justNow': '刚刚',
+  'ai.assistant.noThreads': '暂无会话',
+  'ai.assistant.noMatches': '没有匹配的会话。',
+
+  'ai.assistant.scope': '检索范围',
+  'ai.assistant.scopeNote': '回答只使用 {{company}} 的资料。切换公司请用左侧 GROUP COMPANIES。',
+  'ai.assistant.byAssistant': '助手 · 依据 {{count}} 份',
+  'ai.assistant.evidence': '依据',
+  'ai.assistant.evidenceCount': '{{count}} 份资料',
+  'ai.assistant.evidenceEmpty': '回答所依据的资料会显示在这里。',
+  'ai.assistant.openAll': '全部展开',
+  'ai.assistant.closeAll': '全部收起',
+  'ai.assistant.relevance': '相关度 {{percent}}%',
+  'ai.assistant.openSource': '打开来源 {{index}}',
+
+  'ai.assistant.typeContract': '合同',
+  'ai.assistant.typeInvoice': '发票',
+  'ai.assistant.typePolicy': '政策',
+  'ai.assistant.typeRecord': '记录',
+  'ai.assistant.openFile': '打开文件',
+  'ai.assistant.openRecord': '打开记录',
+  'ai.assistant.notWired': '尚未接入',
+
+  'ai.assistant.tracePending': '正在检索资料…',
+  'ai.assistant.traceScanned': '检索 {{count}} 段',
+  'ai.assistant.traceMatched': '命中 {{count}} 段',
+  'ai.assistant.traceCited': '引用 {{count}} 份',
+  'ai.assistant.traceSeconds': '{{count}} 秒',
+
+  'ai.assistant.composerPlaceholder': '继续追问，或粘贴单号 / 合同号…',
+  'ai.assistant.attach': '附件',
+  'ai.assistant.groundedOnly': '仅基于资料回答',
+  'ai.assistant.send': '发送',
+
+  'ai.assistant.emptyTitle': '可以问合同、发票、政策或人员',
+  'ai.assistant.emptyHint': '每条回答都会标注它出自哪个公司、哪份文件或记录、哪一节。',
+  'ai.assistant.suggestions': '试试这些',
+}

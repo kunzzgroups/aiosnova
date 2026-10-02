@@ -1,3 +1,4 @@
+import { ai } from './ai'
 import { auth } from './auth'
 import { common } from './common'
 import { home } from './home'
@@ -15,5 +16,6 @@ export const zhCN: Record<string, string> = {
   ...auth,
   ...users,
   ...org,
+  ...ai,
   ...nav,
 }

@@ -439,7 +439,14 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(() => {
     return window.sessionStorage.getItem(COLLAPSED_STORAGE_KEY) === '1'
   })
-  const [companiesPanelOpen, setCompaniesPanelOpen] = useState(false)
+  /**
+   * Lives in the store, not in local state: the top company strip renders only
+   * while this panel is open, so both components must agree on one value.
+   */
+  const companiesPanelOpen = useCompanyStore((state) => state.panelOpen)
+  const setCompaniesPanelOpen = useCompanyStore((state) => state.setPanelOpen)
+  const stripHovered = useCompanyStore((state) => state.stripHovered)
+  const setPinnedGroup = useCompanyStore((state) => state.setPinnedGroup)
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null)
   const [flyoutSectionId, setFlyoutSectionId] = useState<string | null>(null)
   const [popoverAnchor, setPopoverAnchor] = useState({ top: 0, center: 0 })
@@ -482,6 +489,23 @@ export function Sidebar() {
     }
   }, [])
 
+  /**
+   * Hovering the top company strip holds the GROUP COMPANIES panel open (see
+   * `scheduleHideFlyout`). Leaving the strip therefore has to end that
+   * interaction the same way leaving the sidebar does - otherwise nothing would
+   * ever close the panel again, since the pointer is far from the sidebar and no
+   * sidebar mouseleave can fire. The 320ms grace still applies, so moving from
+   * the strip back into the panel keeps it open.
+   */
+  useEffect(() => {
+    if (!stripHovered) {
+      return
+    }
+    // `scheduleHideFlyout` is re-created every render but only touches refs and
+    // stable store setters, so the captured version stays correct.
+    return () => scheduleHideFlyout()
+  }, [stripHovered])
+
   useEffect(() => {
     if (flyoutSectionId === null && iconTipLabel === null && !companiesPanelOpen) {
       return
@@ -496,7 +520,11 @@ export function Sidebar() {
         target.closest('.sidebar-flyout--modules') ||
         target.closest('.sidebar-flyout--groups') ||
         target.closest('[data-section-flyout="true"]') ||
-        target.closest('[data-group-panel="true"]')
+        target.closest('[data-group-panel="true"]') ||
+        // The top company strip is part of the GROUP COMPANIES interaction. A
+        // pointerdown here must not close the panel, or the strip would unmount
+        // before its click fires and the company would never be switched.
+        target.closest('[data-company-strip="true"]')
       ) {
         return
       }
@@ -551,13 +579,24 @@ export function Sidebar() {
 
   function scheduleHideFlyout() {
     cancelHideFlyout()
+    // The strip has no mouseleave to cancel the timer for us while the pointer is
+    // parked on it; the strip itself drives the closing instead.
+    if (useCompanyStore.getState().stripHovered) {
+      return
+    }
     hideFlyoutTimerRef.current = window.setTimeout(() => {
+      hideFlyoutTimerRef.current = null
+      // The pointer may have crossed onto the top company strip while this timer
+      // was pending. Keep the panel open then: the strip's own mouseleave closes
+      // it, and closing here would unmount the strip under the pointer.
+      if (useCompanyStore.getState().stripHovered) {
+        return
+      }
       setHoveredGroupId(null)
       setFlyoutSectionId(null)
       setIconTipLabel(null)
       setCompaniesPanelOpen(false)
       setPreviewCompany(null)
-      hideFlyoutTimerRef.current = null
     }, POPOVER_HIDE_DELAY_MS)
   }
 
@@ -638,8 +677,11 @@ export function Sidebar() {
   }
 
   /**
-   * A group has no page of its own: clicking it moves the active company into
-   * that group, which makes its companies the tabs in the top bar.
+   * Level-2 row (a group) has no page of its own: clicking it is a *step*, not a
+   * decision. It moves the active company into that group and holds the group's
+   * companies in the top strip so the level-3 choice can be made there; the
+   * strip only disappears once that company is picked (see CompanyTabs).
+   * A standalone company is a leaf, so it clears any pending group.
    */
   function handleSelectLevel2(item: Level2Item) {
     if (item.kind === 'group') {
@@ -647,11 +689,13 @@ export function Sidebar() {
       if (firstMemberId) {
         persistCompany(firstMemberId)
       }
+      setPinnedGroup(item.id)
       closePopovers()
       return
     }
 
     persistCompany(item.id)
+    setPinnedGroup(null)
     closePopovers()
   }
 

@@ -9,6 +9,7 @@ import { MfaChallengePage } from '@/modules/core/auth/pages/MfaChallengePage'
 import { MfaSetupPage } from '@/modules/core/auth/pages/MfaSetupPage'
 import { OAuthCallbackPage } from '@/modules/core/auth/pages/OAuthCallbackPage'
 import { HomePage } from '@/modules/core/auth/pages/HomePage'
+import { AiAssistantPage } from '@/modules/ai/assistant/pages/AiAssistantPage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { CompaniesPage } from '@/modules/core/identity/pages/CompaniesPage'
@@ -36,6 +37,7 @@ export function AppRouter() {
           <Route element={<AppShell />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/mfa/setup" element={<MfaSetupPage />} />
+            <Route path="/ai/ai/ai-assistant" element={<AiAssistantPage />} />
             <Route path="/system/core/users" element={<UsersPage />} />
             <Route path="/system/core/users/:userId" element={<UserDetailPage />} />
             <Route path="/system/core/companies" element={<CompaniesPage />} />

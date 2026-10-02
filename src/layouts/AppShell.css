@@ -52,4 +52,18 @@
   flex: 1;
   min-width: 0;
   padding: var(--space-6);
+  /* Flex column so a page can claim the leftover height instead of guessing it
+     (the AI Assistant workspace does, via `flex: 1`). Content-sized pages are
+     unaffected: stretch + content height is what block children already did. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Workspace pages own their own panes and read as full-bleed surfaces (the AI
+   Assistant does): the surrounding card + 2rem inset would be a fourth frame
+   and cost real estate. Opt-in per page by its root class, and browsers without
+   `:has()` simply keep the padded card look. */
+.app-shell__main:has(> .ai-page) {
+  padding: 0;
 }
