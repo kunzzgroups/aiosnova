@@ -15,8 +15,6 @@ import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { CompaniesPage } from '@/modules/core/identity/pages/CompaniesPage'
 import { CompanyDetailPage } from '@/modules/core/identity/pages/CompanyDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
-import { PositionsPage } from '@/modules/core/identity/pages/PositionsPage'
-import { MembershipsPage } from '@/modules/core/identity/pages/MembershipsPage'
 import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
 
 export function AppRouter() {
@@ -38,13 +36,14 @@ export function AppRouter() {
             <Route path="/" element={<HomePage />} />
             <Route path="/mfa/setup" element={<MfaSetupPage />} />
             <Route path="/ai/ai/ai-assistant" element={<AiAssistantPage />} />
-            <Route path="/system/core/users" element={<UsersPage />} />
-            <Route path="/system/core/users/:userId" element={<UserDetailPage />} />
+            <Route path="/system/core/employees" element={<UsersPage />} />
+            <Route path="/system/core/employees/:userId" element={<UserDetailPage />} />
             <Route path="/system/core/companies" element={<CompaniesPage />} />
             <Route path="/system/core/companies/:companyId" element={<CompanyDetailPage />} />
             <Route path="/system/core/organization" element={<OrganizationPage />} />
-            <Route path="/system/core/position" element={<PositionsPage />} />
-            <Route path="/system/core/membership" element={<MembershipsPage />} />
+            <Route path="/system/core/roles-and-access" element={<ModulePlaceholderPage />} />
+            <Route path="/system/core/security" element={<ModulePlaceholderPage />} />
+            <Route path="/system/core/activity" element={<ModulePlaceholderPage />} />
             <Route path="*" element={<ModulePlaceholderPage />} />
           </Route>
         </Route>

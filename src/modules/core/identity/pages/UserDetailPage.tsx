@@ -199,7 +199,7 @@ export function UserDetailPage() {
     setIsDeleting(true)
     try {
       await deleteUser(user.id)
-      navigate('/system/core/users')
+      navigate('/system/core/employees')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('users.errDelete'))
       setIsDeleting(false)
@@ -244,7 +244,7 @@ export function UserDetailPage() {
     return (
       <div className="identity-page">
         <FlashToasts error={error} onClearError={() => setError(null)} />
-        <Button variant="secondary" onClick={() => navigate('/system/core/users')}>
+        <Button variant="secondary" onClick={() => navigate('/system/core/employees')}>
           Back to users
         </Button>
       </div>
@@ -255,11 +255,11 @@ export function UserDetailPage() {
     <div className="identity-page">
       <header className="identity-page__header identity-page__header--row identity-page__header--toolbar">
         <nav className="identity-breadcrumb" aria-label={t('users.breadcrumb')}>
-          <Link to="/system/core/users">{t('users.title')}</Link>
+          <Link to="/system/core/employees">{t('users.title')}</Link>
           <span aria-hidden="true"> / </span>
           <h1>{user.displayName}</h1>
         </nav>
-        <Button variant="ghost" onClick={() => navigate('/system/core/users')}>
+        <Button variant="ghost" onClick={() => navigate('/system/core/employees')}>
           Back
         </Button>
       </header>
@@ -515,9 +515,6 @@ export function UserDetailPage() {
       <section className="identity-panel">
         <div className="identity-panel__title-row">
           <h2>{t('users.memberships')}</h2>
-          <Link className="identity-text-link" to="/system/core/membership">
-            Open memberships
-          </Link>
         </div>
         {memberships.length === 0 ? (
           <p className="identity-empty">{t('users.noMemberships')}</p>

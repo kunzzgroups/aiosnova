@@ -411,7 +411,7 @@ export function UsersPage() {
                 {filteredUsers.map((user) => (
                   <tr key={user.id}>
                     <td>
-                      <Link className="identity-text-link" to={`/system/core/users/${user.id}`}>
+                      <Link className="identity-text-link" to={`/system/core/employees/${user.id}`}>
                         {user.displayName}
                       </Link>
                       {!isIdentityProfileComplete(user) ? (
@@ -434,13 +434,13 @@ export function UsersPage() {
                       <div className="identity-inline-actions">
                         <IconButton
                           label={t('users.actionView')}
-                          onClick={() => navigate(`/system/core/users/${user.id}`)}
+                          onClick={() => navigate(`/system/core/employees/${user.id}`)}
                         >
                           <IconEye />
                         </IconButton>
                         <IconButton
                           label={t('users.actionEdit')}
-                          onClick={() => navigate(`/system/core/users/${user.id}?edit=1`)}
+                          onClick={() => navigate(`/system/core/employees/${user.id}?edit=1`)}
                         >
                           <IconPencil />
                         </IconButton>
