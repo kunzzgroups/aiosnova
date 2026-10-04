@@ -218,7 +218,6 @@ export const nav: Record<string, string> = {
   'nav.system.core.companies': '公司',
   'nav.system.core.organization': '组织架构',
   'nav.system.core.roles-and-access': '角色与权限',
-  'nav.system.core.security': '安全',
   'nav.system.core.activity': '活动记录',
   'nav.system.security': '安全',
   'nav.system.security.mfa': 'MFA',

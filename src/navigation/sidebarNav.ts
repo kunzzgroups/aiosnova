@@ -380,7 +380,6 @@ export const sidebarSections: SidebarSection[] = [
           'Companies',
           'Organization',
           'Roles & Access',
-          'Security',
           'Activity',
         ],
       },

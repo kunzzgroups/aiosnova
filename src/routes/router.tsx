@@ -42,7 +42,6 @@ export function AppRouter() {
             <Route path="/system/core/companies/:companyId" element={<CompanyDetailPage />} />
             <Route path="/system/core/organization" element={<OrganizationPage />} />
             <Route path="/system/core/roles-and-access" element={<ModulePlaceholderPage />} />
-            <Route path="/system/core/security" element={<ModulePlaceholderPage />} />
             <Route path="/system/core/activity" element={<ModulePlaceholderPage />} />
             <Route path="*" element={<ModulePlaceholderPage />} />
           </Route>
