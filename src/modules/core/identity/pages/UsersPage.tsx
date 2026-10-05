@@ -311,7 +311,7 @@ export function UsersPage() {
   }
 
   return (
-    <div className="identity-page identity-users-page">
+    <div className={`identity-page identity-users-page${showInvite ? ' identity-users-page--inviting' : ''}`}>
       <FlashToasts
         error={error}
         message={message}
@@ -469,6 +469,7 @@ export function UsersPage() {
 
 
       {showInvite? <form noValidate className="identity-invite identity-invite--page" onSubmit={e => void handleCreate(e)}>
+        <div className="identity-invite-content">
         <header className="identity-panel__title-row">
           <div>
             <h2>{editingDraftId? 'Edit invitation draft':'Invite user'}</h2>
@@ -536,6 +537,7 @@ export function UsersPage() {
             </div>
           </section>
         </fieldset>
+        </div>
         <footer className="identity-invite-page-footer">
           <Button variant="secondary" onClick={handleToggleInvite} disabled={isSubmitting}>Cancel</Button>
           <Button type="submit" name="invitation-action" value="send" disabled={isSubmitting||!inviteOptions?.canInvite}>{isSubmitting ? t('users.saving') : 'Send invitation'}</Button>
