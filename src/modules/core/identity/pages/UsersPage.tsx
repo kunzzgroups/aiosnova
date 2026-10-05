@@ -39,10 +39,6 @@ import {
 } from '@/modules/core/identity/services/identityService'
 import './IdentityPage.css'
 
-const INVITATION_MESSAGES: Record<string, string> = {
-  en: 'Welcome to AIOS! You’re invited to join our team. Please accept this invitation to activate your account and access your assigned companies.',
-  'zh-CN': '欢迎加入 AIOS！诚邀您加入我们的团队。请接受邀请以激活您的账户，并访问为您分配的公司。',
-}
 
 type InviteField = 'email' | 'name' | 'department' | 'position' | 'company'
 const INVITE_FIELD_IDS: Record<InviteField, string> = { email: 'user-email', name: 'user-name', department: 'user-department', position: 'user-position', company: 'user-company' }
@@ -63,6 +59,7 @@ function matchesSearch(user: IdentityUser,query: string) {
 
 export function UsersPage() {
   const { t }=useTranslation()
+  const invitationMessage = (locale: string) => t('users.defaultInvitationMessage', { lng: locale })
   const navigate=useNavigate()
 
   // Filter values are plain strings in the module-level constant; labels are
@@ -90,7 +87,7 @@ export function UsersPage() {
   const [requireMfa,setRequireMfa]=useState(false)
   const [canInvite,setCanInvite]=useState(false)
   const [language,setLanguage]=useState('en')
-  const [personalMessage,setPersonalMessage]=useState(INVITATION_MESSAGES.en)
+  const [personalMessage,setPersonalMessage]=useState(invitationMessage('en'))
   const [departmentId, setDepartmentId] = useState('')
   const [positionId, setPositionId] = useState('')
   const [assignments,setAssignments]=useState<InvitationAssignment[]>([])
@@ -182,7 +179,7 @@ export function UsersPage() {
     setEditingDraftId(null)
     setEmail('')
     setFullName(''); setPhone(''); setRequireMfa(false); setCanInvite(false)
-    setDepartmentId(''); setPositionId(''); setAssignments([]); setLanguage('en'); setPersonalMessage(INVITATION_MESSAGES.en)
+    setDepartmentId(''); setPositionId(''); setAssignments([]); setLanguage('en'); setPersonalMessage(invitationMessage('en'))
   }
 
   function openDraft(user: IdentityUser) {
@@ -203,7 +200,7 @@ export function UsersPage() {
     setCanInvite(draft?.canInvite ?? user.canInvite ?? false)
     const settings = draft?.settings ?? user.invitationSettings
     setLanguage(settings?.language ?? 'en')
-    setPersonalMessage(settings?.personalMessage ?? INVITATION_MESSAGES.en)
+    setPersonalMessage(settings?.personalMessage ?? invitationMessage('en'))
     setError(null)
     setShowInvite(true)
   }
@@ -258,11 +255,11 @@ export function UsersPage() {
     if(!inviteOptions?.canInvite||!isOwner) return
     const sendNow = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') !== 'draft'
     const errors: Partial<Record<InviteField,string>> = {}
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'Enter a valid work email.'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'users.invalidWorkEmail'
     if (sendNow) {
-      if (!fullName.trim()) errors.name = 'Enter the full name.'
+      if (!fullName.trim()) errors.name = 'users.requiredFullName'
 
-      if (!assignments.length) errors.company = 'Select at least one company.'
+      if (!assignments.length) errors.company = 'users.requiredCompany'
     }
     setFieldErrors(errors)
     setError(null)
@@ -287,7 +284,7 @@ export function UsersPage() {
       else await createUser(payload)
       resetInviteForm()
       setShowInvite(false)
-      setMessage(sendNow? 'Invitation recorded. Email delivery is not connected in the mock API.':'Invitation draft saved.')
+      setMessage(sendNow? t('users.mockInvitationRecorded'):t('users.draftSaved'))
       await loadUsers()
     } catch(err) {
       setError(err instanceof ApiError? err.message:t('users.errCreate'))
@@ -355,8 +352,8 @@ export function UsersPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name, email or phone…"
-            aria-label="Search staff by name, email or phone"
+            placeholder={t('users.directorySearch')}
+            aria-label={t('users.directorySearchAria')}
           />
           <div className="identity-directory-toolbar__filters">
             <SidebarSelect
@@ -390,17 +387,17 @@ export function UsersPage() {
           <p className="identity-empty">{t('users.emptyFiltered')}</p>
         ):null}
         {filteredUsers.length>0? (
-          <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label="Staff directory">
+          <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('users.staffDirectory')}>
             <table className="identity-table identity-table--packed">
               <thead>
                 <tr>
                   <th>{t('users.colName')}</th>
                   <th>{t('users.colEmail')}</th>
                   <th className="identity-table__status">{t('users.colStatus')}</th>
-                  <th>Phone</th>
-                  <th>Position</th>
+                  <th>{t('users.fieldPhone')}</th>
+                  <th>{t('users.colPosition')}</th>
                   <th>{t('users.colMfa')}</th>
-                  <th>Created at</th>
+                  <th>{t('users.createdAt')}</th>
                   <th className="identity-table__spacer" aria-hidden="true" />
                   <th className="identity-table__actions">{t('users.colActions')}</th>
                 </tr>
@@ -412,10 +409,10 @@ export function UsersPage() {
                       <Link className="identity-text-link" to={`/system/core/employees/${user.id}`}>
                         {user.fullName||user.displayName}
                       </Link>
-                      {user.isOwner? <span className="identity-directory-muted">Owner · You</span>:null}
+                      {user.isOwner? <span className="identity-directory-muted">{t('users.ownerYou')}</span>:null}
                       {!isIdentityProfileComplete(user)? (
                         <span className="identity-status identity-status--invited identity-status--inline">
-                          Incomplete
+                          {t('users.incomplete')}
                         </span>
                       ):null}
                     </td>
@@ -440,7 +437,7 @@ export function UsersPage() {
                           <IconEye />
                         </IconButton>
                         <IconButton
-                          label={user.status==='draft'? 'Continue editing draft':t('users.actionEdit')}
+                          label={user.status==='draft'? t('users.continueDraft'):t('users.actionEdit')}
                           disabled={!isOwner && sessionUser?.id !== user.id}
                           onClick={() => user.status==='draft'? openDraft(user):navigate(`/system/core/employees/${user.id}?edit=1`)}
                         >
@@ -483,15 +480,15 @@ export function UsersPage() {
           </div>
         ):null}
         <footer className="identity-directory-footer">
-          <label>Rows per page <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>{[25,50,100,200].map(n =>
+          <label>{t('users.rowsPerPage')} <select aria-label={t('users.rowsPerPage')} value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>{[25,50,100,200].map(n =>
             <option key={n}>{n}</option>)}</select>
-            <span>{filteredUsers.length? (currentPage-1)*pageSize+1:0}–{Math.min(currentPage*pageSize,filteredUsers.length)} of {filteredUsers.length}</span>
+            <span>{t('users.listingRange', { start: filteredUsers.length ? (currentPage-1)*pageSize+1 : 0, end: Math.min(currentPage*pageSize,filteredUsers.length), total: filteredUsers.length })}</span>
           </label>
-          <nav aria-label="Staff directory pages">
-            <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label="Previous page">‹</Button>{[...new Set([1,currentPage-1,currentPage,currentPage+1,pageCount])].filter(n => n>0&&n<=pageCount).sort((a,b) => a-b).map(n =>
-              <Button key={n} variant={n===currentPage? 'primary':'secondary'} aria-current={n===currentPage? 'page':undefined} onClick={() => setPage(n)}>{n}</Button>)}<select aria-label="Select page" value={currentPage} onChange={e => setPage(Number(e.target.value))}>{Array.from({ length: pageCount },(_,i) =>
-                <option key={i} value={i+1}>Page {i+1}</option>)}</select>
-            <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => setPage(currentPage+1)} aria-label="Next page">›</Button>
+          <nav aria-label={t('users.directoryPages')}>
+            <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>{[...new Set([1,currentPage-1,currentPage,currentPage+1,pageCount])].filter(n => n>0&&n<=pageCount).sort((a,b) => a-b).map(n =>
+              <Button key={n} variant={n===currentPage? 'primary':'secondary'} aria-current={n===currentPage? 'page':undefined} onClick={() => setPage(n)}>{n}</Button>)}<select aria-label={t('users.selectPage')} value={currentPage} onChange={e => setPage(Number(e.target.value))}>{Array.from({ length: pageCount },(_,i) =>
+                <option key={i} value={i+1}>{t('users.pageNumber', { page: i+1 })}</option>)}</select>
+            <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => setPage(currentPage+1)} aria-label={t('users.nextPage')}>›</Button>
           </nav>
         </footer>
       </section>
@@ -501,27 +498,27 @@ export function UsersPage() {
         <div className="identity-invite-content">
         <header className="identity-panel__title-row">
           <div>
-            <h2>{editingDraftId? 'Edit invitation draft':'Invite user'}</h2>
-            <p>Set up their profile, company assignments and access.</p>
+            <h2>{editingDraftId? t('users.editDraft'):t('users.inviteTitle')}</h2>
+            <p>{t('users.inviteDescription')}</p>
           </div>
-          <Button variant="secondary" onClick={handleToggleInvite} disabled={isSubmitting}>Back to users</Button>
+          <Button variant="secondary" onClick={handleToggleInvite} disabled={isSubmitting}>{t('users.backToUsers')}</Button>
         </header>
         <fieldset disabled={isSubmitting} className="identity-invite-sections">
           <section className="identity-panel">
-            <span className="identity-directory-muted">01 / PROFILE & SECURITY</span>
-            <h3>Basic information</h3>
+            <span className="identity-directory-muted">{t('users.profileSecurity')}</span>
+            <h3>{t('users.basicInformation')}</h3>
             <div className="identity-invite-fields">
-              <FormField label="Work email" htmlFor="user-email" error={fieldErrors.email}>
+              <FormField label={t('users.workEmail')} htmlFor="user-email" error={fieldErrors.email ? t(fieldErrors.email) : undefined}>
                 <TextField id="user-email" type="email" required value={email} hasError={Boolean(fieldErrors.email)} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? 'user-email-error' : undefined} onChange={e => { setEmail(e.target.value); clearFieldError('email') }} autoComplete="email" />
               </FormField>
-              <FormField label="Full name" htmlFor="user-name" error={fieldErrors.name}>
+              <FormField label={t('users.fieldFullName')} htmlFor="user-name" error={fieldErrors.name ? t(fieldErrors.name) : undefined}>
                 <TextField id="user-name" required value={fullName} hasError={Boolean(fieldErrors.name)} aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? 'user-name-error' : undefined} onChange={e => { setFullName(e.target.value); clearFieldError('name') }} autoComplete="name" />
               </FormField>
-              <FormField label="Phone number (optional)" htmlFor="user-phone">
+              <FormField label={t('users.optionalPhone')} htmlFor="user-phone">
                 <TextField id="user-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" />
               </FormField>
-              <FormField label="Department (optional)" htmlFor="user-department" error={fieldErrors.department}>
-              <SidebarSelect id="user-department" hideLabel aria-invalid={Boolean(fieldErrors.department)} aria-describedby={fieldErrors.department ? 'user-department-error' : undefined} label="Department" value={departmentId} options={[{ value: '', label: 'Select department' }, ...(inviteOptions?.departments.map(d => ({ value: d.id, label: d.name })) || [])]} onChange={id => {
+              <FormField label={t('users.optionalDepartment')} htmlFor="user-department" error={fieldErrors.department ? t(fieldErrors.department) : undefined}>
+              <SidebarSelect id="user-department" hideLabel aria-invalid={Boolean(fieldErrors.department)} aria-describedby={fieldErrors.department ? 'user-department-error' : undefined} label={t('users.department')} value={departmentId} options={[{ value: '', label: t('users.selectDepartment') }, ...(inviteOptions?.departments.map(d => ({ value: d.id, label: d.name })) || [])]} onChange={id => {
                 clearFieldError('department')
                 clearFieldError('position')
                 setDepartmentId(id)
@@ -529,47 +526,47 @@ export function UsersPage() {
                 setPositionId(positions.length === 1 ? positions[0]!.id : '')
               }} disabled={isSubmitting} />
               </FormField>
-              <FormField label="Position (optional)" htmlFor="user-position" error={fieldErrors.position}>
-              <SidebarSelect id="user-position" hideLabel aria-invalid={Boolean(fieldErrors.position)} aria-describedby={fieldErrors.position ? 'user-position-error' : undefined} label="Position" value={positionId} options={[{ value: '', label: 'Select position' }, ...(department?.positions.map(p => ({ value: p.id, label: p.name })) || [])]} onChange={id => { setPositionId(id); clearFieldError('position') }} disabled={!department || isSubmitting} />
+              <FormField label={t('users.optionalPosition')} htmlFor="user-position" error={fieldErrors.position ? t(fieldErrors.position) : undefined}>
+              <SidebarSelect id="user-position" hideLabel aria-invalid={Boolean(fieldErrors.position)} aria-describedby={fieldErrors.position ? 'user-position-error' : undefined} label={t('users.colPosition')} value={positionId} options={[{ value: '', label: t('users.selectPosition') }, ...(department?.positions.map(p => ({ value: p.id, label: p.name })) || [])]} onChange={id => { setPositionId(id); clearFieldError('position') }} disabled={!department || isSubmitting} />
               </FormField>
 
             </div>
             <label className="identity-invite-switch">
-              <input type="checkbox" role="switch" checked={requireMfa||mfaRequiredByPolicy} disabled={mfaRequiredByPolicy} onChange={e => setRequireMfa(e.target.checked)} />Require MFA</label>{mfaRequiredByPolicy? <p className="identity-directory-muted">Required by company policy</p>:null}<p className="identity-directory-muted">Staff enroll their own authenticator before activation. Password setup is not required.</p>
+              <input type="checkbox" role="switch" checked={requireMfa||mfaRequiredByPolicy} disabled={mfaRequiredByPolicy} onChange={e => setRequireMfa(e.target.checked)} />{t('users.actionRequireMfa')}</label>{mfaRequiredByPolicy? <p className="identity-directory-muted">{t('users.companyPolicyMfa')}</p>:null}<p className="identity-directory-muted">{t('users.mfaEnrollmentHint')}</p>
           </section>
           <section className="identity-panel">
-            <span className="identity-directory-muted">02 / COMPANY & TEAM</span>
-            <h3>Company selection</h3>
-            <p className="identity-directory-muted">Select one or more companies. Department and position can be assigned now or later.</p>
+            <span className="identity-directory-muted">{t('users.companyTeam')}</span>
+            <h3>{t('users.companySelection')}</h3>
+            <p className="identity-directory-muted">{t('users.companySelectionHint')}</p>
             <div className="identity-company-buttons">{inviteOptions?.companies.map(company => {
               const selected = assignments.some(a => a.companyId === company.id)
               return <Button id={company.id === inviteOptions.companies[0]?.id ? 'user-company' : undefined} aria-invalid={Boolean(fieldErrors.company)} aria-describedby={fieldErrors.company ? 'user-company-error' : undefined} key={company.id} variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} onClick={() => { clearFieldError('company'); setAssignments(current => selected ? current.filter(a => a.companyId !== company.id) : [...current, { companyId: company.id, organizationId: '', positionId: '', roleIds: [] }]) }}>
                 <span>{company.name}</span>
               </Button>
             })}</div>
-            {fieldErrors.company ? <p id="user-company-error" className="ui-form-field__error" role="alert">{fieldErrors.company}</p> : null}
-            <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={canInvite} onChange={e => setCanInvite(e.target.checked)} />Can invite users</label>
+            {fieldErrors.company ? <p id="user-company-error" className="ui-form-field__error" role="alert">{t(fieldErrors.company)}</p> : null}
+            <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={canInvite} onChange={e => setCanInvite(e.target.checked)} />{t('users.canInvite')}</label>
           </section>
           <section className="identity-panel identity-invite-section--wide">
             <div className="identity-delivery-heading">
-              <div><span className="identity-directory-muted">03 / DELIVERY</span><h3>Invitation settings</h3><p className="identity-directory-muted">Invitation expires <strong>7 days after sending</strong>.</p></div>
-              <div className="identity-language-toggle" data-language={language} role="group" aria-label="Email language">
-                {[{ value: 'en', label: 'English' }, { value: 'zh-CN', label: '中文' }].map(option => <button key={option.value} type="button" aria-pressed={language === option.value} disabled={isSubmitting} onClick={() => { setLanguage(option.value); if (language !== option.value) setPersonalMessage(INVITATION_MESSAGES[option.value]) }}>{option.label}</button>)}
+              <div><span className="identity-directory-muted">{t('users.delivery')}</span><h3>{t('users.invitationSettings')}</h3><p className="identity-directory-muted">{t('users.expiryPrefix')} <strong>{t('users.expiryDuration')}</strong>.</p></div>
+              <div className="identity-language-toggle" data-language={language} role="group" aria-label={t('users.emailLanguage')}>
+                {[{ value: 'en', label: 'English' }, { value: 'zh-CN', label: '中文' }].map(option => <button key={option.value} type="button" aria-pressed={language === option.value} disabled={isSubmitting} onClick={() => { setLanguage(option.value); if (language !== option.value) setPersonalMessage(invitationMessage(option.value)) }}>{option.label}</button>)}
               </div>
             </div>
-            <FormField label="Personal message (optional)" htmlFor="user-message">
+            <FormField label={t('users.personalMessage')} htmlFor="user-message">
               <textarea id="user-message" value={personalMessage} onChange={e => setPersonalMessage(e.target.value)} maxLength={1000} />
             </FormField>
             <div className="identity-delivery-actions">
-              <Button type="button" variant="ghost" onClick={() => setPersonalMessage(INVITATION_MESSAGES[language])}>Restore default message</Button>
-              <Button type="submit" name="invitation-action" value="draft" formNoValidate variant="secondary" disabled={isSubmitting || !inviteOptions?.canInvite}>Save draft</Button>
+              <Button type="button" variant="ghost" onClick={() => setPersonalMessage(invitationMessage(language))}>{t('users.restoreMessage')}</Button>
+              <Button type="submit" name="invitation-action" value="draft" formNoValidate variant="secondary" disabled={isSubmitting || !inviteOptions?.canInvite}>{t('users.saveDraft')}</Button>
             </div>
           </section>
         </fieldset>
         </div>
         <footer className="identity-invite-page-footer">
-          <Button variant="secondary" onClick={handleToggleInvite} disabled={isSubmitting}>Cancel</Button>
-          <Button type="submit" name="invitation-action" value="send" disabled={isSubmitting||!inviteOptions?.canInvite}>{isSubmitting ? t('users.saving') : 'Send invitation'}</Button>
+          <Button variant="secondary" onClick={handleToggleInvite} disabled={isSubmitting}>{t('users.cancel')}</Button>
+          <Button type="submit" name="invitation-action" value="send" disabled={isSubmitting||!inviteOptions?.canInvite}>{isSubmitting ? t('users.saving') : t('users.sendInvitation')}</Button>
         </footer>
       </form>:null}
 
@@ -579,11 +576,11 @@ export function UsersPage() {
         description={
           pendingDelete? (
             <>
-              This will permanently remove{' '}
+              {t('users.deleteDescriptionPrefix')}{' '}
               <strong>
                 {pendingDelete.displayName} ({pendingDelete.email})
               </strong>{' '}
-              and their memberships.
+              {t('users.deleteDescriptionSuffix')}
             </>
           ):null
         }

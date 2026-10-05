@@ -974,6 +974,7 @@
 }
 
 .identity-users-page--inviting .identity-invite--page {
+  z-index: 0;
   display: flex;
   flex-direction: column;
   flex: 1;

@@ -35,7 +35,7 @@ export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 
 }
 
 export function formatStatusLabel(status: string, t: TFunction) {
-  if (status === 'draft') return 'Draft'
+  if (status === 'draft') return t('users.statusDraft')
   if (!status) {
     return status
   }
