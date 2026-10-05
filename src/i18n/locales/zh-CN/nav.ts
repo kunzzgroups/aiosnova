@@ -16,7 +16,6 @@ export const nav: Record<string, string> = {
   'nav.ai.ai': '人工智能',
   'nav.ai.ai.ai-assistant': 'AI 助手',
   'nav.ai.ai.ai-agents': 'AI 智能体',
-  'nav.ai.ai.agent-manager': '智能体管理',
   'nav.ai.ai.knowledge': '知识库',
   'nav.ai.ai.automation': '自动化',
   'nav.ai.ai.ai-settings': 'AI 设置',

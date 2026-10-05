@@ -42,7 +42,6 @@ export const org: Record<string, string> = {
 
   // messages
   'org.msgOrganizationCreated': '组织节点已创建。',
-  'org.msgOrganizationUpdated': '组织节点已更新。',
   'org.msgOrganizationDeleted': '组织节点已删除。',
   'org.msgPositionCreated': '职位已创建。',
   'org.msgMembershipCreated': '成员关系已创建。',

@@ -42,7 +42,6 @@ export const org: Record<string, string> = {
 
   // messages
   'org.msgOrganizationCreated': 'Organization created.',
-  'org.msgOrganizationUpdated': 'Organization updated.',
   'org.msgOrganizationDeleted': 'Organization deleted.',
   'org.msgPositionCreated': 'Position created.',
   'org.msgMembershipCreated': 'Membership created.',
