@@ -35,9 +35,12 @@
   backdrop-filter: blur(10px);
 }
 
+/* The header names the current page (see AppShell), so it is sized like a page
+   title - locked to --text-2xl by request, not the old small label style. */
 .app-shell__header-title {
-  font-size: var(--text-sm);
+  font-size: var(--text-2xl);
   font-weight: 650;
+  line-height: 1.2;
   color: var(--color-text-muted);
 }
 
@@ -52,4 +55,34 @@
   flex: 1;
   min-width: 0;
   padding: var(--space-6);
+  /* Flex column so a page can claim the leftover height instead of guessing it
+     (the AI Assistant workspace does, via `flex: 1`). Content-sized pages are
+     unaffected: stretch + content height is what block children already did. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Workspace pages own their own panes and read as full-bleed surfaces (the AI
+   Assistant does): the surrounding card + 2rem inset would be a fourth frame
+   and cost real estate. Opt-in per page by its root class, and browsers without
+   `:has()` simply keep the padded card look. */
+.app-shell__main:has(> .ai-page) {
+  padding: 0;
+}
+
+/* A workspace page scrolls inside its own panes, so its shell needs a DEFINITE
+   height. Without this the shell is sized by content (`min-height: 100vh`), every
+   `flex: 1; min-height: 0` down the chain resolves against content instead of the
+   viewport, and expanding anything (say the provenance trace) grows the document
+   and pushes the composer below the fold. Scoped to the page that needs it. */
+.app-shell:has(.ai-page) .app-shell__workspace {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell:has(.ai-page) .app-shell__main {
+  /* Last-resort scrollport: the composer's sticky bottom resolves against it. */
+  overflow-y: auto;
 }

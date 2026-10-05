@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<title>AI Assistant · 设计候选 v2（公司=全局上下文）</title>
+<link rel="stylesheet" href="src/design-system/tokens.css" />
+<link rel="stylesheet" href="src/layouts/TopTabs.css" />
+<link rel="stylesheet" href="src/components/ui/Button.css" />
+<link rel="stylesheet" href="src/components/ui/TextField.css" />
+<link rel="stylesheet" href="src/components/ui/IconButton.css" />
+<link rel="stylesheet" href="src/components/navigation/SidebarSelect.css" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
+<style>
+* { box-sizing:border-box; }
+body { margin:0; padding:26px 24px 90px; background:var(--color-bg); color:var(--color-text); font-family:var(--font-sans); font-size:var(--text-sm); -webkit-font-smoothing:antialiased; }
+.pv-head { max-width:1480px; margin:0 auto 22px; display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; }
+.pv-head h1 { margin:0 0 4px; font-size:1.5rem; letter-spacing:-.02em; }
+.pv-head p { margin:0; color:var(--color-text-muted); max-width:70ch; line-height:1.6; }
+.pv-head .sp { flex:1; }
+.pv-toggle { appearance:none; border:1px solid var(--color-border); background:var(--color-bg-elevated); color:var(--color-text); border-radius:999px; padding:7px 15px; font:inherit; font-weight:600; cursor:pointer; box-shadow:var(--shadow-sm); }
+.pv-toggle:hover { border-color:color-mix(in srgb, var(--color-brand) 45%, var(--color-border)); color:var(--color-brand); }
+.pv-grid { max-width:1480px; margin:0 auto; display:grid; gap:26px; }
+.demo { border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; background:var(--color-bg); box-shadow:var(--shadow-sm); }
+.demo__bar { display:flex; align-items:center; gap:10px; padding:11px 16px; background:var(--color-bg-elevated); border-bottom:1px solid var(--color-border); flex-wrap:wrap; }
+.demo__no { width:24px; height:24px; flex:none; border-radius:8px; display:grid; place-items:center; background:var(--color-brand-soft); color:var(--color-brand); font-weight:700; font-size:var(--text-xs); }
+.demo__name { font-weight:650; letter-spacing:-.01em; }
+.demo__tags { margin-left:auto; display:flex; gap:7px; flex-wrap:wrap; }
+.tagx { font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; background:var(--color-bg-muted); color:var(--color-text-muted); border:1px solid var(--color-border); }
+.tagx--pick { background:var(--color-brand-soft); color:var(--color-brand); border-color:color-mix(in srgb, var(--color-brand) 25%, transparent); }
+.frame { display:flex; flex-direction:column; height:620px; background:var(--color-bg); overflow:hidden; }
+.frame__header { display:flex; align-items:center; justify-content:space-between; padding:.6rem 1.15rem; background:color-mix(in srgb, var(--color-bg-elevated) 88%, transparent); border-bottom:1px solid var(--color-border); font-weight:650; color:var(--color-text-muted); flex:none; }
+.frame__header .r { display:flex; gap:1rem; font-weight:500; }
+.frame__tabs { flex:none; }
+.pt-page { flex:1; min-height:0; display:flex; }
+
+.ico { width:1rem; height:1rem; flex:none; }
+.ico--sm { width:.85rem; height:.85rem; }
+.btn-quiet { appearance:none; border:0; background:transparent; color:var(--color-text-muted); font:inherit; font-size:var(--text-sm); font-weight:550; display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .5rem; border-radius:8px; cursor:pointer; transition:background .15s ease, color .15s ease; white-space:nowrap; }
+.btn-quiet:hover { background:var(--color-bg-muted); color:var(--color-text); }
+.btn-quiet.is-on { background:var(--color-brand-soft); color:var(--color-brand); }
+.rail-title { font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--color-text-muted); }
+.ctx { display:inline-flex; align-items:center; gap:.4rem; padding:.22rem .55rem; border-radius:999px; border:1px solid var(--color-border); background:var(--color-bg-elevated); font-size:11.5px; font-weight:600; color:var(--color-text-muted); }
+.ctx b { color:var(--color-text); font-weight:650; }
+.ctx__dot { width:.4rem; height:.4rem; border-radius:50%; background:#10b981; flex:none; }
+.meta-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .45rem; border-radius:6px; background:var(--color-bg-muted); color:var(--color-text-muted); font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
+.doc-badge { display:inline-flex; align-items:center; padding:.1rem .4rem; border-radius:5px; font-size:10px; font-weight:700; }
+.doc-badge--con { background:#ecebff; color:#5148e5; }
+.doc-badge--inv { background:#e0fbff; color:#0e7490; }
+.doc-badge--pol { background:#fef3c7; color:#b45309; }
+.doc-badge--rec { background:#d1fae5; color:#047857; }
+[data-theme='dark'] .doc-badge--con { background:rgba(124,115,255,.18); color:#b9b3ff; }
+[data-theme='dark'] .doc-badge--inv { background:rgba(34,211,238,.16); color:#67e8f9; }
+[data-theme='dark'] .doc-badge--pol { background:rgba(245,158,11,.18); color:#fcd34d; }
+[data-theme='dark'] .doc-badge--rec { background:rgba(16,185,129,.18); color:#6ee7b7; }
+
+/* thread list */
+.tl { display:flex; flex-direction:column; min-height:0; }
+.tl__head { display:flex; align-items:center; gap:.5rem; padding:.8rem .9rem; border-bottom:1px solid var(--color-border); flex:none; }
+.tl__title { font-weight:700; letter-spacing:-.01em; }
+.tl__scroll { flex:1; min-height:0; overflow:hidden; padding:.45rem .55rem 1rem; }
+.tl__group { margin-top:.7rem; }
+.tl__group > .rail-title { display:block; padding:0 .45rem .35rem; }
+.tl__item { display:block; width:100%; text-align:left; appearance:none; border:0; background:transparent; font:inherit; color:var(--color-text); padding:.48rem .55rem; border-radius:9px; cursor:pointer; transition:background .14s ease; }
+.tl__item:hover { background:var(--color-bg-muted); }
+.tl__item.is-on { background:var(--color-brand-soft); }
+.tl__item.is-on .tl__name { color:var(--color-brand); font-weight:650; }
+.tl__name { display:block; font-size:var(--text-sm); font-weight:550; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tl__sub { display:block; margin-top:2px; font-size:11px; color:var(--color-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* conversation */
+.cv { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; }
+.cv__bar { flex:none; display:flex; align-items:center; gap:.5rem; padding:.6rem 1.1rem; border-bottom:1px solid var(--color-border); background:color-mix(in srgb, var(--color-bg-elevated) 82%, transparent); }
+.cv__bar h2 { margin:0; font-size:var(--text-sm); font-weight:650; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cv__body { flex:1; min-height:0; overflow:hidden; padding:1.3rem 1.1rem 0; }
+.cv__col { max-width:44rem; margin:0 auto; display:flex; flex-direction:column; gap:1rem; }
+.msg-user { align-self:flex-end; max-width:32rem; background:var(--color-brand-soft); border-radius:14px 14px 4px 14px; padding:.6rem .85rem; line-height:1.6; }
+.msg-ai { display:flex; flex-direction:column; gap:.65rem; }
+.msg-ai__who { display:flex; align-items:center; gap:.45rem; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--color-text-muted); }
+.msg-ai__mark { width:1.15rem; height:1.15rem; border-radius:6px; display:grid; place-items:center; background:var(--color-brand); color:#fff; }
+.msg-ai__mark svg { width:.72rem; height:.72rem; }
+.prose { line-height:1.72; }
+.prose p { margin:0 0 .65rem; }
+.prose p:last-child { margin-bottom:0; }
+.prose strong { font-weight:650; }
+.kv { display:flex; flex-wrap:wrap; gap:.45rem; margin:.1rem 0 .2rem; }
+.kv__cell { flex:1 1 8.5rem; border:1px solid var(--color-border); border-radius:10px; padding:.5rem .65rem; background:var(--color-bg-elevated); }
+.kv__k { display:block; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--color-text-muted); margin-bottom:.2rem; }
+.kv__v { font-size:.95rem; font-weight:650; font-variant-numeric:tabular-nums; }
+.cites { display:inline-flex; gap:.3rem; margin-left:.35rem; vertical-align:baseline; }
+.cite { display:inline-flex; align-items:center; justify-content:center; min-width:1.15rem; height:1.15rem; padding:0 .3rem; border-radius:5px; background:var(--color-brand-soft); color:var(--color-brand); font-size:10.5px; font-weight:700; border:1px solid transparent; cursor:pointer; font-variant-numeric:tabular-nums; }
+.cite:hover { border-color:color-mix(in srgb, var(--color-brand) 45%, transparent); }
+.trace { border:1px solid var(--color-border); border-radius:10px; background:var(--color-bg-elevated); overflow:hidden; }
+.trace__head { display:flex; align-items:center; gap:.5rem; padding:.45rem .7rem; font-size:11.5px; color:var(--color-text-muted); width:100%; background:none; border:0; font-family:inherit; cursor:pointer; text-align:left; }
+.trace__dot { width:.4rem; height:.4rem; border-radius:50%; background:#10b981; flex:none; }
+.trace__steps { display:flex; align-items:center; gap:.4rem; font-variant-numeric:tabular-nums; }
+.trace__arrow { color:var(--color-border); }
+.trace__body { border-top:1px solid var(--color-border); padding:.5rem .65rem; display:flex; flex-direction:column; gap:.4rem; }
+.src { display:flex; gap:.55rem; padding:.5rem; border-radius:9px; border:1px solid transparent; }
+.src:hover { background:var(--color-bg-muted); border-color:var(--color-border); }
+.src__n { width:1.15rem; height:1.15rem; flex:none; border-radius:5px; background:var(--color-bg-muted); color:var(--color-text-muted); font-size:10.5px; font-weight:700; display:grid; place-items:center; }
+.src__body { min-width:0; flex:1; }
+.src__t { display:block; font-weight:600; font-size:12.5px; margin-bottom:2px; }
+.src__m { display:block; font-size:11px; color:var(--color-text-muted); }
+.src__s { display:block; margin-top:.35rem; font-size:11.5px; color:var(--color-text-muted); line-height:1.55; border-left:2px solid var(--color-border); padding-left:.5rem; }
+.rel { margin-left:auto; width:2.4rem; height:3px; border-radius:999px; background:var(--color-bg-muted); flex:none; overflow:hidden; align-self:center; }
+.rel i { display:block; height:100%; background:var(--color-brand); }
+.cv__composer { flex:none; padding:.85rem 1.1rem 1rem; }
+.composer { max-width:44rem; margin:0 auto; border:1px solid var(--color-border); border-radius:14px; background:var(--color-bg-elevated); box-shadow:var(--shadow-sm); }
+.composer:focus-within { border-color:var(--color-border-focus); box-shadow:0 0 0 3px var(--color-focus-ring); }
+.composer__input { width:100%; border:0; background:transparent; color:var(--color-text); font:inherit; resize:none; padding:.65rem .85rem .3rem; outline:none; line-height:1.6; }
+.composer__input::placeholder { color:var(--color-text-muted); }
+.composer__foot { display:flex; align-items:center; gap:.35rem; padding:.35rem .5rem .45rem; }
+.composer__spacer { flex:1; }
+.send { width:1.9rem; height:1.9rem; border-radius:9px; border:0; background:var(--color-brand); color:#fff; display:grid; place-items:center; cursor:pointer; }
+.send:hover { background:var(--color-brand-hover); }
+
+/* history popover (replaces the permanent history rail) */
+.pop-wrap { position:relative; }
+.pop { position:absolute; top:calc(100% + .4rem); left:0; z-index:5; width:19rem; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-bg-elevated); box-shadow:var(--shadow-md); overflow:hidden; }
+.pop__head { padding:.55rem .6rem .45rem; border-bottom:1px solid var(--color-border); }
+.pop__body { max-height:13rem; overflow:hidden; padding:.35rem .45rem .5rem; }
+.pop__item { display:flex; align-items:center; gap:.5rem; width:100%; text-align:left; border:0; background:none; font:inherit; padding:.42rem .5rem; border-radius:8px; cursor:pointer; color:var(--color-text); }
+.pop__item:hover { background:var(--color-bg-muted); }
+.pop__item .t { font-size:12.5px; font-weight:550; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pop__item .m { margin-left:auto; font-size:10.5px; color:var(--color-text-muted); white-space:nowrap; }
+.pop__foot { border-top:1px solid var(--color-border); padding:.4rem .6rem; }
+
+/* knowledge pane */
+.kb { display:flex; flex-direction:column; min-height:0; background:var(--color-bg-elevated); border-right:1px solid var(--color-border); }
+.kb__head { padding:.75rem .85rem .6rem; border-bottom:1px solid var(--color-border); display:flex; flex-direction:column; gap:.5rem; flex:none; }
+.kb__scroll { flex:1; min-height:0; overflow:hidden; padding:.45rem .55rem 1rem; }
+.kb__row { display:flex; align-items:flex-start; gap:.5rem; padding:.45rem .5rem; border-radius:8px; cursor:pointer; }
+.kb__row:hover { background:var(--color-bg-muted); }
+.kb__row.is-on { background:var(--color-brand-soft); }
+.kb__row .t { font-size:12.5px; font-weight:550; display:block; }
+.kb__row .m { font-size:11px; color:var(--color-text-muted); display:block; margin-top:1px; }
+.kb__folder { display:flex; align-items:center; gap:.45rem; padding:.42rem .5rem .25rem; font-weight:700; font-size:12.5px; }
+.kb__folder .n { margin-left:auto; font-size:11px; color:var(--color-text-muted); font-variant-numeric:tabular-nums; }
+.check { width:.85rem; height:.85rem; flex:none; margin-top:.18rem; border:1.5px solid var(--color-border); border-radius:4px; display:grid; place-items:center; }
+.kb__row.is-on .check { background:var(--color-brand); border-color:var(--color-brand); color:#fff; }
+.check svg { width:.6rem; height:.6rem; opacity:0; }
+.kb__row.is-on .check svg { opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="pv-head">
+  <div>
+    <h1>AI Assistant · 设计候选 v2</h1>
+    <p>公司/租户是<b>全局上下文</b>（侧栏 GROUP COMPANIES 切换），页面里不再有公司选择器或按公司分组的历史，只保留一个只读的上下文标记。<br />四个方案的区别在于：<b>历史放哪（栏 / 浮层）</b>、<b>依据常驻还是内联</b>、<b>是否要资料浏览器</b>。</p>
+  </div>
+  <div class="sp"></div>
+  <button class="pv-toggle" id="themeBtn">切换深色 / 浅色</button>
+</div>
+
+<div class="pv-grid" id="grid"></div>
+
+<script>
+const S = (p) => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden>${p}</svg>`
+const Ss = (p) => `<svg class="ico ico--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden>${p}</svg>`
+const I = {
+  plus: S('<path d="M12 5v14M5 12h14"/>'),
+  search: S('<circle cx="11" cy="11" r="7"/><path d="m16.2 16.2 4.3 4.3"/>'),
+  send: S('<path d="M4.5 12h14"/><path d="m13 6.5 6 5.5-6 5.5"/>'),
+  clip: S('<path d="M12.5 7.5 8 12a3.5 3.5 0 0 0 5 5l5-5a5 5 0 0 0-7-7l-5 5a7 7 0 0 0 10 10l3-3"/>'),
+  chev: Ss('<path d="m6 9 6 6 6-6"/>'),
+  hist: S('<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5V9H8"/><path d="M12 8v4.4l3 1.8"/>'),
+  spark: S('<path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9 12 3.5Z"/>'),
+  folder: S('<path d="M3.5 6.5h6l1.6 2h9.4v9.5H3.5z"/>'),
+  open: S('<path d="M14 4.5h5.5V10"/><path d="M19.5 4.5 11 13"/><path d="M18 14.5v4a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h4"/>'),
+  check: Ss('<path d="m5 12.5 4.5 4.5L19 7"/>'),
+  pin: S('<path d="M12 3.5v9"/><path d="M8.5 17.5h7"/><path d="M7 8.5h10l-1.5 4h-7z"/>'),
+}
+const TABS = ['AI Assistant','AI Agents','Agent Manager','Knowledge','Automation','AI Settings']
+const chrome = (inner) => `
+  <div class="frame">
+    <div class="frame__header"><span>AI Assistant</span><span class="r"><span>English</span><span>Manage MFA</span></span></div>
+    <nav class="top-tabs frame__tabs"><div class="top-tabs__inner">${TABS.map((t, i) => `<a class="top-tabs__tab${i === 0 ? ' top-tabs__tab--active' : ''}" href="#">${t}</a>`).join('')}</div></nav>
+    <div class="pt-page">${inner}</div>
+  </div>`
+
+/* company context = read-only marker */
+const ctxChip = `<span class="ctx"><span class="ctx__dot"></span>检索范围 <b>Acme Retail</b> · KUNZZ HOLDINGS</span>`
+
+/* history: by time, not by company */
+const hist = [
+  ['今天', [['KUNZZ 付款条件是 NET 30 还是 45？','12 分钟前'],['Invoice matching 的三条规则','1 小时前']]],
+  ['昨天', [['Golden customer 的定义口径','昨天 16:20'],['MFA 强制策略影响哪些角色','昨天 09:05']]],
+  ['更早', [['集团口径的合并报表范围','上周']]],
+]
+const histList = (rows = 5) => hist.map(([g, items]) => `
+  <span class="rail-title" style="display:block;padding:.5rem .45rem .25rem">${g}</span>
+  ${items.map(([t, m]) => `<button class="tl__item"><span class="tl__name">${t}</span><span class="tl__sub">${m}</span></button>`).join('')}`).join('')
+const histPop = (open) => open ? `
+  <div class="pop">
+    <div class="pop__head">
+      <div style="position:relative">
+        <span style="position:absolute;left:.5rem;top:50%;transform:translateY(-50%);color:var(--color-text-muted)">${I.search}</span>
+        <input class="ui-text-field" style="padding-left:1.8rem;font-size:.8rem;min-height:2rem" placeholder="搜索历史会话" />
+      </div>
+    </div>
+    <div class="pop__body">${histList()}</div>
+    <div class="pop__foot"><button class="btn-quiet">查看全部会话</button></div>
+  </div>` : ''
+
+/* sources: files AND records, mixed — the assistant cites both */
+const sources = [
+  { n:1, type:'con', label:'合同', t:'KUNZZ 主采购协议 2026', m:'文件 · Acme Retail · 2026-01-12 · p.4 §3.2', s:'"...付款期限为发票签收后 30 日内（NET 30）..."', rel:96 },
+  { n:2, type:'rec', label:'记录', t:'INV-2026-0418 · 付款条件字段', m:'发票记录 · Acme Wholesale · 2026-04-18', s:'付款条件 = NET 45（供应商主数据标记为集团例外）', rel:88 },
+  { n:3, type:'pol', label:'政策', t:'集团付款条件例外政策 v3', m:'文件 · KUNZZ HOLDINGS · 2026-03-02 · §2', s:'例外账期须由集团财务总监审批，单笔上限 RM 500,000。', rel:71 },
+]
+const srcRow = (s) => `
+  <div class="src">
+    <span class="src__n">${s.n}</span>
+    <span class="src__body">
+      <span class="src__t"><span class="doc-badge doc-badge--${s.type}">${s.label}</span> ${s.t}</span>
+      <span class="src__m">${s.m}</span>
+      <span class="src__s">${s.s}</span>
+    </span>
+    <span class="rel"><i style="width:${s.rel}%"></i></span>
+  </div>`
+const trace = (open) => `
+  <div class="trace">
+    <button class="trace__head">
+      <span class="trace__dot"></span>
+      <span class="trace__steps">检索 1,284 段<span class="trace__arrow">→</span>命中 17 段<span class="trace__arrow">→</span>引用 3 份<span class="trace__arrow">→</span>2.4s</span>
+      <span style="margin-left:auto;display:flex">${I.chev}</span>
+    </button>
+    <div class="trace__body"${open ? '' : ' style="display:none"'}>${sources.map(srcRow).join('')}</div>
+  </div>`
+const answer = (open) => `
+  <div class="msg-ai">
+    <span class="msg-ai__who"><span class="msg-ai__mark">${I.spark}</span>Assistant · 依据 3 份</span>
+    <div class="prose">
+      <p>集团<strong>默认</strong>付款条件是 <strong>NET 30</strong>；<strong>KUNZZ HOLDINGS</strong> 享有登记在案的例外账期 <strong>NET 45</strong>，不是合同漏洞。</p>
+      <div class="kv">
+        <span class="kv__cell"><span class="kv__k">默认账期</span><span class="kv__v">NET 30</span></span>
+        <span class="kv__cell"><span class="kv__k">集团例外</span><span class="kv__v">NET 45</span></span>
+        <span class="kv__cell"><span class="kv__k">例外条款</span><span class="kv__v">2 份合同</span></span>
+        <span class="kv__cell"><span class="kv__k">审批上限</span><span class="kv__v">RM 500,000</span></span>
+      </div>
+      <p>注意：例外仅对 2026-03 之后签发的发票生效，2026-01 的两笔仍按 NET 30 计滞纳金。<span class="cites"><button class="cite">1</button><button class="cite">2</button><button class="cite">3</button></span></p>
+    </div>
+    ${trace(open)}
+  </div>`
+const userMsg = `<div class="msg-user">我们和 KUNZZ 的付款条件是 NET 30 还是 NET 45？合同里有例外吗？</div>`
+const composer = (extra) => `
+  <div class="composer">
+    <textarea class="composer__input" rows="1" placeholder="继续追问，或粘贴单号 / 合同名…"></textarea>
+    <div class="composer__foot">
+      <button class="btn-quiet">${I.clip}附件</button>
+      <button class="btn-quiet">仅基于资料回答 ${I.check}</button>
+      <span class="composer__spacer"></span>
+      ${extra || ''}
+      <button class="send" aria-label="发送">${I.send}</button>
+    </div>
+  </div>`
+const cvBar = (title, right) => `<div class="cv__bar"><h2>${title}</h2>${ctxChip}${right || ''}</div>`
+
+/* ── 01 · 对话 + 常驻依据栏（历史进浮层） ── */
+const A = `
+  <section class="cv">
+    ${cvBar('KUNZZ 付款条件是 NET 30 还是 45？',
+      `<span class="composer__spacer"></span>
+       <span class="pop-wrap"><button class="btn-quiet">${I.hist}历史 ${I.chev}</button>${histPop(true)}</span>
+       <button class="btn-quiet">${I.plus}新建</button>`)}
+    <div class="cv__body"><div class="cv__col">${userMsg}${answer(false)}</div></div>
+    <div class="cv__composer">${composer()}</div>
+  </section>
+  <aside style="width:21rem;flex:none;border-left:1px solid var(--color-border);background:var(--color-bg-elevated);display:flex;flex-direction:column;min-height:0">
+    <div class="tl__head"><span class="tl__title">依据 · 3 份</span><button class="btn-quiet" style="margin-left:auto">${I.open}全部</button></div>
+    <div style="flex:1;min-height:0;overflow:hidden;padding:.5rem">
+      <span class="rail-title" style="display:block;padding:0 .45rem .35rem">按相关度</span>
+      ${sources.map(srcRow).join('')}
+    </div>
+    <div style="flex:none;padding:.6rem .85rem;border-top:1px solid var(--color-border);font-size:11.5px;color:var(--color-text-muted);line-height:1.55">
+      当前范围只含 <b style="color:var(--color-text)">Acme Retail</b> 的资料。切换公司请用左侧 GROUP COMPANIES。
+    </div>
+  </aside>`
+
+/* ── 02 · 全宽专注对话（依据内联展开） ── */
+const B = `
+  <section class="cv">
+    ${cvBar('KUNZZ 付款条件是 NET 30 还是 45？',
+      `<span class="composer__spacer"></span>
+       <span class="meta-chip">${I.check} 已索引 42 份</span>
+       <span class="pop-wrap"><button class="btn-quiet">${I.hist}历史 ${I.chev}</button>${histPop(true)}</span>
+       <button class="btn-quiet">${I.plus}新建</button>`)}
+    <div class="cv__body">
+      <div class="cv__col" style="max-width:46rem">
+        ${userMsg}${answer(true)}
+      </div>
+    </div>
+    <div class="cv__composer">${composer()}</div>
+  </section>`
+
+/* ── 03 · 资料库优先（左资料 / 右对话） ── */
+const kbRows = [
+  { t:'KUNZZ 主采购协议 2026.pdf', m:'合同 · 42 页 · 已索引', on:true },
+  { t:'INV-2026-0418 付款记录.xlsx', m:'发票记录 · 已索引', on:true },
+  { t:'集团付款条件例外政策 v3.docx', m:'政策 · 8 页 · 已索引', on:true },
+  { t:'供应商主数据 2026Q2.csv', m:'主数据 · 索引中 68%', on:false },
+]
+const C = `
+  <aside class="kb" style="width:19.5rem;flex:none">
+    <div class="kb__head">
+      <div style="display:flex;align-items:center;gap:.5rem"><span class="tl__title">资料</span><button class="btn-quiet" style="margin-left:auto">${I.plus}上传</button></div>
+      <div>${ctxChip}</div>
+      <div style="position:relative">
+        <span style="position:absolute;left:.55rem;top:50%;transform:translateY(-50%);color:var(--color-text-muted)">${I.search}</span>
+        <input class="ui-text-field" style="padding-left:1.9rem;font-size:.8rem" placeholder="搜索文件 / 字段内容" />
+      </div>
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+        <button class="btn-quiet is-on">全部 42</button><button class="btn-quiet">合同</button><button class="btn-quiet">发票</button><button class="btn-quiet">政策</button>
+      </div>
+    </div>
+    <div class="kb__scroll">
+      <div class="kb__folder">${I.folder}已索引<span class="n">3</span></div>
+      ${kbRows.map((f) => `
+        <div class="kb__row${f.on ? ' is-on' : ''}">
+          <span class="check">${I.check}</span>
+          <span><span class="t">${f.t}</span><span class="m">${f.m}</span></span>
+        </div>`).join('')}
+      <div class="kb__folder" style="margin-top:.6rem">${I.folder}未索引 / 处理中<span class="n">1</span></div>
+      <div class="kb__row"><span class="check"></span><span><span class="t">2026 供应商对账单.zip</span><span class="m">压缩包 · 待索引（1.2 GB）</span></span></div>
+    </div>
+  </aside>
+  <section class="cv">
+    ${cvBar('KUNZZ 付款条件是 NET 30 还是 45？', `<span class="meta-chip" style="margin-left:.3rem">已选 3 份</span><span class="composer__spacer"></span><button class="btn-quiet">${I.plus}新建</button>`)}
+    <div class="cv__body"><div class="cv__col">${userMsg}${answer(true)}</div></div>
+    <div class="cv__composer">${composer()}</div>
+  </section>`
+
+/* ── 04 · 时间线历史栏（三栏，最接近常见产品） ── */
+const D = `
+  <aside class="tl" style="width:15.5rem;flex:none;border-right:1px solid var(--color-border);background:var(--color-bg-elevated)">
+    <div class="tl__head"><span class="tl__title">会话</span><button class="btn-quiet" style="margin-left:auto">${I.plus}</button></div>
+    <div style="padding:.5rem .55rem 0;position:relative">
+      <span style="position:absolute;left:1.05rem;top:50%;transform:translateY(-50%);color:var(--color-text-muted)">${I.search}</span>
+      <input class="ui-text-field" style="padding-left:1.9rem;font-size:.8rem" placeholder="搜索" />
+    </div>
+    <div class="tl__scroll">
+      <span class="rail-title" style="display:block;padding:.7rem .45rem .25rem">置顶</span>
+      <button class="tl__item"><span class="tl__name">${I.pin} 集团付款条件口径</span><span class="tl__sub">每周核对用 · 5 份资料</span></button>
+      ${histList()}
+    </div>
+  </aside>
+  <section class="cv">
+    ${cvBar('KUNZZ 付款条件是 NET 30 还是 45？', `<span class="composer__spacer"></span><button class="btn-quiet">${I.open}在新标签打开</button>`)}
+    <div class="cv__body"><div class="cv__col">${userMsg}${answer(false)}</div></div>
+    <div class="cv__composer">${composer()}</div>
+  </section>
+  <aside style="width:19rem;flex:none;border-left:1px solid var(--color-border);background:var(--color-bg-elevated);display:flex;flex-direction:column;min-height:0">
+    <div class="tl__head"><span class="tl__title">依据 · 3 份</span><button class="btn-quiet" style="margin-left:auto">${I.open}全部</button></div>
+    <div style="flex:1;min-height:0;overflow:hidden;padding:.5rem">${sources.map(srcRow).join('')}</div>
+    <div style="flex:none;padding:.6rem .85rem;border-top:1px solid var(--color-border);font-size:11.5px;color:var(--color-text-muted)">${ctxChip}</div>
+  </aside>`
+
+const demos = [
+  { no:'01', name:'对话 + 常驻依据栏，历史进浮层', tags:['推荐 · 引用与正文并排核对','页面里没有公司选择器','左栏省掉了'], pick:true, body:A },
+  { no:'02', name:'全宽专注对话 + 依据内联展开', tags:['最安静、最像助手','窄屏也能用','对比引用要展开'], body:B },
+  { no:'03', name:'资料库优先：左资料 / 右对话', tags:['先圈范围再提问','索引状态可见','占宽最多'], body:C },
+  { no:'04', name:'三栏：时间线历史 / 对话 / 依据', tags:['最接近常见产品','历史常驻','信息最全但最挤'], body:D },
+]
+document.getElementById('grid').innerHTML = demos.map((d) => `
+  <section class="demo">
+    <div class="demo__bar">
+      <div class="demo__no">${d.no}</div><div class="demo__name">${d.name}</div>
+      <div class="demo__tags">${d.tags.map((t, i) => `<span class="tagx${d.pick && i === 0 ? ' tagx--pick' : ''}">${t}</span>`).join('')}</div>
+    </div>
+    ${chrome(d.body)}
+  </section>`).join('')
+
+document.querySelectorAll('.tl__item, .pop__item').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); }))
+document.querySelectorAll('.kb__row').forEach((f) => f.addEventListener('click', () => f.classList.toggle('is-on')))
+document.querySelectorAll('.trace__head').forEach((h) => h.addEventListener('click', () => {
+  const body = h.nextElementSibling
+  body.style.display = body.style.display === 'none' ? 'flex' : 'none'
+}))
+document.getElementById('themeBtn').addEventListener('click', () => {
+  document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+})
+</script>
+</body>
+</html>

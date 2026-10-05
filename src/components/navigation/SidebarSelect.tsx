@@ -13,6 +13,8 @@ type SidebarSelectProps = {
   disabled?: boolean
   hideLabel?: boolean
   className?: string
+  /** Optional native tooltip; useful when the selected value needs explaining. */
+  title?: string
 }
 
 function normalizeOptions(options: SidebarSelectOption[]) {
@@ -30,6 +32,7 @@ export function SidebarSelect({
   disabled = false,
   hideLabel = false,
   className = '',
+  title,
 }: SidebarSelectProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -77,6 +80,7 @@ export function SidebarSelect({
         aria-expanded={open}
         aria-controls={listId}
         aria-label={label}
+        title={title}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
       >

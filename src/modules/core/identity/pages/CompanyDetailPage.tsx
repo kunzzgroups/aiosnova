@@ -228,7 +228,7 @@ export function CompanyDetailPage() {
                 {members.map((member) => (
                   <tr key={member.membershipId}>
                     <td>
-                      <Link className="identity-text-link" to={`/system/core/users/${member.userId}`}>
+                      <Link className="identity-text-link" to={`/system/core/employees/${member.userId}`}>
                         {member.displayName}
                       </Link>
                       {member.isPrimary ? (

@@ -18,9 +18,33 @@ type CompanyState = {
    * must not keep showing the previously previewed group.
    */
   previewCompanyId: string | null
+  /**
+   * Whether the sidebar GROUP COMPANIES panel is open. The top company strip is
+   * a picker for that panel, so it exists only while this is true - the strip
+   * must not sit there taking a row when nobody is switching company.
+   * Session state only - deliberately not persisted.
+   */
+  panelOpen: boolean
+  /**
+   * Group whose companies the strip is holding open after the user clicked that
+   * row in the panel. Clicking a level-2 row is a *step*, not a decision: it
+   * lifts that group's companies into the strip and keeps them there until one
+   * is picked. `null` = no pending choice. Session state only.
+   */
+  pinnedGroupId: string | null
+  /**
+   * True while the pointer is over the top company strip. The strip sits outside
+   * the sidebar, so without this flag the panel's hover grace timer would
+   * collapse the strip before the pointer ever reaches it. Can only be true
+   * while `panelOpen` is true - see `setPanelOpen`.
+   */
+  stripHovered: boolean
   setData: (companies: CompanyOption[], groups: CompanyGroupRecord[]) => void
   setCompany: (companyId: string) => void
   setPreviewCompany: (companyId: string | null) => void
+  setPanelOpen: (panelOpen: boolean) => void
+  setStripHovered: (stripHovered: boolean) => void
+  setPinnedGroup: (groupId: string | null) => void
 }
 
 function readStoredCompanyId(): string {
@@ -47,6 +71,9 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
   groups: [],
   companyId: readStoredCompanyId(),
   previewCompanyId: null,
+  panelOpen: false,
+  pinnedGroupId: null,
+  stripHovered: false,
   setData: (companies, groups) => {
     const current = get().companyId
     const next =
@@ -73,6 +100,24 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
   setPreviewCompany: (previewCompanyId) => {
     if (get().previewCompanyId !== previewCompanyId) {
       set({ previewCompanyId })
+    }
+  },
+  setPanelOpen: (panelOpen) => {
+    if (get().panelOpen === panelOpen) {
+      return
+    }
+    // Closing the panel unmounts the strip, so its hover flag can never fire a
+    // mouseleave afterwards - reset it here or the panel would stop auto-hiding.
+    set(panelOpen ? { panelOpen } : { panelOpen, stripHovered: false })
+  },
+  setStripHovered: (stripHovered) => {
+    if (get().stripHovered !== stripHovered) {
+      set({ stripHovered })
+    }
+  },
+  setPinnedGroup: (pinnedGroupId) => {
+    if (get().pinnedGroupId !== pinnedGroupId) {
+      set({ pinnedGroupId })
     }
   },
 }))

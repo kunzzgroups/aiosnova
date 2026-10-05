@@ -706,3 +706,15 @@
 }
 
 
+
+/* Collapsed rail: the section whose pages include the current route. The icon is
+   a link there, so it needs to show where you are. */
+.sidebar--collapsed .sidebar__section-icon-only.is-active,
+.sidebar--collapsed .sidebar__section-icon-only.is-active:hover {
+  background: var(--sidebar-active);
+  color: var(--sidebar-active-ink);
+}
+
+.sidebar--collapsed .sidebar__section-icon-only.is-active .sidebar__icon {
+  color: inherit;
+}

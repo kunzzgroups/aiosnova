@@ -4,6 +4,7 @@ import {
   filterSidebarSections,
   findModuleByPath,
   type SidebarLink,
+  type SidebarNode,
   type SidebarSection,
 } from '@/navigation/sidebarNav'
 import { BrandLogo } from '@/components/brand/BrandLogo'
@@ -40,6 +41,28 @@ const POPOVER_HIDE_DELAY_MS = 320
  */
 function hasModuleChoice(section: SidebarSection): boolean {
   return section.children.filter((node) => node.kind === 'group').length > 1
+}
+
+/**
+ * First page inside a section, depth first. The collapsed rail sends a click on
+ * a section icon straight here, so a collapsed sidebar is still a way to move
+ * around rather than only a way to re-open itself.
+ */
+function firstLinkInSection(section: SidebarSection): SidebarLink | null {
+  function visit(nodes: SidebarNode[]): SidebarLink | null {
+    for (const node of nodes) {
+      if (node.kind === 'link') {
+        return node
+      }
+      const nested = visit(node.children)
+      if (nested) {
+        return nested
+      }
+    }
+    return null
+  }
+
+  return visit(section.children)
 }
 
 type CompanyOption = { value: string; label: string }
@@ -321,13 +344,15 @@ function SectionBlock({
   collapsed: boolean
   flyout: {
     open: boolean
-    onEnter: (anchor: HTMLButtonElement) => void
+    // HTMLElement, not HTMLButtonElement: in the collapsed rail the same row is
+    // a NavLink, and the flyout only needs its position.
+    onEnter: (anchor: HTMLElement) => void
     onLeave: () => void
-    onActivate: (anchor: HTMLButtonElement) => void
+    onActivate: (anchor: HTMLElement) => void
   }
   /** Collapsed rail: hovering an icon asks the parent for its name panel/tip. */
   hover: {
-    onEnter: (anchor: HTMLButtonElement) => void
+    onEnter: (anchor: HTMLElement) => void
     onLeave: () => void
   }
   onExpand: () => void
@@ -337,13 +362,47 @@ function SectionBlock({
   const location = useLocation()
 
   if (collapsed) {
+    const entry = firstLinkInSection(section)
+    const insideSection = findModuleByPath(location.pathname)?.section.id === section.id
+
+    // Section without pages: nothing to navigate to, so keep the old behaviour.
+    if (!entry) {
+      return (
+        <section className="sidebar__section">
+          <button
+            type="button"
+            className="sidebar__item sidebar__section-icon-only"
+            aria-label={navLabel(section)}
+            onClick={onExpand}
+            onMouseEnter={(event) => hover.onEnter(event.currentTarget)}
+            onMouseLeave={hover.onLeave}
+            onFocus={(event) => hover.onEnter(event.currentTarget)}
+          >
+            <span className="sidebar__icon">
+              <SectionIcon />
+            </span>
+          </button>
+        </section>
+      )
+    }
+
     return (
       <section className="sidebar__section">
-        <button
-          type="button"
-          className="sidebar__item sidebar__section-icon-only"
+        {/* Collapsed rail: the icon is a link, not an expander. Hovering still
+            opens the module panel for picking a specific page. */}
+        <NavLink
+          to={insideSection ? location.pathname : entry.path}
+          className={['sidebar__item', 'sidebar__section-icon-only', insideSection ? 'is-active' : '']
+            .filter(Boolean)
+            .join(' ')}
           aria-label={navLabel(section)}
-          onClick={onExpand}
+          onClick={(event) => {
+            // Already somewhere inside this section: don't push a history entry
+            // (and don't jump back to the section's first page).
+            if (insideSection) {
+              event.preventDefault()
+            }
+          }}
           onMouseEnter={(event) => hover.onEnter(event.currentTarget)}
           onMouseLeave={hover.onLeave}
           onFocus={(event) => hover.onEnter(event.currentTarget)}
@@ -351,7 +410,7 @@ function SectionBlock({
           <span className="sidebar__icon">
             <SectionIcon />
           </span>
-        </button>
+        </NavLink>
       </section>
     )
   }
@@ -439,7 +498,14 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(() => {
     return window.sessionStorage.getItem(COLLAPSED_STORAGE_KEY) === '1'
   })
-  const [companiesPanelOpen, setCompaniesPanelOpen] = useState(false)
+  /**
+   * Lives in the store, not in local state: the top company strip renders only
+   * while this panel is open, so both components must agree on one value.
+   */
+  const companiesPanelOpen = useCompanyStore((state) => state.panelOpen)
+  const setCompaniesPanelOpen = useCompanyStore((state) => state.setPanelOpen)
+  const stripHovered = useCompanyStore((state) => state.stripHovered)
+  const setPinnedGroup = useCompanyStore((state) => state.setPinnedGroup)
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null)
   const [flyoutSectionId, setFlyoutSectionId] = useState<string | null>(null)
   const [popoverAnchor, setPopoverAnchor] = useState({ top: 0, center: 0 })
@@ -482,6 +548,23 @@ export function Sidebar() {
     }
   }, [])
 
+  /**
+   * Hovering the top company strip holds the GROUP COMPANIES panel open (see
+   * `scheduleHideFlyout`). Leaving the strip therefore has to end that
+   * interaction the same way leaving the sidebar does - otherwise nothing would
+   * ever close the panel again, since the pointer is far from the sidebar and no
+   * sidebar mouseleave can fire. The 320ms grace still applies, so moving from
+   * the strip back into the panel keeps it open.
+   */
+  useEffect(() => {
+    if (!stripHovered) {
+      return
+    }
+    // `scheduleHideFlyout` is re-created every render but only touches refs and
+    // stable store setters, so the captured version stays correct.
+    return () => scheduleHideFlyout()
+  }, [stripHovered])
+
   useEffect(() => {
     if (flyoutSectionId === null && iconTipLabel === null && !companiesPanelOpen) {
       return
@@ -496,7 +579,11 @@ export function Sidebar() {
         target.closest('.sidebar-flyout--modules') ||
         target.closest('.sidebar-flyout--groups') ||
         target.closest('[data-section-flyout="true"]') ||
-        target.closest('[data-group-panel="true"]')
+        target.closest('[data-group-panel="true"]') ||
+        // The top company strip is part of the GROUP COMPANIES interaction. A
+        // pointerdown here must not close the panel, or the strip would unmount
+        // before its click fires and the company would never be switched.
+        target.closest('[data-company-strip="true"]')
       ) {
         return
       }
@@ -551,13 +638,24 @@ export function Sidebar() {
 
   function scheduleHideFlyout() {
     cancelHideFlyout()
+    // The strip has no mouseleave to cancel the timer for us while the pointer is
+    // parked on it; the strip itself drives the closing instead.
+    if (useCompanyStore.getState().stripHovered) {
+      return
+    }
     hideFlyoutTimerRef.current = window.setTimeout(() => {
+      hideFlyoutTimerRef.current = null
+      // The pointer may have crossed onto the top company strip while this timer
+      // was pending. Keep the panel open then: the strip's own mouseleave closes
+      // it, and closing here would unmount the strip under the pointer.
+      if (useCompanyStore.getState().stripHovered) {
+        return
+      }
       setHoveredGroupId(null)
       setFlyoutSectionId(null)
       setIconTipLabel(null)
       setCompaniesPanelOpen(false)
       setPreviewCompany(null)
-      hideFlyoutTimerRef.current = null
     }, POPOVER_HIDE_DELAY_MS)
   }
 
@@ -604,7 +702,7 @@ export function Sidebar() {
     setPreviewCompany(item.companies[0]?.value ?? null)
   }
 
-  function handleOpenCompaniesPanel(anchor: HTMLButtonElement) {
+  function handleOpenCompaniesPanel(anchor: HTMLElement) {
     cancelHideFlyout()
     setHoveredGroupId(null)
     setFlyoutSectionId(null)
@@ -613,7 +711,7 @@ export function Sidebar() {
     setCompaniesPanelOpen(true)
   }
 
-  function handleOpenSectionFlyout(section: SidebarSection, anchor: HTMLButtonElement) {
+  function handleOpenSectionFlyout(section: SidebarSection, anchor: HTMLElement) {
     cancelHideFlyout()
     setHoveredGroupId(null)
     setIconTipLabel(null)
@@ -624,7 +722,7 @@ export function Sidebar() {
   }
 
   /** Collapsed rail: sections with modules show the panel, the rest a name tip. */
-  function handleHoverRailIcon(section: SidebarSection, anchor: HTMLButtonElement) {
+  function handleHoverRailIcon(section: SidebarSection, anchor: HTMLElement) {
     if (collapsed && !hasModuleChoice(section)) {
       cancelHideFlyout()
       setHoveredGroupId(null)
@@ -638,8 +736,11 @@ export function Sidebar() {
   }
 
   /**
-   * A group has no page of its own: clicking it moves the active company into
-   * that group, which makes its companies the tabs in the top bar.
+   * Level-2 row (a group) has no page of its own: clicking it is a *step*, not a
+   * decision. It moves the active company into that group and holds the group's
+   * companies in the top strip so the level-3 choice can be made there; the
+   * strip only disappears once that company is picked (see CompanyTabs).
+   * A standalone company is a leaf, so it clears any pending group.
    */
   function handleSelectLevel2(item: Level2Item) {
     if (item.kind === 'group') {
@@ -647,11 +748,13 @@ export function Sidebar() {
       if (firstMemberId) {
         persistCompany(firstMemberId)
       }
+      setPinnedGroup(item.id)
       closePopovers()
       return
     }
 
     persistCompany(item.id)
+    setPinnedGroup(null)
     closePopovers()
   }
 
