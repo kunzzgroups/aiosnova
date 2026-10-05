@@ -3,11 +3,13 @@ import type { AuthUser } from '@/modules/core/auth/types/auth'
 
 export class ApiError extends Error {
   status: number
+  retryAfter: number | null
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryAfter: number | null = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.retryAfter = retryAfter
   }
 }
 
@@ -123,7 +125,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } catch {
       // ignore JSON parse errors
     }
-    throw new ApiError(message, response.status)
+      const retryAfter = response.headers.get('Retry-After')
+      throw new ApiError(
+        message,
+        response.status,
+        retryAfter === null ? null : Number(retryAfter),
+      )
   }
 
   if (response.status === 204) {

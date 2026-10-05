@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next'
 
-export type UserStatus = 'active' | 'disabled' | 'invited'
+export type UserStatus = 'active' | 'disabled' | 'invited' | 'draft'
 
 export type SignInMethod = 'password' | 'otp' | 'google' | 'facebook' | 'apple'
 
@@ -10,6 +10,11 @@ export type IdentityUser = {
   displayName: string
   fullName: string
   phone: string
+  isOwner?: boolean
+  requireMfa?: boolean
+  canInvite?: boolean
+  invitationSettings?: InvitationPayload['settings']
+  invitationDraft?: InvitationPayload
   avatarUrl: string
   language: string
   timezone: string
@@ -18,6 +23,7 @@ export type IdentityUser = {
   mfaEnabled: boolean
   lastActiveAt: string | null
   createdAt: string
+  
 }
 
 export type IdentityProfilePayload = Partial<
@@ -29,6 +35,7 @@ export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 
 }
 
 export function formatStatusLabel(status: string, t: TFunction) {
+  if (status === 'draft') return 'Draft'
   if (!status) {
     return status
   }
@@ -128,7 +135,7 @@ export type PositionRecord = {
   status: 'active' | 'inactive'
 }
 
-export type MembershipStatus = 'active' | 'ended'
+export type MembershipStatus = 'active' | 'ended' | 'invited'
 
 export type MembershipRecord = {
   id: string
@@ -140,6 +147,7 @@ export type MembershipRecord = {
   isPrimary: boolean
   status: MembershipStatus
   validFrom: string
+  roleIds?: string[]
   validTo: string | null
 }
 
@@ -155,3 +163,17 @@ export type CompanyRecord = {
 }
 
 export type CompanyOption = CompanyRecord
+
+export type InvitationAssignment = { companyId: string; organizationId: string; positionId: string; roleIds: string[] }
+export type InvitationPayload = {
+  email: string; fullName: string; phone: string; assignments: InvitationAssignment[]; departmentId: string; positionId: string
+
+  requireMfa: boolean; canInvite: boolean
+  settings: { expiryDays: 7; language: string; personalMessage: string; sendNow: boolean }
+}
+export type InvitationOptions = {
+  departments: InvitationOptions['companies'][number]['departments']
+  canInvite: boolean
+  companies: { id: string; name: string; groupName: string; requireMfa: boolean; departments: { id: string; name: string; positions: { id: string; name: string }[] }[] }[]
+  roles: { id: string; name: string; permissions: { group: string; page: string; action: string }[] }[]
+}

@@ -589,3 +589,59 @@
   color: var(--color-text);
   font: inherit;
 }
+
+/* Users directory and its full-page invitation form share the existing identity shell. */
+.identity-users-page .identity-directory-toolbar { align-items: center; flex-wrap: wrap; }
+.identity-directory-invite-button { margin-left: auto; white-space: nowrap; }
+.identity-directory-muted { display: block; color: var(--color-text-muted); font-size: var(--text-sm); margin-top: .4rem; }
+.identity-directory-scroll { max-height: clamp(240px, calc(100dvh - 330px), 680px); overflow: auto; }
+.identity-directory-scroll th { position: sticky; top: 0; z-index: 1; background: var(--color-bg-elevated); }
+.identity-directory-footer, .identity-directory-footer label, .identity-directory-footer nav { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.identity-directory-footer { justify-content: space-between; padding-top: 1rem; margin-top: 1rem; border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
+.identity-users-page select, .identity-users-page textarea { background: var(--color-bg-muted); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: .6rem; font: inherit; }
+.identity-users-page [hidden] { display: none !important; }
+.identity-users-page .identity-invite--page { margin: 0; border: 0; padding: 0; background: transparent; }
+.identity-invite--page > header { margin-bottom: 1.5rem; }
+.identity-invite-sections { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; grid-template-columns: 1fr; gap: 1.25rem; align-items: start; }
+.identity-invite-section--wide { grid-column: 1 / -1; }
+.identity-invite-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+.identity-invite-company { margin: 1rem 0; padding: 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.identity-invite-check, .identity-invite-switch { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; cursor: pointer; }
+.identity-users-page input[type=checkbox] { accent-color: var(--color-brand); width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
+.identity-invite-switch input { appearance: none; width: 2.4rem !important; height: 1.4rem !important; border-radius: 1rem; background: var(--color-text-muted); position: relative; }
+.identity-invite-switch input::before { content: ''; position: absolute; top: .2rem; left: .2rem; height: 1rem; width: 1rem; background: white; border-radius: 50%; }
+.identity-invite-switch input:checked { background: var(--color-brand); }
+.identity-invite-switch input:checked::before { left: 1.2rem; }
+.identity-invite-switch input:disabled { opacity: .6; }
+.identity-role-chips { display: flex; gap: .5rem; flex-wrap: wrap; margin: .75rem 0; }
+.identity-role-chips button { border: 1px solid var(--color-border); background: var(--color-bg-muted); color: var(--color-brand); border-radius: var(--radius-md); padding: .4rem .7rem; cursor: pointer; }
+.identity-role-options { display: flex; gap: 1.5rem; flex-wrap: wrap; padding: .75rem; }
+.identity-invite-company summary { cursor: pointer; padding: .75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.identity-permission-preview { padding: 1rem; margin-top: 1rem; background: var(--color-bg-muted); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.identity-permission-preview p { margin: .4rem 0 0; color: var(--color-text-muted); }
+.identity-invite--page textarea { width: 100%; min-height: 6rem; resize: vertical; }
+.identity-invite-page-footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-top: 1.25rem; }
+@media (max-width: 960px) { .identity-invite-sections { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .identity-invite-fields { grid-template-columns: 1fr; } }
+
+.identity-delivery-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.identity-delivery-heading p { margin: .4rem 0 0; }
+.identity-delivery-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1rem; flex-wrap: wrap; }
+@media (max-width: 560px) { .identity-delivery-heading { flex-wrap: wrap; } }
+
+.identity-company-buttons { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.identity-company-buttons .ui-button { text-align: left; min-height: 2.75rem; justify-content: flex-start; }
+.identity-company-buttons [aria-pressed=true] { box-shadow: 0 0 0 2px var(--color-brand); }
+
+.identity-language-toggle { display: inline-flex; flex-shrink: 0; gap: .125rem; padding: .125rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-muted); }
+.identity-language-toggle button { border: 0; background: transparent; color: var(--color-text-muted); padding: .35rem .65rem; border-radius: calc(var(--radius-md) - 2px); font: inherit; font-size: .75rem; cursor: pointer; }
+.identity-language-toggle button[aria-pressed=true] { background: var(--color-brand); color: var(--color-on-brand); }
+.identity-language-toggle button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.identity-language-toggle button:disabled { opacity: .6; cursor: default; }
+
+
+
+.identity-invite .sidebar-select__trigger[aria-invalid="true"],
+.identity-invite .identity-company-buttons button[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}

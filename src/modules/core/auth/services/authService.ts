@@ -32,7 +32,7 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
 }
 
 export async function requestLoginTac(payload: TacSendRequest) {
-  return apiRequest<MessageResponse & { demoHint?: string }>('/api/auth/login/tac/send', {
+  return apiRequest<MessageResponse & { demoHint?: string; resendCooldown?: number }>('/api/auth/login/tac/send', {
     method: 'POST',
     body: payload,
   })

@@ -17,7 +17,7 @@ export function FormField({ label, htmlFor, error, hint, className = '', childre
         {label}
       </label>
       {children}
-      {error ? <p className="ui-form-field__error">{error}</p> : null}
+      {error ? <p id={`${htmlFor}-error`} className="ui-form-field__error" role="alert">{error}</p> : null}
       {!error && hint ? <p className="ui-form-field__hint">{hint}</p> : null}
     </div>
   )

@@ -8,8 +8,6 @@ export type MockUser = Omit<AuthUser, 'profileComplete'> & {
 }
 
 export const MOCK_MFA_CODE = '123456'
-// export const MOCK_TAC_CODE = '123456'
-export const MOCK_TAC_CODE = Math.floor(100000 + Math.random() * 900000).toString()
 export const DEMO_LOGIN_PASSWORD = 'Password1!'
 
 export const seedUsers: MockUser[] = [

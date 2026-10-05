@@ -1,4 +1,5 @@
 import type {
+  InvitationOptions,
   CompanyRecord,
   IdentityUser,
   MembershipRecord,
@@ -317,3 +318,29 @@ export const identityMemberships: MembershipRecord[] = [
     validTo: null,
   },
 ]
+
+// Preset department and position records used by the invitation mock.
+identityOrganizations.push({ id:'org-hr',tenantId:DEMO_TENANT_ID,parentId:'org-hq',code:'HR',name:'HR',type:'department',status:'active',sortOrder:4 })
+identityPositions.push(
+  { id:'pos-hr-lead',tenantId:DEMO_TENANT_ID,code:'HR-LEAD',name:'HR Lead',description:'HR leadership',status:'active' },
+  { id:'pos-hr',tenantId:DEMO_TENANT_ID,code:'HR',name:'HR',description:'HR staff',status:'active' },
+  { id:'pos-finance-mgr',tenantId:DEMO_TENANT_ID,code:'FIN-MGR',name:'Finance Manager',description:'Finance leadership',status:'active' },
+)
+// Mock Permissions-module presets. The users page only reads these definitions.
+export const identityRolePresets: InvitationOptions['roles'] = [
+  { id: 'role-manager', name: 'Manager', permissions: [{ group: 'Work Management', page: 'Projects', action: 'View' }, { group: 'Work Management', page: 'Documents', action: 'View' }] },
+  { id: 'role-staff', name: 'Staff', permissions: [{ group: 'Work Management', page: 'Documents', action: 'View' }] },
+  { id: 'role-hr', name: 'HR', permissions: [{ group: 'Finance & People', page: 'HRM', action: 'View' }] },
+  { id: 'role-finance', name: 'Finance', permissions: [{ group: 'Finance & People', page: 'Finance', action: 'View' }] },
+]
+export function mockInvitationOptions(canInvite: boolean): InvitationOptions {
+  const departments = identityOrganizations.filter(o=>o.type==='department' && o.status==='active').map(o=>({id:o.id,name:o.name,
+      positions:identityPositions.filter(p=>p.status==='active' && (o.id==='org-finance' ? ['pos-finance-mgr','pos-acc'].includes(p.id) : o.id==='org-hr' ? ['pos-hr-lead','pos-hr'].includes(p.id) : p.id==='pos-mgr')).map(p=>({id:p.id,name:p.name}))
+    }))
+  return { canInvite, departments, roles: identityRolePresets, companies: identityCompanies.filter(c=>c.status==='active').map(c=>({
+    id:c.id, name:c.name, groupName:identityCompanyGroups.find(g=>g.companyIds.includes(c.id))?.name || c.name,
+    requireMfa:c.id==='company-retail',
+    departments
+  })) }
+}
+identityUsers[0]!.isOwner = true

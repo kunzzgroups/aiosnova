@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: aiosnova-server
+  profiles:
+    default: local
+
+server:
+  port: 8080
+
+auth:
+  tac:
+    resend-cooldown-seconds: 60

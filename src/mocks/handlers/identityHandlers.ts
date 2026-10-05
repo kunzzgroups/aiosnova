@@ -1,12 +1,12 @@
 import { HttpResponse, http } from 'msw'
 import {
   MOCK_MFA_CODE,
-  provisionMockAuthUser,
   removeMockAuthUser,
   setMockUserMfaEnabled,
   updateMockAuthUser,
 } from '@/mocks/data/users'
 import {
+  mockInvitationOptions,
   DEMO_TENANT_ID,
   identityCompanies,
   identityMemberships,
@@ -14,8 +14,8 @@ import {
   identityPositions,
   identityUsers,
 } from '@/mocks/data/identity'
-import { isValidPassword, PASSWORD_ERROR_MESSAGE } from '@/modules/core/auth/utils/passwordPolicy'
 import type {
+  InvitationPayload,
   CompanyRecord,
   IdentityProfilePayload,
   IdentityUser,
@@ -63,7 +63,69 @@ function withMemberCount(company: CompanyRecord) {
   }
 }
 
+function directoryActor(request: Request) {
+  const id = /^Bearer access_(.+)$/.exec(request.headers.get('Authorization') || '')?.[1]
+  return identityUsers.find(u=>u.id===id)
+}
+
+async function saveInvitation(request: Request, id?: string) {
+    const actor = directoryActor(request)
+    if (!actor?.isOwner) return HttpResponse.json({ message: 'Only the owner can assign staff access in this mock API.' }, { status: 403 })
+    const existing = id ? identityUsers.find(u => u.id === id) : undefined
+    if (id && !existing) return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
+    if (existing && existing.status !== 'draft') return HttpResponse.json({ message: 'Only drafts can be edited here.' }, { status: 409 })
+    const body = await request.json() as InvitationPayload
+    const email = body.email?.trim().toLowerCase()
+    const options=mockInvitationOptions(true)
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (body.settings?.sendNow && (!body.fullName?.trim() || !body.assignments?.length)) || !Array.isArray(body.assignments) || body.settings?.expiryDays!==7 || !['en','zh-CN'].includes(body.settings.language)) {
+      return HttpResponse.json({ message: 'Complete the staff details and invitation settings.' }, { status: 400 })
+    }
+    const selectedDepartment = options.departments.find(d => d.id === body.departmentId)
+    if (typeof body.departmentId !== 'string' || typeof body.positionId !== 'string' ||
+      (body.departmentId && !selectedDepartment) ||
+      (body.positionId && !selectedDepartment?.positions.some(p => p.id === body.positionId)) ||
+      (body.settings.sendNow && (!body.departmentId || !body.positionId))) {
+      return HttpResponse.json({ message: 'Select a valid department and position.' }, { status: 400 })
+    }
+    const companyIds=new Set<string>()
+    for (const assignment of body.assignments) {
+      const company=options.companies.find(c=>c.id===assignment.companyId)
+      const department=options.departments.find(d=>d.id===assignment.organizationId)
+      if (assignment.organizationId !== body.departmentId || assignment.positionId !== body.positionId || !company || companyIds.has(assignment.companyId) || (assignment.organizationId && !department) || (assignment.positionId && !department?.positions.some(p=>p.id===assignment.positionId)) || !Array.isArray(assignment.roleIds) || assignment.roleIds.some(id=>!options.roles.some(r=>r.id===id)) || (body.settings.sendNow && (!assignment.organizationId || !assignment.positionId))) {
+        return HttpResponse.json({ message: 'Invalid company, department, position or role assignment.' }, { status: 400 })
+      }
+      companyIds.add(assignment.companyId)
+    }
+    if (identityUsers.some(u=>u.email===email && u.id !== existing?.id)) return HttpResponse.json({ message:'This email already has an account. Add a membership to the existing user.' }, { status:409 })
+    const user: IdentityUser = {
+      id:existing?.id ?? createId('user'),email,displayName:body.fullName?.trim() || email.split('@')[0]!,fullName:body.fullName?.trim() || '',phone:body.phone?.trim() || '',
+      avatarUrl:'',language:body.settings.language,timezone:'Asia/Kuala_Lumpur',status:body.settings.sendNow?'invited':'draft',
+      signInMethod:null,mfaEnabled:false,lastActiveAt:null,createdAt:existing?.createdAt ?? new Date().toISOString(),
+      requireMfa:Boolean(body.requireMfa || options.companies.some(c=>companyIds.has(c.id) && c.requireMfa)),
+      canInvite:Boolean(body.canInvite),invitationSettings:body.settings,
+      invitationDraft:body.settings.sendNow ? undefined : structuredClone(body),
+    }
+    if (existing) {
+      Object.assign(existing, user)
+      for (let i = identityMemberships.length - 1; i >= 0; i--) {
+        if (identityMemberships[i]?.userId === user.id) identityMemberships.splice(i, 1)
+      }
+    } else identityUsers.push(user)
+    body.assignments.forEach((assignment,index)=>identityMemberships.push({
+      id:createId('mem'),tenantId:DEMO_TENANT_ID,userId:user.id,companyId:assignment.companyId,
+      organizationId:assignment.organizationId || null,positionId:assignment.positionId || null,roleIds:[...new Set(assignment.roleIds)],
+      isPrimary:index===0,status:'invited',validFrom:new Date().toISOString().slice(0,10),validTo:null,
+    }))
+    // Invitation delivery and passwordless activation require the production backend.
+    // Do not provision a default password or activate access before acceptance.
+    return HttpResponse.json(user, { status:existing ? 200 : 201 })
+}
+
 export const identityHandlers = [
+  http.get('/api/identity/invitation-options', ({ request }) => {
+    const actor=directoryActor(request)
+    return HttpResponse.json(mockInvitationOptions(Boolean(actor?.isOwner || actor?.canInvite)))
+  }),
   http.get('/api/identity/meta', () => {
     return HttpResponse.json({
       tenantId: DEMO_TENANT_ID,
@@ -71,13 +133,13 @@ export const identityHandlers = [
     })
   }),
 
-  http.get('/api/identity/users', () => {
-    return HttpResponse.json({ items: identityUsers })
+  http.get('/api/identity/users', ({request}) => {
+    return HttpResponse.json({ items: identityUsers.filter(u=>directoryActor(request)?.isOwner || !u.isOwner) })
   }),
 
-  http.get('/api/identity/users/:id', ({ params }) => {
+  http.get('/api/identity/users/:id', ({ params, request }) => {
     const user = identityUsers.find((item) => item.id === params.id)
-    if (!user) {
+    if (!user || (user.isOwner && !directoryActor(request)?.isOwner)) {
       return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
     }
 
@@ -140,77 +202,8 @@ export const identityHandlers = [
     })
   }),
 
-  http.post('/api/identity/users', async ({ request }) => {
-    const body = (await request.json()) as {
-      email?: string
-      password?: string
-      companyId?: string
-      status?: IdentityUser['status']
-    }
-
-    const email = body.email?.trim().toLowerCase() ?? ''
-    const password = body.password ?? ''
-    const companyId = body.companyId?.trim() ?? ''
-    const displayName = email.split('@')[0]?.replace(/[._-]+/g, ' ').trim() || 'Invited user'
-
-    if (!email) {
-      return HttpResponse.json({ message: 'Email is required.' }, { status: 400 })
-    }
-
-    if (!isValidPassword(password)) {
-      return HttpResponse.json({ message: PASSWORD_ERROR_MESSAGE }, { status: 400 })
-    }
-
-    const company = identityCompanies.find((item) => item.id === companyId && item.tenantId === DEMO_TENANT_ID)
-    if (!company) {
-      return HttpResponse.json({ message: 'Company is required.' }, { status: 400 })
-    }
-    if (company.status !== 'active') {
-      return HttpResponse.json({ message: 'Cannot invite a user into an inactive company.' }, { status: 400 })
-    }
-
-    if (identityUsers.some((user) => user.email === email)) {
-      return HttpResponse.json({ message: 'A user with this email already exists.' }, { status: 409 })
-    }
-
-    const user: IdentityUser = {
-      id: createId('user'),
-      email,
-      displayName,
-      fullName: '',
-      phone: '',
-      avatarUrl: '',
-      language: 'en',
-      timezone: 'Asia/Kuala_Lumpur',
-      status: body.status ?? 'invited',
-      signInMethod: null,
-      mfaEnabled: false,
-      lastActiveAt: null,
-      createdAt: new Date().toISOString(),
-    }
-
-    identityUsers.push(user)
-    identityMemberships.push({
-      id: createId('mem'),
-      tenantId: DEMO_TENANT_ID,
-      userId: user.id,
-      companyId: company.id,
-      organizationId: null,
-      positionId: null,
-      isPrimary: true,
-      status: 'active',
-      validFrom: new Date().toISOString().slice(0, 10),
-      validTo: null,
-    })
-    provisionMockAuthUser({
-      id: user.id,
-      email: user.email,
-      name: user.displayName,
-      mfaEnabled: user.mfaEnabled,
-      password,
-    })
-    return HttpResponse.json(user, { status: 201 })
-  }),
+  http.post('/api/identity/users', ({ request }) => saveInvitation(request)),
+  http.patch('/api/identity/users/:id/invitation', ({ request, params }) => saveInvitation(request, String(params.id))),
 
   http.patch('/api/identity/users/:id', async ({ params, request }) => {
     const user = identityUsers.find((item) => item.id === params.id)
@@ -218,7 +211,10 @@ export const identityHandlers = [
       return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
     }
 
+    const actor = directoryActor(request)
+    if (!actor?.isOwner && actor?.id !== user.id) return HttpResponse.json({ message: 'Only the owner can edit this account.' }, { status: 403 })
     const body = (await request.json()) as IdentityProfilePayload
+    if ((user.status === 'invited' || user.status === 'draft') && body.status === 'active') return HttpResponse.json({ message: 'Complete invitation acceptance before activation.' }, { status: 400 })
     if (body.email !== undefined) {
       const email = body.email.trim().toLowerCase()
       if (!email.includes('@')) {
@@ -525,8 +521,9 @@ export const identityHandlers = [
     return HttpResponse.json(position)
   }),
 
-  http.get('/api/identity/memberships', () => {
-    return HttpResponse.json({ items: identityMemberships })
+  http.get('/api/identity/memberships', ({ request }) => {
+    const ownerIds=new Set(identityUsers.filter(u=>u.isOwner).map(u=>u.id))
+    return HttpResponse.json({ items: identityMemberships.filter(m=>directoryActor(request)?.isOwner || !ownerIds.has(m.userId)) })
   }),
 
   http.post('/api/identity/memberships', async ({ request }) => {

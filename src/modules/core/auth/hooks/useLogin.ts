@@ -13,11 +13,16 @@ export function useLogin() {
   async function handleRequestTac(payload: { email?: string; phone?: string }) {
     setError(null)
     setMessage(null)
+
     try {
       const result = await requestLoginTac(payload)
       setMessage(result.demoHint ? `${result.message} ${result.demoHint}` : result.message)
-      return true
+      return { ...result, sent: true }
     } catch (err) {
+      if (err instanceof ApiError && err.status === 429 && err.retryAfter !== null) {
+        return { sent: false, resendCooldown: err.retryAfter }
+      }
+
       setError(err instanceof ApiError ? err.message : 'Unable to send OTP.')
       return false
     }

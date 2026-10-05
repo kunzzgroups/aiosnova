@@ -11,5 +11,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    proxy: {
+    '/api/auth/login/tac/send': 'http://localhost:8080',
+    '/api/auth/login/tac/verify': 'http://localhost:8080',
+    '/api/mock/inbox': 'http://localhost:8080',
+  },
   },
 })

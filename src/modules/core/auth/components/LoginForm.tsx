@@ -1,9 +1,9 @@
-import { useState, useEffect type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
-// import { useTranslation } from 'react-i18next'
+import { useTranslation } from 'react-i18next'
 import { SocialAuthButtons } from '@/modules/core/auth/components/SocialAuthButtons'
 import { useLogin } from '@/modules/core/auth/hooks/useLogin'
 import { readRememberedLogin } from '@/modules/core/auth/utils/rememberedLogin'
@@ -26,33 +26,48 @@ export function LoginForm() {
   const [sendingTac, setSendingTac] = useState(false)
 
   const canSendOtp = Boolean(email.trim())
-//Resend Tac Cooldown
-  const[resendCooldown, setResendCooldown] = useState(0)
 
-  useEffect(()=> {
-    if (resendCooldown <= 0){
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendAvailableAt, setResendAvailableAt] = useState(0)
+
+  useEffect(() => {
+    if (!resendAvailableAt) {
+      return
+    }
+
+    function updateCountdown() {
+      setResendCooldown(
+        Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000)),
+      )
+    }
+
+    updateCountdown()
+    const timer = setInterval(updateCountdown, 1000)
+    return () => clearInterval(timer)
+  }, [resendAvailableAt])
+
+  const cooldownLabel =
+    `${Math.floor(resendCooldown / 60)}m ${resendCooldown % 60}s`
+
+  async function sendTac() {
+  if (!canSendOtp || sendingTac || isSubmitting || resendCooldown > 0) {
     return
   }
 
-  const timer =setInterval(() =>{
-    setResendCooldown((current) => current-1)
-  }, 1000)
+  setSendingTac(true)
+  const result = await handleRequestTac({ email })
+  setSendingTac(false)
 
-  return () => clearInterval(timer)
-}, [resendCooldown])
+  if (result) {
+    const seconds = result.resendCooldown ?? 60
+    setResendCooldown(seconds)
+    setResendAvailableAt(Date.now() + seconds * 1000)
 
-  async function sendTac() {
-    if (!canSendOtp || sendingTac || isSubmitting) {
-      return
-    }
-    setSendingTac(true)
-    const sent = await handleRequestTac({ email })
-    setSendingTac(false)
-    if (sent) {
+    if (result.sent) {
       setTacSent(true)
-      setResendCooldown(60)
     }
   }
+}
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -95,7 +110,7 @@ export function LoginForm() {
               onClick={() => void sendTac()}
               disabled={sendingTac || isSubmitting || !canSendOtp || resendCooldown > 0}
             >
-              {sendingTac ? t('auth.sendingTac') :resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : tacSent ? t('auth.resendTac') : t('auth.sendTac')}
+              {sendingTac ? t('auth.sendingTac') : resendCooldown > 0 ? `Resend OTP in ${cooldownLabel}` : tacSent ? t('auth.resendTac') : t('auth.sendTac')}
             </button>
           </div>
         </FormField>

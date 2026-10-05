@@ -1,4 +1,4 @@
-import { HttpResponse, http } from 'msw'
+import { bypass, HttpResponse, http } from 'msw'
 import type {
   AuthUser,
   ForgotPasswordRequest,
@@ -8,10 +8,9 @@ import type {
   MfaSetupConfirmRequest,
   MfaVerifyRequest,
   ResetPasswordRequest,
-  TacSendRequest,
   TacVerifyRequest,
 } from '@/modules/core/auth/types/auth'
-import { MOCK_MFA_CODE, MOCK_TAC_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
+import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
 import { identityUsers, recordIdentitySignIn, upsertIdentityUser } from '@/mocks/data/identity'
 import type { SignInMethod } from '@/modules/core/identity/types/identity'
 import { isValidPassword, NEW_PASSWORD_ERROR_MESSAGE, PASSWORD_ERROR_MESSAGE } from '@/modules/core/auth/utils/passwordPolicy'
@@ -35,26 +34,27 @@ type ResetTokenRecord = {
   expiresAt: number
 }
 //Mock emai; features
-type MockEmail = {
-  id:string
-  to:string
-  subject:string
-  body:string
-  createdAt:string
-}
+// type MockEmail = {
+//   id:string
+//   to:string
+//   subject:string
+//   body:string
+//   createdAt:string
+// }
 
 const sessions = new Map<string, SessionRecord>()
 const mfaTickets = new Map<string, MfaTicketRecord>()
-const tacChallenges = new Map<string, { userId: string; expiresAt: number }>()
+// const tacChallenges = new Map<string, { userId: string; expiresAt: number }>()
 const resetTokens = new Map<string, ResetTokenRecord>()
 const pendingMfaSecrets = new Map<string, string>()
 //Mock inbox features
-const mockInbox = new Map<string, MockEmail[]>()
+// const mockInbox = new Map<string, MockEmail[]>()
 
-function addMockEmail(email: MockEmail){
-  const existing =mockInbox.get(email.to) ?? []
-  mockInbox.set(email.to, [email, ...existing])
-}
+// //Add Mock Email features
+// function addMockEmail(email: MockEmail){
+//   const existing =mockInbox.get(email.to) ?? []
+//   mockInbox.set(email.to, [email, ...existing])
+// }
 
 function createToken(prefix: string) {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, '')}`
@@ -101,21 +101,21 @@ function findUserByEmail(email: string) {
   return users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase())
 }
 
-function normalizePhone(value: string) {
-  return value.replace(/[^\d+]/g, '')
-}
+// function normalizePhone(value: string) {
+//   return value.replace(/[^\d+]/g, '')
+// }
 
-function findUserByPhone(phone: string) {
-  const needle = normalizePhone(phone)
-  if (!needle) {
-    return undefined
-  }
-  const identity = identityUsers.find((item) => normalizePhone(item.phone) === needle)
-  if (!identity) {
-    return undefined
-  }
-  return users.find((user) => user.id === identity.id || user.email === identity.email)
-}
+// function findUserByPhone(phone: string) {
+//   const needle = normalizePhone(phone)
+//   if (!needle) {
+//     return undefined
+//   }
+//   const identity = identityUsers.find((item) => normalizePhone(item.phone) === needle)
+//   if (!identity) {
+//     return undefined
+//   }
+//   return users.find((user) => user.id === identity.id || user.email === identity.email)
+// }
 
 function findUserById(id: string) {
   return users.find((user) => user.id === id)
@@ -178,22 +178,22 @@ function requireCsrf(request: Request) {
 }
 
 const GENERIC_LOGIN_ERROR = 'Invalid email or password.'
-const TAC_SENT_MESSAGE = 'If this number is registered, an OTP has been sent.'
-const EMAIL_OTP_SENT_MESSAGE = 'If this email is registered, an OTP has been sent.'
+// const TAC_SENT_MESSAGE = 'If this number is registered, an OTP has been sent.'
+// const EMAIL_OTP_SENT_MESSAGE = 'If this email is registered, an OTP has been sent.'
 const FORGOT_MESSAGE =
   'If an account exists for that email, you will receive password reset instructions.'
 
-function tacChallengeKey(payload: { email?: string; phone?: string }) {
-  const email = payload.email?.trim().toLowerCase()
-  if (email) {
-    return `email:${email}`
-  }
-  const phone = normalizePhone(payload.phone ?? '')
-  if (phone) {
-    return `phone:${phone}`
-  }
-  return ''
-}
+// function tacChallengeKey(payload: { email?: string; phone?: string }) {
+//   const email = payload.email?.trim().toLowerCase()
+//   if (email) {
+//     return `email:${email}`
+//   }
+//   const phone = normalizePhone(payload.phone ?? '')
+//   if (phone) {
+//     return `phone:${phone}`
+//   }
+//   return ''
+// }
 
 export const authHandlers = [
   http.post('/api/auth/login', async ({ request }) => {
@@ -227,77 +227,81 @@ export const authHandlers = [
     return issueSession(user)
   }),
 
-  http.post('/api/auth/login/tac/send', async ({ request }) => {
-    const body = (await request.json()) as TacSendRequest
-    const email = body.email?.trim() ?? ''
-    const phone = body.phone?.trim() ?? ''
-    const key = tacChallengeKey(body)
+  // http.post('/api/auth/login/tac/send', async ({ request }) => {
+  //   const body = (await request.json()) as TacSendRequest
+  //   const email = body.email?.trim() ?? ''
+  //   const phone = body.phone?.trim() ?? ''
+  //   const key = tacChallengeKey(body)
 
-    if (email) {
-      if (!email.includes('@')) {
-        return HttpResponse.json({ message: 'Enter a valid email address.' }, { status: 400 })
-      }
-    } else if (!normalizePhone(phone)) {
-      return HttpResponse.json({ message: 'Enter a valid phone number.' }, { status: 400 })
-    }
+  //   if (email) {
+  //     if (!email.includes('@')) {
+  //       return HttpResponse.json({ message: 'Enter a valid email address.' }, { status: 400 })
+  //     }
+  //   } else if (!normalizePhone(phone)) {
+  //     return HttpResponse.json({ message: 'Enter a valid phone number.' }, { status: 400 })
+  //   }
 
-    const user = email ? findUserByEmail(email) : findUserByPhone(phone)
-    if (user) {
-      const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)
-      if (identity?.status === 'disabled') {
-        return HttpResponse.json({ message: 'This account has been disabled.' }, { status: 401 })
-      }
-      tacChallenges.set(key, {
-        userId: user.id,
-        expiresAt: Date.now() + 5 * 60 * 1000,
-      })
+  //   const user = email ? findUserByEmail(email) : findUserByPhone(phone)
+  //   if (user) {
+  //     const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)
+  //     if (identity?.status === 'disabled') {
+  //       return HttpResponse.json({ message: 'This account has been disabled.' }, { status: 401 })
+  //     }
+  //     tacChallenges.set(key, {
+  //       userId: user.id,
+  //       expiresAt: Date.now() + 5 * 60 * 1000,
+  //     })
 
-      //Mock email features
-      addMockEmail({
-        id: crypto.randomUUID(),
-        to: email,
-        subject: 'Your AIOS verification code',
-        body: `Your verification code is: ${MOCK_TAC_CODE}\n\nThis code expires in 5 minutes`,
-        createdAt: Date.now(),
-      })
-    }
+  //     //Mock email features
+  //     addMockEmail({
+  //       id: crypto.randomUUID(),
+  //       to: email,
+  //       subject: 'Your AIOS verification code',
+  //       body: `Your verification code is: ${MOCK_TAC_CODE}\n\nThis code expires in 5 minutes`,
+  //       createdAt: Date.now(),
+  //     })
+  //   }
 
-    return HttpResponse.json({
-      message: email ? EMAIL_OTP_SENT_MESSAGE : TAC_SENT_MESSAGE,
-      demoHint: `Demo OTP: ${MOCK_TAC_CODE}`,
-    })
-  }),
+  //   return HttpResponse.json({
+  //     message: email ? EMAIL_OTP_SENT_MESSAGE : TAC_SENT_MESSAGE,
+  //     demoHint: `Demo OTP: ${MOCK_TAC_CODE}`,
+  //   })
+  // }),
 
-  http.get('/api/mock/inbox', ({request})=>{
-    const url = new URL(request.url)
-    const email = url.searchParams.get('email')?.trim().toLowerCase() ?? ''
+  // // Mock Inbox features
+  // http.get('/api/mock/inbox', ({request})=>{
+  //   const url = new URL(request.url)
+  //   const email = url.searchParams.get('email')?.trim().toLowerCase() ?? ''
 
-    const emails = mockInbox.get(email) ?? []
+  //   const emails = mockInbox.get(email) ?? []
 
-    return HttpResponse.json({
-      emails,
-    })
-  }),
+  //   return HttpResponse.json({
+  //     emails,
+  //   })
+  // }),
 
   http.post('/api/auth/login/tac/verify', async ({ request }) => {
-    const body = (await request.json()) as TacVerifyRequest
-    const key = tacChallengeKey(body)
-    const challenge = key ? tacChallenges.get(key) : undefined
+  const body = (await request.json()) as TacVerifyRequest
+  const user = findUserByEmail(body.email?.trim() ?? '')
 
-    if (!challenge || challenge.expiresAt < Date.now()) {
-      return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
-    }
-    if (body.code !== MOCK_TAC_CODE) {
-      return HttpResponse.json({ message: 'Invalid OTP.' }, { status: 401 })
-    }
+  if (!user) {
+    return HttpResponse.json(
+      { message: 'Use an existing demo account for this local login test.' },
+      { status: 401 },
+    )
+  }
 
-    const user = findUserById(challenge.userId)
-    if (!user) {
-      return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
-    }
+  const response = await fetch(bypass(request.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+  }))
 
-    tacChallenges.delete(key)
-    return issueSession(user, 'otp')
+  if (!response.ok) {
+    return HttpResponse.json(await response.json(), { status: response.status })
+  }
+
+  return issueSession(user, 'otp')
   }),
 
   http.post('/api/auth/mfa/verify', async ({ request }) => {

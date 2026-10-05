@@ -1,10 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { type AriaAttributes, useEffect, useId, useRef, useState } from 'react'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import './SidebarSelect.css'
 
 export type SidebarSelectOption = string | { value: string; label: string }
 
-type SidebarSelectProps = {
+type SidebarSelectProps = Pick<AriaAttributes, 'aria-invalid' | 'aria-describedby'> & {
   label: string
   value: string
   options: SidebarSelectOption[]
@@ -33,6 +33,8 @@ export function SidebarSelect({
   hideLabel = false,
   className = '',
   title,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
 }: SidebarSelectProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -80,6 +82,8 @@ export function SidebarSelect({
         aria-expanded={open}
         aria-controls={listId}
         aria-label={label}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         title={title}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
