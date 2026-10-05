@@ -98,7 +98,6 @@ export const sidebarSections: SidebarSection[] = [
       group('AI', '/ai', [
         'AI Assistant',
         'AI Agents',
-        'Agent Manager',
         'Knowledge',
         'Automation',
         'AI Settings',
