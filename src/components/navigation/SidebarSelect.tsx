@@ -15,6 +15,13 @@ type SidebarSelectProps = {
   className?: string
   /** Optional native tooltip; useful when the selected value needs explaining. */
   title?: string
+  /**
+   * Controlled open state. When provided, the component no longer owns it —
+   * the parent is then responsible for opening, closing, and enforcing
+   * "only one popover at a time" alongside the model picker and settings panel.
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 function normalizeOptions(options: SidebarSelectOption[]) {
@@ -33,8 +40,21 @@ export function SidebarSelect({
   hideLabel = false,
   className = '',
   title,
+  open: controlledOpen,
+  onOpenChange,
 }: SidebarSelectProps) {
-  const [open, setOpen] = useState(false)
+  // `open` above is now potentially controlled. The uncontrolled path keeps
+  // its own state under a distinct name, and `setOpen` below fans out to both
+  // the parent (via onOpenChange) and the internal store.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = controlledOpen ?? uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    onOpenChange?.(next)
+    if (controlledOpen === undefined) {
+      setUncontrolledOpen(next)
+    }
+  }
+
   const rootRef = useRef<HTMLDivElement>(null)
   const generatedId = useId()
   const listId = id ? `${id}-list` : generatedId
@@ -82,7 +102,7 @@ export function SidebarSelect({
         aria-label={label}
         title={title}
         disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen(!open)}
       >
         <span className="sidebar-select__value">{selectedLabel}</span>
         <span className="sidebar-select__chevron" aria-hidden>
