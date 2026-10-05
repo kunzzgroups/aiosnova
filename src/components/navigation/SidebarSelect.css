@@ -9,7 +9,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--sidebar-muted, #7a8a85);
+  color: var(--sidebar-muted, var(--color-text-muted));
 }
 
 .sidebar-select__trigger {
@@ -59,7 +59,7 @@
   place-items: center;
   width: 0.9rem;
   height: 0.9rem;
-  color: var(--sidebar-muted, #7a8a85);
+  color: var(--sidebar-muted, var(--color-text-muted));
   transform: rotate(90deg);
   transition: transform 0.18s ease;
   flex-shrink: 0;
@@ -72,7 +72,7 @@
 
 .sidebar-select__trigger.is-open .sidebar-select__chevron {
   transform: rotate(-90deg);
-  color: var(--sidebar-active-ink);
+  color: var(--sidebar-active-ink, var(--color-brand));
 }
 
 .sidebar-select__menu {
@@ -96,7 +96,7 @@
   border: 0;
   border-radius: 0.65rem;
   background: transparent;
-  color: var(--sidebar-ink, #1a2422);
+  color: var(--sidebar-ink, var(--color-text));
   font: inherit;
   font-size: 0.84rem;
   font-weight: 500;
@@ -106,11 +106,11 @@
 }
 
 .sidebar-select__option:hover {
-  background: var(--sidebar-hover, #f2f6f4);
+  background: var(--sidebar-hover, var(--color-bg-muted));
 }
 
 .sidebar-select__option.is-selected {
-  background: var(--sidebar-active, #e4f0eb);
-  color: var(--sidebar-active-ink, #0f3d3e);
+  background: var(--sidebar-active, var(--color-brand-soft));
+  color: var(--sidebar-active-ink, var(--color-brand));
   font-weight: 650;
 }
