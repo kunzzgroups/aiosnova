@@ -12,8 +12,6 @@ import { HomePage } from '@/modules/core/auth/pages/HomePage'
 import { AiAssistantPage } from '@/modules/ai/assistant/pages/AiAssistantPage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
-import { CompaniesPage } from '@/modules/core/identity/pages/CompaniesPage'
-import { CompanyDetailPage } from '@/modules/core/identity/pages/CompanyDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
 import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
 
@@ -38,8 +36,6 @@ export function AppRouter() {
             <Route path="/ai/ai/ai-assistant" element={<AiAssistantPage />} />
             <Route path="/system/core/employees" element={<UsersPage />} />
             <Route path="/system/core/employees/:userId" element={<UserDetailPage />} />
-            <Route path="/system/core/companies" element={<CompaniesPage />} />
-            <Route path="/system/core/companies/:companyId" element={<CompanyDetailPage />} />
             <Route path="/system/core/organization" element={<OrganizationPage />} />
             <Route path="/system/core/roles-and-access" element={<ModulePlaceholderPage />} />
             <Route path="/system/core/activity" element={<ModulePlaceholderPage />} />

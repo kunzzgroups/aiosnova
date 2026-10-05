@@ -15,26 +15,9 @@ export const org: Record<string, string> = {
   // shared table headers
   'org.colCode': '编码',
   'org.colName': '名称',
-  'org.colEmail': '邮箱',
-  'org.colMembers': '成员数',
-  'org.colUserStatus': '用户状态',
-  'org.colTenant': '租户',
-  'org.colMembership': '成员关系',
 
   // shared actions
   'org.actionAdd': '添加',
-
-  // companies
-  'org.companies.title': '公司',
-  'org.companies.directory': '公司目录',
-  'org.companies.newCompany': '新建公司',
-  'org.companies.newTitle': '新建公司',
-  'org.companies.newHint': '在当前租户下创建法人主体；成员通过成员关系加入该公司。',
-  'org.companies.searchPlaceholder': '搜索名称或编码...',
-  'org.companies.searchAria': '搜索名称或编码',
-  'org.companies.codePlaceholder': '例如 RETAIL',
-  'org.companies.namePlaceholder': '请输入公司名称',
-  'org.companies.create': '创建',
 
   // organization
   'org.organization.title': '组织架构',
@@ -57,12 +40,7 @@ export const org: Record<string, string> = {
   'org.memberships.makePrimary': '设为主要',
   'org.memberships.endMembership': '结束成员关系',
 
-  // company detail
-  'org.company.title': '公司',
-
   // messages
-  'org.msgCompanyCreated': '公司已创建。',
-  'org.msgCompanyUpdated': '公司已更新。',
   'org.msgOrganizationCreated': '组织节点已创建。',
   'org.msgOrganizationUpdated': '组织节点已更新。',
   'org.msgOrganizationDeleted': '组织节点已删除。',
@@ -70,10 +48,6 @@ export const org: Record<string, string> = {
   'org.msgMembershipCreated': '成员关系已创建。',
 
   // errors
-  'org.errLoadCompanies': '无法加载公司列表。',
-  'org.errLoadCompany': '无法加载公司。',
-  'org.errCreateCompany': '无法创建公司。',
-  'org.errUpdateCompany': '无法更新公司。',
   'org.errLoadOrganizations': '无法加载组织架构。',
   'org.errCreateOrganization': '无法创建组织节点。',
   'org.errUpdateOrganization': '无法更新组织节点。',
@@ -85,8 +59,5 @@ export const org: Record<string, string> = {
   'org.errCreateMembership': '无法创建成员关系。',
   'org.errEndMembership': '无法结束成员关系。',
   'org.errUpdateMembership': '无法更新成员关系。',
-  'org.companies.empty': '暂无公司。',
-  'org.companies.emptyFiltered': '没有符合筛选条件的公司。',
-  'org.company.noMembers': '该公司暂无成员。请邀请用户并选择此公司。',
   'org.organization.empty': '暂无组织节点。',
 }
