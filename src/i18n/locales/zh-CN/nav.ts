@@ -215,7 +215,6 @@ export const nav: Record<string, string> = {
   'nav.system': '系统管理',
   'nav.system.core': '核心配置',
   'nav.system.core.employees': '员工',
-  'nav.system.core.companies': '公司',
   'nav.system.core.organization': '组织架构',
   'nav.system.core.roles-and-access': '角色与权限',
   'nav.system.core.activity': '活动记录',

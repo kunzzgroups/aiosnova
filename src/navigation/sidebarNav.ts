@@ -377,7 +377,6 @@ export const sidebarSections: SidebarSection[] = [
         label: 'Core',
         items: [
           'Employees',
-          'Companies',
           'Organization',
           'Roles & Access',
           'Activity',
