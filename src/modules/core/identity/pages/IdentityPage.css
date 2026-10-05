@@ -815,6 +815,12 @@
   }
 }
 
+@container invitation (max-width: 560px) {
+  .identity-invite-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .identity-delivery-heading {
   display: flex;
   align-items: flex-start;
