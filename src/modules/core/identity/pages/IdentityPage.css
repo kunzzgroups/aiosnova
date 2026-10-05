@@ -716,6 +716,8 @@
   border-radius: 1rem;
   background: var(--color-text-muted);
   position: relative;
+  cursor: pointer;
+  transition: background-color 200ms ease;
 }
 
 .identity-invite-switch input::before {
@@ -727,6 +729,7 @@
   width: 1rem;
   background: white;
   border-radius: 50%;
+  transition: transform 200ms ease;
 }
 
 .identity-invite-switch input:checked {
@@ -734,11 +737,24 @@
 }
 
 .identity-invite-switch input:checked::before {
-  left: 1.2rem;
+  transform: translateX(1rem);
+}
+
+.identity-invite-switch input:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
 }
 
 .identity-invite-switch input:disabled {
   opacity: .6;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-invite-switch input,
+  .identity-invite-switch input::before {
+    transition: none;
+  }
 }
 
 .identity-role-chips {
@@ -865,7 +881,9 @@
 }
 
 .identity-language-toggle {
-  display: inline-flex;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
   flex-shrink: 0;
   gap: .125rem;
   padding: .125rem;
@@ -874,7 +892,25 @@
   background: var(--color-bg-muted);
 }
 
+.identity-language-toggle::before {
+  content: '';
+  position: absolute;
+  top: .125rem;
+  bottom: .125rem;
+  left: .125rem;
+  width: calc((100% - .375rem) / 2);
+  border-radius: calc(var(--radius-md) - 2px);
+  background: var(--color-brand);
+  pointer-events: none;
+  transition: transform 200ms ease;
+}
+
+.identity-language-toggle[data-language='zh-CN']::before {
+  transform: translateX(calc(100% + .125rem));
+}
+
 .identity-language-toggle button {
+  position: relative;
   border: 0;
   background: transparent;
   color: var(--color-text-muted);
@@ -883,11 +919,18 @@
   font: inherit;
   font-size: .75rem;
   cursor: pointer;
+  transition: color 200ms ease;
 }
 
 .identity-language-toggle button[aria-pressed=true] {
-  background: var(--color-brand);
   color: var(--color-on-brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-language-toggle::before,
+  .identity-language-toggle button {
+    transition: none;
+  }
 }
 
 .identity-language-toggle button:focus-visible {
@@ -955,11 +998,16 @@
 .identity-users-page--inviting .identity-invite-page-footer {
   position: relative;
   flex-shrink: 0;
-  min-height: 4rem;
+  min-height: var(--invitation-footer-height, 4rem);
+  box-sizing: border-box;
   margin: 0;
   padding: .65rem var(--space-6);
   align-items: center;
   border: 0;
   border-top: 1px solid var(--color-border);
   border-radius: 0;
+}
+
+.identity-users-page--inviting .identity-invite-page-footer > button {
+  transform: translateY(var(--invitation-footer-offset, 0px));
 }

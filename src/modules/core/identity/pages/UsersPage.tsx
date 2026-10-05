@@ -100,6 +100,7 @@ export function UsersPage() {
   const [page,setPage]=useState(1)
   const department = inviteOptions?.departments.find(d => d.id === departmentId)
   const tableRef=useRef<HTMLDivElement>(null)
+  const invitePageRef=useRef<HTMLDivElement>(null)
   const mfaRequiredByPolicy=assignments.some(a => inviteOptions?.companies.find(c => c.id===a.companyId)?.requireMfa)
   const isOwner=users.some(u => u.id===sessionUser?.id&&u.isOwner)
   const [query,setQuery]=useState('')
@@ -223,6 +224,35 @@ export function UsersPage() {
   useEffect(() => { setPage(1) },[query,statusFilter,signInFilter,mfaFilter,pageSize])
   useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,pageSize])
   useEffect(() => { if(showInvite) document.getElementById('user-email')?.focus() },[showInvite])
+  useEffect(() => {
+    if (!showInvite) return
+    const footer = document.querySelector<HTMLElement>('.sidebar__footer')
+    const pageElement = invitePageRef.current
+    if (!footer || !pageElement) return
+    function alignFooter() {
+      if (!footer || !pageElement) return
+      const height = Math.max(0, window.innerHeight - footer.getBoundingClientRect().top)
+      pageElement.style.setProperty('--invitation-footer-height', height + 'px')
+      const control = footer.querySelector<HTMLElement>('.sidebar__logout')
+      if (control) {
+        const controlRect = control.getBoundingClientRect()
+        const center = controlRect.top + controlRect.height / 2
+        const footerCenter = window.innerHeight - height / 2
+        pageElement.style.setProperty('--invitation-footer-offset', (center - footerCenter) + 'px')
+      }
+    }
+    alignFooter()
+    const observer = new ResizeObserver(alignFooter)
+    observer.observe(footer)
+    window.addEventListener('resize', alignFooter)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', alignFooter)
+      pageElement.style.removeProperty('--invitation-footer-height')
+      pageElement.style.removeProperty('--invitation-footer-offset')
+    }
+  }, [showInvite])
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if(!inviteOptions?.canInvite||!isOwner) return
@@ -231,8 +261,7 @@ export function UsersPage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'Enter a valid work email.'
     if (sendNow) {
       if (!fullName.trim()) errors.name = 'Enter the full name.'
-      if (!departmentId) errors.department = 'Select a department.'
-      if (departmentId && !positionId) errors.position = 'Select a position.'
+
       if (!assignments.length) errors.company = 'Select at least one company.'
     }
     setFieldErrors(errors)
@@ -311,7 +340,7 @@ export function UsersPage() {
   }
 
   return (
-    <div className={`identity-page identity-users-page${showInvite ? ' identity-users-page--inviting' : ''}`}>
+    <div ref={invitePageRef} className={`identity-page identity-users-page${showInvite ? ' identity-users-page--inviting' : ''}`}>
       <FlashToasts
         error={error}
         message={message}
@@ -491,7 +520,7 @@ export function UsersPage() {
               <FormField label="Phone number (optional)" htmlFor="user-phone">
                 <TextField id="user-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" />
               </FormField>
-              <FormField label="Department" htmlFor="user-department" error={fieldErrors.department}>
+              <FormField label="Department (optional)" htmlFor="user-department" error={fieldErrors.department}>
               <SidebarSelect id="user-department" hideLabel aria-invalid={Boolean(fieldErrors.department)} aria-describedby={fieldErrors.department ? 'user-department-error' : undefined} label="Department" value={departmentId} options={[{ value: '', label: 'Select department' }, ...(inviteOptions?.departments.map(d => ({ value: d.id, label: d.name })) || [])]} onChange={id => {
                 clearFieldError('department')
                 clearFieldError('position')
@@ -500,7 +529,7 @@ export function UsersPage() {
                 setPositionId(positions.length === 1 ? positions[0]!.id : '')
               }} disabled={isSubmitting} />
               </FormField>
-              <FormField label="Position" htmlFor="user-position" error={fieldErrors.position}>
+              <FormField label="Position (optional)" htmlFor="user-position" error={fieldErrors.position}>
               <SidebarSelect id="user-position" hideLabel aria-invalid={Boolean(fieldErrors.position)} aria-describedby={fieldErrors.position ? 'user-position-error' : undefined} label="Position" value={positionId} options={[{ value: '', label: 'Select position' }, ...(department?.positions.map(p => ({ value: p.id, label: p.name })) || [])]} onChange={id => { setPositionId(id); clearFieldError('position') }} disabled={!department || isSubmitting} />
               </FormField>
 
@@ -511,7 +540,7 @@ export function UsersPage() {
           <section className="identity-panel">
             <span className="identity-directory-muted">02 / COMPANY & TEAM</span>
             <h3>Company selection</h3>
-            <p className="identity-directory-muted">Select one or more companies. The department and position above apply to all selected companies.</p>
+            <p className="identity-directory-muted">Select one or more companies. Department and position can be assigned now or later.</p>
             <div className="identity-company-buttons">{inviteOptions?.companies.map(company => {
               const selected = assignments.some(a => a.companyId === company.id)
               return <Button id={company.id === inviteOptions.companies[0]?.id ? 'user-company' : undefined} aria-invalid={Boolean(fieldErrors.company)} aria-describedby={fieldErrors.company ? 'user-company-error' : undefined} key={company.id} variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} onClick={() => { clearFieldError('company'); setAssignments(current => selected ? current.filter(a => a.companyId !== company.id) : [...current, { companyId: company.id, organizationId: '', positionId: '', roleIds: [] }]) }}>
@@ -519,12 +548,12 @@ export function UsersPage() {
               </Button>
             })}</div>
             {fieldErrors.company ? <p id="user-company-error" className="ui-form-field__error" role="alert">{fieldErrors.company}</p> : null}
-            <label className="identity-invite-check"><input type="checkbox" checked={canInvite} onChange={e => setCanInvite(e.target.checked)} />Can invite users</label>
+            <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={canInvite} onChange={e => setCanInvite(e.target.checked)} />Can invite users</label>
           </section>
           <section className="identity-panel identity-invite-section--wide">
             <div className="identity-delivery-heading">
               <div><span className="identity-directory-muted">03 / DELIVERY</span><h3>Invitation settings</h3><p className="identity-directory-muted">Invitation expires <strong>7 days after sending</strong>.</p></div>
-              <div className="identity-language-toggle" role="group" aria-label="Email language">
+              <div className="identity-language-toggle" data-language={language} role="group" aria-label="Email language">
                 {[{ value: 'en', label: 'English' }, { value: 'zh-CN', label: '中文' }].map(option => <button key={option.value} type="button" aria-pressed={language === option.value} disabled={isSubmitting} onClick={() => { setLanguage(option.value); if (language !== option.value) setPersonalMessage(INVITATION_MESSAGES[option.value]) }}>{option.label}</button>)}
               </div>
             </div>

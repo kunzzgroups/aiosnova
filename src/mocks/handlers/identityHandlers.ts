@@ -83,15 +83,14 @@ async function saveInvitation(request: Request, id?: string) {
     const selectedDepartment = options.departments.find(d => d.id === body.departmentId)
     if (typeof body.departmentId !== 'string' || typeof body.positionId !== 'string' ||
       (body.departmentId && !selectedDepartment) ||
-      (body.positionId && !selectedDepartment?.positions.some(p => p.id === body.positionId)) ||
-      (body.settings.sendNow && (!body.departmentId || !body.positionId))) {
+      (body.positionId && !selectedDepartment?.positions.some(p => p.id === body.positionId))) {
       return HttpResponse.json({ message: 'Select a valid department and position.' }, { status: 400 })
     }
     const companyIds=new Set<string>()
     for (const assignment of body.assignments) {
       const company=options.companies.find(c=>c.id===assignment.companyId)
       const department=options.departments.find(d=>d.id===assignment.organizationId)
-      if (assignment.organizationId !== body.departmentId || assignment.positionId !== body.positionId || !company || companyIds.has(assignment.companyId) || (assignment.organizationId && !department) || (assignment.positionId && !department?.positions.some(p=>p.id===assignment.positionId)) || !Array.isArray(assignment.roleIds) || assignment.roleIds.some(id=>!options.roles.some(r=>r.id===id)) || (body.settings.sendNow && (!assignment.organizationId || !assignment.positionId))) {
+      if (assignment.organizationId !== body.departmentId || assignment.positionId !== body.positionId || !company || companyIds.has(assignment.companyId) || (assignment.organizationId && !department) || (assignment.positionId && !department?.positions.some(p=>p.id===assignment.positionId)) || !Array.isArray(assignment.roleIds) || assignment.roleIds.some(id=>!options.roles.some(r=>r.id===id))) {
         return HttpResponse.json({ message: 'Invalid company, department, position or role assignment.' }, { status: 400 })
       }
       companyIds.add(assignment.companyId)
