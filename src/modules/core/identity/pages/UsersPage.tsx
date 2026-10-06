@@ -49,6 +49,18 @@ const MFA_FILTERS=['all','enabled','disabled'] as const
 
 const SIGN_IN_FILTERS=['all','otp','password','google','facebook','apple','none'] as const
 
+function paginationItems(current: number, total: number): (number | 'backward' | 'forward')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
+  const start = Math.max(2, Math.min(current - 2, total - 5))
+  const end = Math.min(total - 1, Math.max(current + 2, 6))
+  const items: (number | 'backward' | 'forward')[] = [1]
+  if (start > 2) items.push('backward')
+  for (let number = start; number <= end; number++) items.push(number)
+  if (end < total - 1) items.push('forward')
+  items.push(total)
+  return items
+}
+
 function matchesSearch(user: IdentityUser,query: string) {
   if(!query) {
     return true
@@ -486,12 +498,20 @@ export function UsersPage() {
             <SidebarSelect id="directory-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} value={String(pageSize)} options={[25,50,100,200].map(n => ({ value: String(n), label: String(n) }))} onChange={value => setPageSize(Number(value))} />
             <span>{t('users.listingRange', { start: filteredUsers.length ? (currentPage-1)*pageSize+1 : 0, end: Math.min(currentPage*pageSize,filteredUsers.length), total: filteredUsers.length })}</span>
           </div>
-          <nav aria-label={t('users.directoryPages')}>
+          <nav className="identity-pagination" aria-label={t('users.directoryPages')}>
             <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>
-            {[...new Set([1,currentPage-1,currentPage,currentPage+1,pageCount])].filter(n => n>0&&n<=pageCount).sort((a,b) => a-b).map(n =>
-              <Button key={n} variant={n===currentPage? 'primary':'secondary'} aria-current={n===currentPage? 'page':undefined} onClick={() => setPage(n)}>{n}</Button>)}
+            {paginationItems(currentPage,pageCount).map(item => {
+              if (typeof item === 'number') return (
+                <Button key={item} variant="secondary" aria-label={t('users.pageNumber', { page: item })} aria-current={item===currentPage? 'page':undefined} onClick={() => setPage(item)}>{item}</Button>
+              )
+              const backward = item === 'backward'
+              const label = t(backward ? 'users.jumpBackPages' : 'users.jumpForwardPages')
+              return <Button key={item} variant="ghost" className="identity-pagination__jump" aria-label={label} title={label} onClick={() => setPage(Math.max(1,Math.min(pageCount,currentPage + (backward ? -5 : 5))))}>
+                <span className="identity-pagination__ellipsis" aria-hidden>•••</span>
+                <span className="identity-pagination__jump-arrow" aria-hidden>{backward ? '«' : '»'}</span>
+              </Button>
+            })}
             <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => setPage(currentPage+1)} aria-label={t('users.nextPage')}>›</Button>
-            <SidebarSelect id="directory-page" hideLabel className="identity-pagination-select identity-pagination-select--page" label={t('users.selectPage')} value={String(currentPage)} options={Array.from({ length: pageCount },(_,i) => ({ value: String(i+1), label: t('users.pageNumber', { page: i+1 }) }))} onChange={value => setPage(Number(value))} />
           </nav>
         </footer>
       </section>

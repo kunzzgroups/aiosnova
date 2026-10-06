@@ -146,4 +146,6 @@ export const users: Record<string, string> = {
   "users.statusDraft": "Draft",
   "users.deleteDescriptionPrefix": "This will permanently remove",
   "users.deleteDescriptionSuffix": "and their memberships.",
+  'users.jumpBackPages': "Jump back 5 pages",
+  'users.jumpForwardPages': "Jump forward 5 pages",
 }

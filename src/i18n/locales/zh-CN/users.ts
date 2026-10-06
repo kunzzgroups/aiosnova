@@ -146,4 +146,6 @@ export const users: Record<string, string> = {
   "users.statusDraft": "草稿",
   "users.deleteDescriptionPrefix": "此操作将永久删除",
   "users.deleteDescriptionSuffix": "及其成员关系。",
+  'users.jumpBackPages': "向前跳转 5 页",
+  'users.jumpForwardPages': "向后跳转 5 页",
 }
