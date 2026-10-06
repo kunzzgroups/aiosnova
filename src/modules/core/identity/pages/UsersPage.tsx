@@ -450,8 +450,8 @@ export function UsersPage() {
                           <IconEye />
                         </IconButton>
                         <IconButton
-                          label={t('users.actionEdit')}
-                          onClick={() => navigate(`/system/core/employees/${user.id}?edit=1`)}
+                          label={user.status==='draft'? t('users.continueDraft'):t('users.actionEdit')}
+                          onClick={() => user.status==='draft'? openDraft(user):navigate(`/system/core/employees/${user.id}?edit=1`)}
                         >
                           <IconPencil />
                         </IconButton>
