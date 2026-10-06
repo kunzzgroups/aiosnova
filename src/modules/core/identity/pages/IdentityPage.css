@@ -484,6 +484,31 @@
   font-weight: 600;
 }
 
+.identity-status--interactive {
+  border: 1px solid transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.identity-status--interactive:hover:not(:disabled) {
+  border-color: currentColor;
+}
+
+.identity-status--interactive:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+.identity-status--interactive:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-status--interactive { transition: none; }
+}
+
 .identity-status--active {
   background: var(--color-success-bg);
   color: var(--color-success);
@@ -918,7 +943,7 @@
   padding: .35rem .65rem;
   border-radius: calc(var(--radius-md) - 2px);
   font: inherit;
-  font-size: .75rem;
+  font-size: .8125rem;
   cursor: pointer;
   transition: color 200ms ease;
 }
@@ -1262,3 +1287,16 @@
     transition: none;
   }
 }
+
+/* Compact invitation spacing keeps the stacked sections within desktop height. */
+.identity-invite-content { padding: 1rem var(--space-5); }
+.identity-invite-sections { gap: .75rem; }
+.identity-invite-sections > .identity-panel { padding: 1rem; }
+.identity-invite-fields { margin: .75rem 0; }
+.identity-invite-sections .identity-invite-switch { margin-top: .75rem; }
+.identity-invite-sections .identity-directory-muted { font-size: var(--text-xs); }
+.identity-invite-sections .identity-company-buttons { margin-top: .75rem; gap: .5rem; }
+.identity-invite-sections .identity-company-buttons .ui-button { min-height: 2.5rem; }
+.identity-invite-sections .identity-delivery-heading { margin-bottom: .75rem; }
+.identity-invite--page textarea { min-height: 4rem; }
+.identity-invite-sections .identity-delivery-actions { margin-top: .75rem; }

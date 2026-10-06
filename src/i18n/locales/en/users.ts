@@ -148,4 +148,7 @@ export const users: Record<string, string> = {
   "users.deleteDescriptionSuffix": "and their memberships.",
   'users.jumpBackPages': "Jump back 5 pages",
   'users.jumpForwardPages': "Jump forward 5 pages",
+  'users.activateUser': "Activate {{name}}",
+  'users.deactivateUser': "Deactivate {{name}}",
+  'users.autoRowsHint': "Automatically fits the panel: {{count}} rows per page",
 }

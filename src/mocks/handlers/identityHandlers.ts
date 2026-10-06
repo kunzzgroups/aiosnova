@@ -214,6 +214,14 @@ export const identityHandlers = [
     const actor = directoryActor(request)
     if (!actor?.isOwner && actor?.id !== user.id) return HttpResponse.json({ message: 'Only the owner can edit this account.' }, { status: 403 })
     const body = (await request.json()) as IdentityProfilePayload
+    if (body.status !== undefined) {
+      // Owner fallback until the Permissions-module capability is connected.
+      if (!actor?.isOwner) return HttpResponse.json({ message: 'You do not have permission to change account status.' }, { status: 403 })
+      if (user.isOwner) return HttpResponse.json({ message: 'Owner account status cannot be changed here.' }, { status: 403 })
+      if (!['active', 'disabled'].includes(user.status) || !['active', 'disabled'].includes(body.status)) {
+        return HttpResponse.json({ message: 'Only active or inactive accounts can switch status. Pending invitations must complete acceptance.' }, { status: 400 })
+      }
+    }
     if ((user.status === 'invited' || user.status === 'draft') && body.status === 'active') return HttpResponse.json({ message: 'Complete invitation acceptance before activation.' }, { status: 400 })
     if (body.email !== undefined) {
       const email = body.email.trim().toLowerCase()

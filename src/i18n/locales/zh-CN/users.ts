@@ -148,4 +148,7 @@ export const users: Record<string, string> = {
   "users.deleteDescriptionSuffix": "及其成员关系。",
   'users.jumpBackPages': "向前跳转 5 页",
   'users.jumpForwardPages': "向后跳转 5 页",
+  'users.activateUser': "启用 {{name}}",
+  'users.deactivateUser': "停用 {{name}}",
+  'users.autoRowsHint': "自动适应面板高度：每页 {{count}} 条",
 }

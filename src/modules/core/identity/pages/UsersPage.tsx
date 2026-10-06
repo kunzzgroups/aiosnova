@@ -1,4 +1,4 @@
-import { useCallback,useEffect,useMemo,useRef,useState,type FormEvent } from 'react'
+import { useCallback,useContext,useEffect,useMemo,useRef,useState,type FormEvent } from 'react'
 import { Link,useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
@@ -9,12 +9,8 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import {
-  IconBan,
-  IconCircleCheck,
   IconEye,
   IconPencil,
-  IconShield,
-  IconShieldOff,
   IconTrash,
 } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
@@ -37,6 +33,7 @@ import {
   fetchUsers,
   updateUser,
 } from '@/modules/core/identity/services/identityService'
+import { AppShellHeaderContext } from '@/layouts/AppShell'
 import './IdentityPage.css'
 
 
@@ -71,6 +68,7 @@ function matchesSearch(user: IdentityUser,query: string) {
 
 export function UsersPage() {
   const { t }=useTranslation()
+  const setShellHeader = useContext(AppShellHeaderContext)
   const invitationMessage = (locale: string) => t('users.defaultInvitationMessage', { lng: locale })
   const navigate=useNavigate()
 
@@ -105,13 +103,18 @@ export function UsersPage() {
   const [assignments,setAssignments]=useState<InvitationAssignment[]>([])
   const [inviteOptions,setInviteOptions]=useState<InvitationOptions|null>(null)
   const [memberships,setMemberships]=useState<Awaited<ReturnType<typeof fetchMemberships>>['items']>([])
-  const [pageSize,setPageSize]=useState(50)
+  // Zero represents automatic sizing; numeric choices keep their explicit limit.
+  const [pageSize,setPageSize]=useState(0)
+  const [autoPageSize,setAutoPageSize]=useState(10)
+  const autoFitRowMeasurement=useRef({ width: 0, height: 0 })
   const [page,setPage]=useState(1)
   const department = inviteOptions?.departments.find(d => d.id === departmentId)
   const tableRef=useRef<HTMLDivElement>(null)
   const invitePageRef=useRef<HTMLDivElement>(null)
   const mfaRequiredByPolicy=assignments.some(a => inviteOptions?.companies.find(c => c.id===a.companyId)?.requireMfa)
   const isOwner=users.some(u => u.id===sessionUser?.id&&u.isOwner)
+  // Replace the owner fallback with the Permissions-module capability when available.
+  const canManageUserStatus = isOwner
   const [query,setQuery]=useState('')
   const [statusFilter,setStatusFilter]=useState('all')
   const [signInFilter,setSignInFilter]=useState('all')
@@ -119,6 +122,10 @@ export function UsersPage() {
   const [showInvite,setShowInvite]=useState(false)
   const [fieldErrors,setFieldErrors]=useState<Partial<Record<InviteField,string>>>({})
   const [editingDraftId,setEditingDraftId]=useState<string|null>(null)
+  useEffect(() => {
+    setShellHeader(showInvite ? { titleKey: editingDraftId ? 'users.editDraft' : 'users.inviteTitle', descriptionKey: 'users.inviteDescription' } : null)
+    return () => setShellHeader(null)
+  }, [showInvite,editingDraftId,setShellHeader])
   const [error,setError]=useState<string|null>(null)
   const [message,setMessage]=useState<string|null>(null)
   const [isLoading,setIsLoading]=useState(true)
@@ -227,11 +234,59 @@ export function UsersPage() {
     setError(null)
   }
 
-  const pageCount=Math.max(1,Math.ceil(filteredUsers.length/pageSize))
+  const effectivePageSize=pageSize || autoPageSize
+  const pageCount=Math.max(1,Math.ceil(filteredUsers.length/effectivePageSize))
   const currentPage=Math.min(page,pageCount)
-  const visibleUsers=filteredUsers.slice((currentPage-1)*pageSize,currentPage*pageSize)
-  useEffect(() => { setPage(1) },[query,statusFilter,signInFilter,mfaFilter,pageSize])
-  useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,pageSize])
+  const visibleUsers=filteredUsers.slice((currentPage-1)*effectivePageSize,currentPage*effectivePageSize)
+  useEffect(() => { setPage(1) },[query,statusFilter,signInFilter,mfaFilter,effectivePageSize])
+  useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,effectivePageSize])
+  useEffect(() => {
+    if (showInvite || isLoading || !filteredUsers.length || pageSize !== 0) return
+    const container = tableRef.current
+    const table = container?.querySelector('table')
+    if (!container || !table) return
+    let frame = 0
+    function measureRows() {
+      if (!container || !table) return
+      const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr'))
+      if (!rows.length) return
+      // Read natural row sizes before distributing spare space. Otherwise padded
+      // rows would feed back into the next capacity calculation.
+      rows.forEach(row => row.style.removeProperty('height'))
+      const width = container.clientWidth
+      const headerHeight = table.querySelector('thead')?.getBoundingClientRect().height ?? 0
+      const availableHeight = container.clientHeight - headerHeight - 8
+      if (availableHeight <= 0) return
+      if (autoFitRowMeasurement.current.width !== width) {
+        autoFitRowMeasurement.current = { width, height: 0 }
+      }
+      // Use a stable natural row height instead of recalculating from each page.
+      // The owner has an extra label, so page-one measurements are retained.
+      if (currentPage === 1 || !autoFitRowMeasurement.current.height) {
+        const naturalHeight = Math.max(1, ...rows.map(row => row.getBoundingClientRect().height))
+        autoFitRowMeasurement.current.height = Math.max(autoFitRowMeasurement.current.height, naturalHeight)
+      }
+      const limit = Math.max(1, Math.floor(availableHeight / autoFitRowMeasurement.current.height))
+      setAutoPageSize(current => current === limit ? current : limit)
+      const uniformHeight = availableHeight / limit
+      // Even a short final page uses the same row height as every other page.
+      rows.forEach(row => { row.style.height = uniformHeight + 'px' })
+    }
+    function scheduleMeasure() {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measureRows)
+    }
+    const observer = new ResizeObserver(scheduleMeasure)
+    observer.observe(container)
+    observer.observe(table)
+    scheduleMeasure()
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+      table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => row.style.removeProperty('height'))
+    }
+  }, [showInvite,isLoading,filteredUsers.length,pageSize,currentPage,effectivePageSize])
+
   useEffect(() => { if(showInvite) document.getElementById('user-email')?.focus() },[showInvite])
   useEffect(() => {
     const footer = document.querySelector<HTMLElement>('.sidebar__footer')
@@ -305,6 +360,7 @@ export function UsersPage() {
   }
 
   async function handleToggleStatus(user: IdentityUser) {
+    if (!canManageUserStatus || user.isOwner || statusUpdatingId || !['active','disabled'].includes(user.status)) return
     const nextStatus: UserStatus=user.status==='disabled'? 'active':'disabled'
     setError(null)
     setMessage(null)
@@ -431,9 +487,15 @@ export function UsersPage() {
                     </td>
                     <td>{user.email}</td>
                     <td className="identity-table__status">
-                      <span className={`identity-status identity-status--${user.status}`}>
-                        {formatStatusLabel(user.status,t)}
-                      </span>
+                      {canManageUserStatus && !user.isOwner && ['active','disabled'].includes(user.status) ? (
+                        <button type="button" className={`identity-status identity-status--${user.status} identity-status--interactive`}
+                          disabled={statusUpdatingId!==null} aria-busy={statusUpdatingId===user.id}
+                          aria-label={t(user.status==='active'? 'users.deactivateUser':'users.activateUser', { name: user.displayName })}
+                          title={t(user.status==='active'? 'users.deactivateUser':'users.activateUser', { name: user.displayName })}
+                          onClick={() => void handleToggleStatus(user)}>
+                          {formatStatusLabel(user.status,t)}
+                        </button>
+                      ) : <span className={`identity-status identity-status--${user.status}`}>{formatStatusLabel(user.status,t)}</span>}
                     </td>
                     <td>{user.phone||'—'}</td>
                     <td>{memberships.filter(m => m.userId===user.id).map(m => companies.find(c => c.id===m.companyId)?.name||'').filter(Boolean).join(', ')||'—'}<span className="identity-directory-muted">{memberships.filter(m => m.userId===user.id).map(m => inviteOptions?.companies.find(c => c.id===m.companyId)?.departments.find(d => d.id===m.organizationId)?.positions.find(p => p.id===m.positionId)?.name).filter(Boolean).join(', ')||'—'}</span>
@@ -455,26 +517,6 @@ export function UsersPage() {
                         >
                           <IconPencil />
                         </IconButton>
-                        {isOwner&&user.signInMethod? (
-                          <IconButton
-                            label={user.mfaEnabled? t('users.actionResetMfa'):t('users.actionRequireMfa')}
-                            onClick={() =>
-                              navigate(
-                                `/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled? 'reset':'require'}`,
-                              )
-                            }
-                          >
-                            {user.mfaEnabled? <IconShieldOff />:<IconShield />}
-                          </IconButton>
-                        ):null}
-                        <IconButton
-                          label={user.status==='active'? t('users.statusActive'):t('users.statusInactive')}
-                          variant={user.status==='active'? 'secondary':'danger'}
-                          onClick={() => void handleToggleStatus(user)}
-                          disabled={!isOwner||user.isOwner||user.status==='invited'||user.status==='draft'||statusUpdatingId===user.id}
-                        >
-                          {user.status==='active'? <IconCircleCheck />:<IconBan />}
-                        </IconButton>
                         <IconButton
                           label={sessionUser?.id===user.id? t('users.deleteSelf'):t('users.actionDelete')}
                           variant="danger"
@@ -494,8 +536,8 @@ export function UsersPage() {
         <footer className="identity-directory-footer">
           <div className="identity-directory-footer__listing">
             <label htmlFor="directory-page-size">{t('users.rowsPerPage')}</label>
-            <SidebarSelect id="directory-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} value={String(pageSize)} options={[25,50,100,200].map(n => ({ value: String(n), label: String(n) }))} onChange={value => setPageSize(Number(value))} />
-            <span>{t('users.listingRange', { start: filteredUsers.length ? (currentPage-1)*pageSize+1 : 0, end: Math.min(currentPage*pageSize,filteredUsers.length), total: filteredUsers.length })}</span>
+            <SidebarSelect id="directory-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} title={pageSize===0? t('users.autoRowsHint', { count: autoPageSize }):undefined} value={String(pageSize)} options={[{ value: '0', label: '–' }, ...[25,50,100,200].map(n => ({ value: String(n), label: String(n) }))]} onChange={value => setPageSize(Number(value))} />
+            <span>{t('users.listingRange', { start: filteredUsers.length ? (currentPage-1)*effectivePageSize+1 : 0, end: Math.min(currentPage*effectivePageSize,filteredUsers.length), total: filteredUsers.length })}</span>
           </div>
           <nav className="identity-pagination" aria-label={t('users.directoryPages')}>
             <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>
@@ -518,16 +560,9 @@ export function UsersPage() {
 
       {showInvite? <form noValidate className="identity-invite identity-invite--page" onSubmit={e => void handleCreate(e)}>
         <div className="identity-invite-content">
-        <header className="identity-panel__title-row">
-          <div>
-            <h2>{editingDraftId? t('users.editDraft'):t('users.inviteTitle')}</h2>
-            <p>{t('users.inviteDescription')}</p>
-          </div>
-          <Button variant="secondary" onClick={handleToggleInvite} disabled={isSubmitting}>{t('users.backToUsers')}</Button>
-        </header>
+
         <fieldset disabled={isSubmitting} className="identity-invite-sections">
           <section className="identity-panel">
-            <span className="identity-directory-muted">{t('users.profileSecurity')}</span>
             <h3>{t('users.basicInformation')}</h3>
             <div className="identity-invite-fields">
               <FormField label={t('users.workEmail')} htmlFor="user-email" error={fieldErrors.email ? t(fieldErrors.email) : undefined}>
@@ -557,7 +592,6 @@ export function UsersPage() {
               <input type="checkbox" role="switch" checked={requireMfa||mfaRequiredByPolicy} disabled={mfaRequiredByPolicy} onChange={e => setRequireMfa(e.target.checked)} />{t('users.actionRequireMfa')}</label>{mfaRequiredByPolicy? <p className="identity-directory-muted">{t('users.companyPolicyMfa')}</p>:null}<p className="identity-directory-muted">{t('users.mfaEnrollmentHint')}</p>
           </section>
           <section className="identity-panel">
-            <span className="identity-directory-muted">{t('users.companyTeam')}</span>
             <h3>{t('users.companySelection')}</h3>
             <p className="identity-directory-muted">{t('users.companySelectionHint')}</p>
             <div className="identity-company-buttons">{inviteOptions?.companies.map(company => {
@@ -571,7 +605,7 @@ export function UsersPage() {
           </section>
           <section className="identity-panel identity-invite-section--wide">
             <div className="identity-delivery-heading">
-              <div><span className="identity-directory-muted">{t('users.delivery')}</span><h3>{t('users.invitationSettings')}</h3><p className="identity-directory-muted">{t('users.expiryPrefix')} <strong>{t('users.expiryDuration')}</strong>.</p></div>
+              <div><h3>{t('users.invitationSettings')}</h3><p className="identity-directory-muted">{t('users.expiryPrefix')} <strong>{t('users.expiryDuration')}</strong>.</p></div>
               <div className="identity-language-toggle" data-language={language} role="group" aria-label={t('users.emailLanguage')}>
                 {[{ value: 'en', label: 'English' }, { value: 'zh-CN', label: '中文' }].map(option => <button key={option.value} type="button" aria-pressed={language === option.value} disabled={isSubmitting} onClick={() => { setLanguage(option.value); if (language !== option.value) setPersonalMessage(invitationMessage(option.value)) }}>{option.label}</button>)}
               </div>
