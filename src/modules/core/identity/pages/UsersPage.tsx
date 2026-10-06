@@ -167,7 +167,7 @@ export function UsersPage() {
         return false
       }
       return true
-    })
+    }).sort((a,b) => Number(Boolean(b.isOwner && b.id===sessionUser?.id)) - Number(Boolean(a.isOwner && a.id===sessionUser?.id)))
   },[users,query,statusFilter,signInFilter,mfaFilter,sessionUser?.id])
 
   function clearFieldError(field: InviteField) {
@@ -222,7 +222,6 @@ export function UsersPage() {
   useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,pageSize])
   useEffect(() => { if(showInvite) document.getElementById('user-email')?.focus() },[showInvite])
   useEffect(() => {
-    if (!showInvite) return
     const footer = document.querySelector<HTMLElement>('.sidebar__footer')
     const pageElement = invitePageRef.current
     if (!footer || !pageElement) return
@@ -252,7 +251,7 @@ export function UsersPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if(!inviteOptions?.canInvite||!isOwner) return
+    if(!inviteOptions?.canInvite) return
     const sendNow = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') !== 'draft'
     const errors: Partial<Record<InviteField,string>> = {}
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'users.invalidWorkEmail'
@@ -345,7 +344,7 @@ export function UsersPage() {
         onClearMessage={() => setMessage(null)}
       />
 
-      <section className="identity-panel" hidden={showInvite}>
+      <section className="identity-panel identity-directory-panel" hidden={showInvite}>
         <div className="identity-directory-toolbar">
           <TextField
             className="identity-directory-toolbar__search"
@@ -378,7 +377,7 @@ export function UsersPage() {
               onChange={setMfaFilter}
             />
           </div>
-          {isOwner&&inviteOptions?.canInvite? <Button className="identity-directory-invite-button" onClick={handleToggleInvite}>{t('users.inviteUser')}</Button>:null}
+          {inviteOptions?.canInvite? <Button className="identity-directory-invite-button" onClick={handleToggleInvite}>{t('users.inviteUser')}</Button>:null}
         </div>
 
         {isLoading? <p className="identity-empty">{t('users.loading')}</p>:null}
@@ -406,15 +405,17 @@ export function UsersPage() {
                 {visibleUsers.map((user) => (
                   <tr key={user.id}>
                     <td>
+                      <div className="identity-directory-name">
                       <Link className="identity-text-link" to={`/system/core/employees/${user.id}`}>
                         {user.fullName||user.displayName}
                       </Link>
-                      {user.isOwner? <span className="identity-directory-muted">{t('users.ownerYou')}</span>:null}
                       {!isIdentityProfileComplete(user)? (
                         <span className="identity-status identity-status--invited identity-status--inline">
                           {t('users.incomplete')}
                         </span>
                       ):null}
+                      </div>
+                      {user.isOwner? <span className="identity-directory-muted">{t('users.ownerYou')}</span>:null}
                     </td>
                     <td>{user.email}</td>
                     <td className="identity-table__status">
@@ -480,15 +481,17 @@ export function UsersPage() {
           </div>
         ):null}
         <footer className="identity-directory-footer">
-          <label>{t('users.rowsPerPage')} <select aria-label={t('users.rowsPerPage')} value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>{[25,50,100,200].map(n =>
-            <option key={n}>{n}</option>)}</select>
+          <div className="identity-directory-footer__listing">
+            <label htmlFor="directory-page-size">{t('users.rowsPerPage')}</label>
+            <SidebarSelect id="directory-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} value={String(pageSize)} options={[25,50,100,200].map(n => ({ value: String(n), label: String(n) }))} onChange={value => setPageSize(Number(value))} />
             <span>{t('users.listingRange', { start: filteredUsers.length ? (currentPage-1)*pageSize+1 : 0, end: Math.min(currentPage*pageSize,filteredUsers.length), total: filteredUsers.length })}</span>
-          </label>
+          </div>
           <nav aria-label={t('users.directoryPages')}>
-            <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>{[...new Set([1,currentPage-1,currentPage,currentPage+1,pageCount])].filter(n => n>0&&n<=pageCount).sort((a,b) => a-b).map(n =>
-              <Button key={n} variant={n===currentPage? 'primary':'secondary'} aria-current={n===currentPage? 'page':undefined} onClick={() => setPage(n)}>{n}</Button>)}<select aria-label={t('users.selectPage')} value={currentPage} onChange={e => setPage(Number(e.target.value))}>{Array.from({ length: pageCount },(_,i) =>
-                <option key={i} value={i+1}>{t('users.pageNumber', { page: i+1 })}</option>)}</select>
+            <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>
+            {[...new Set([1,currentPage-1,currentPage,currentPage+1,pageCount])].filter(n => n>0&&n<=pageCount).sort((a,b) => a-b).map(n =>
+              <Button key={n} variant={n===currentPage? 'primary':'secondary'} aria-current={n===currentPage? 'page':undefined} onClick={() => setPage(n)}>{n}</Button>)}
             <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => setPage(currentPage+1)} aria-label={t('users.nextPage')}>›</Button>
+            <SidebarSelect id="directory-page" hideLabel className="identity-pagination-select identity-pagination-select--page" label={t('users.selectPage')} value={String(currentPage)} options={Array.from({ length: pageCount },(_,i) => ({ value: String(i+1), label: t('users.pageNumber', { page: i+1 }) }))} onChange={value => setPage(Number(value))} />
           </nav>
         </footer>
       </section>

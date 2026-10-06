@@ -344,3 +344,15 @@ export function mockInvitationOptions(canInvite: boolean): InvitationOptions {
   })) }
 }
 identityUsers[0]!.isOwner = true
+
+// Explicit owner access for this local demo identity only.
+// Google sign-in itself does not grant ownership to other accounts.
+const googleDemoOwner = upsertIdentityUser({
+  id: 'user-google',
+  email: 'google.user@aios.dev',
+  displayName: 'Google User',
+  status: 'active',
+  signInMethod: 'google',
+})
+googleDemoOwner.canInvite = true
+googleDemoOwner.isOwner = true

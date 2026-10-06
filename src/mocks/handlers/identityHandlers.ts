@@ -70,9 +70,10 @@ function directoryActor(request: Request) {
 
 async function saveInvitation(request: Request, id?: string) {
     const actor = directoryActor(request)
-    if (!actor?.isOwner) return HttpResponse.json({ message: 'Only the owner can assign staff access in this mock API.' }, { status: 403 })
+    if (!actor?.isOwner && !actor?.canInvite) return HttpResponse.json({ message: 'You do not have permission to invite users.' }, { status: 403 })
     const existing = id ? identityUsers.find(u => u.id === id) : undefined
     if (id && !existing) return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
+    if (existing && !actor?.isOwner) return HttpResponse.json({ message: 'Only the owner can edit existing invitation drafts.' }, { status: 403 })
     if (existing && existing.status !== 'draft') return HttpResponse.json({ message: 'Only drafts can be edited here.' }, { status: 409 })
     const body = await request.json() as InvitationPayload
     const email = body.email?.trim().toLowerCase()
