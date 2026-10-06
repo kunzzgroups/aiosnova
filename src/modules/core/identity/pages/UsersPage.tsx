@@ -419,7 +419,7 @@ export function UsersPage() {
                     <td>
                       <div className="identity-directory-name">
                       <Link className="identity-text-link" to={`/system/core/employees/${user.id}`}>
-                        {user.fullName||user.displayName}
+                        {user.displayName}
                       </Link>
                       {!isIdentityProfileComplete(user)? (
                         <span className="identity-status identity-status--invited identity-status--inline">
@@ -450,9 +450,8 @@ export function UsersPage() {
                           <IconEye />
                         </IconButton>
                         <IconButton
-                          label={user.status==='draft'? t('users.continueDraft'):t('users.actionEdit')}
-                          disabled={!isOwner && sessionUser?.id !== user.id}
-                          onClick={() => user.status==='draft'? openDraft(user):navigate(`/system/core/employees/${user.id}?edit=1`)}
+                          label={t('users.actionEdit')}
+                          onClick={() => navigate(`/system/core/employees/${user.id}?edit=1`)}
                         >
                           <IconPencil />
                         </IconButton>

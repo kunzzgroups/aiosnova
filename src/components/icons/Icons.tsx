@@ -287,3 +287,14 @@ export function IconStop(props: IconProps) {
     </IconSvg>
   )
 }
+
+/** Vertical ellipsis - the "more actions" trigger on a row. */
+export function IconMore(props: IconProps) {
+  return (
+    <IconSvg {...props} stroke="none">
+      <circle cx="12" cy="5" r="1.7" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.7" fill="currentColor" />
+      <circle cx="12" cy="19" r="1.7" fill="currentColor" />
+    </IconSvg>
+  )
+}

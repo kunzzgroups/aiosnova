@@ -11,6 +11,8 @@ type ConfirmDialogProps = {
   warning?: string
   confirmLabel?: string
   cancelLabel?: string
+  /** Shown on the confirm button while `busy`. */
+  busyLabel?: string
   busy?: boolean
   onConfirm: () => void
   onCancel: () => void
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   warning = 'This action cannot be undone.',
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
+  busyLabel = 'Deleting…',
   busy = false,
   onConfirm,
   onCancel,
@@ -70,7 +73,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button type="button" variant="danger" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Deleting…' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </Button>
         </div>
       </div>

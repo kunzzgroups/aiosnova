@@ -33,8 +33,6 @@ export function SidebarSelect({
   hideLabel = false,
   className = '',
   title,
-  'aria-invalid': ariaInvalid,
-  'aria-describedby': ariaDescribedBy,
 }: SidebarSelectProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -82,8 +80,6 @@ export function SidebarSelect({
         aria-expanded={open}
         aria-controls={listId}
         aria-label={label}
-        aria-invalid={ariaInvalid}
-        aria-describedby={ariaDescribedBy}
         title={title}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}

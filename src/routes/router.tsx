@@ -10,10 +10,11 @@ import { MfaSetupPage } from '@/modules/core/auth/pages/MfaSetupPage'
 import { OAuthCallbackPage } from '@/modules/core/auth/pages/OAuthCallbackPage'
 import { HomePage } from '@/modules/core/auth/pages/HomePage'
 import { AiAssistantPage } from '@/modules/ai/assistant/pages/AiAssistantPage'
+import { AgentsPage } from '@/modules/ai/agents/pages/AgentsPage'
+import { KnowledgeBasesPage } from '@/modules/ai/knowledge/pages/KnowledgeBasesPage'
+import { KnowledgeBaseDetailPage } from '@/modules/ai/knowledge/pages/KnowledgeBaseDetailPage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
-import { CompaniesPage } from '@/modules/core/identity/pages/CompaniesPage'
-import { CompanyDetailPage } from '@/modules/core/identity/pages/CompanyDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
 import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
 
@@ -36,10 +37,12 @@ export function AppRouter() {
             <Route path="/" element={<HomePage />} />
             <Route path="/mfa/setup" element={<MfaSetupPage />} />
             <Route path="/ai/ai/ai-assistant" element={<AiAssistantPage />} />
+            <Route path="/ai/ai/ai-agents" element={<AgentsPage />} />
+            <Route path="/ai/ai/knowledge" element={<KnowledgeBasesPage />} />
+            <Route path="/ai/ai/knowledge/:baseId" element={<KnowledgeBaseDetailPage />} />
+            <Route path="/ai/ai/knowledge/:baseId/:tab" element={<KnowledgeBaseDetailPage />} />
             <Route path="/system/core/employees" element={<UsersPage />} />
             <Route path="/system/core/employees/:userId" element={<UserDetailPage />} />
-            <Route path="/system/core/companies" element={<CompaniesPage />} />
-            <Route path="/system/core/companies/:companyId" element={<CompanyDetailPage />} />
             <Route path="/system/core/organization" element={<OrganizationPage />} />
             <Route path="/system/core/roles-and-access" element={<ModulePlaceholderPage />} />
             <Route path="/system/core/activity" element={<ModulePlaceholderPage />} />
