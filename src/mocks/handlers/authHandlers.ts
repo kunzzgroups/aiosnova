@@ -1,4 +1,4 @@
-import { bypass, HttpResponse, http } from 'msw'
+import { HttpResponse, http, passthrough } from 'msw'
 import type {
   AuthUser,
   ForgotPasswordRequest,
@@ -8,7 +8,6 @@ import type {
   MfaSetupConfirmRequest,
   MfaVerifyRequest,
   ResetPasswordRequest,
-  TacVerifyRequest,
 } from '@/modules/core/auth/types/auth'
 import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
 import { identityUsers, recordIdentitySignIn, upsertIdentityUser } from '@/mocks/data/identity'
@@ -91,10 +90,6 @@ function cookieHeader(name: string, value: string, options?: { maxAge?: number; 
   }
 
   return parts.join('; ')
-}
-
-function clearCookieHeader(name: string, httpOnly = false) {
-  return cookieHeader(name, '', { maxAge: 0, httpOnly })
 }
 
 function findUserByEmail(email: string) {
@@ -200,7 +195,7 @@ export const authHandlers = [
     const body = (await request.json()) as LoginRequest
     const user = findUserByEmail(body.email ?? '')
 
-    if (!user || user.password !== body.password) {
+    if (!user || !user.password || user.password !== body.password) {
       return HttpResponse.json({ message: GENERIC_LOGIN_ERROR }, { status: 401 })
     }
 
@@ -280,32 +275,11 @@ export const authHandlers = [
   //   })
   // }),
 
-  http.post('/api/auth/login/tac/verify', async ({ request }) => {
-  const body = (await request.json()) as TacVerifyRequest
-  const user = findUserByEmail(body.email?.trim() ?? '')
-
-  if (!user) {
-    return HttpResponse.json(
-      { message: 'Use an existing demo account for this local login test.' },
-      { status: 401 },
-    )
-  }
-
-  const response = await fetch(bypass(request.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-  }))
-
-  if (!response.ok) {
-    return HttpResponse.json(await response.json(), { status: response.status })
-  }
-
-  return issueSession(user, 'otp')
-  }),
+  http.post('/api/auth/login/tac/verify', () => passthrough()),
 
   http.post('/api/auth/mfa/verify', async ({ request }) => {
     const body = (await request.json()) as MfaVerifyRequest
+    if (body.mfaTicket.startsWith('activation_')) return passthrough()
     const ticket = mfaTickets.get(body.mfaTicket)
 
     if (!ticket || ticket.expiresAt < Date.now()) {
@@ -325,52 +299,8 @@ export const authHandlers = [
     return issueSession(user)
   }),
 
-  http.post('/api/auth/refresh', ({ request }) => {
-    if (!requireCsrf(request)) {
-      return HttpResponse.json({ message: 'CSRF validation failed.' }, { status: 403 })
-    }
-
-    const cookies = parseCookies(request.headers.get('cookie'))
-    const refreshToken = cookies[REFRESH_COOKIE]
-    const session = refreshToken ? sessions.get(refreshToken) : undefined
-
-    if (!session || session.revoked) {
-      return HttpResponse.json({ message: 'Session expired.' }, { status: 401 })
-    }
-
-    const user = findUserById(session.userId)
-    if (!user) {
-      return HttpResponse.json({ message: 'Session expired.' }, { status: 401 })
-    }
-
-    return HttpResponse.json({
-      accessToken: `access_${user.id}`,
-      user: toPublicUser(user),
-    })
-  }),
-
-  http.post('/api/auth/logout', ({ request }) => {
-    if (!requireCsrf(request)) {
-      return HttpResponse.json({ message: 'CSRF validation failed.' }, { status: 403 })
-    }
-
-    const cookies = parseCookies(request.headers.get('cookie'))
-    const refreshToken = cookies[REFRESH_COOKIE]
-    if (refreshToken && sessions.has(refreshToken)) {
-      const session = sessions.get(refreshToken)!
-      sessions.set(refreshToken, { ...session, revoked: true })
-    }
-
-    return HttpResponse.json(
-      { message: 'Signed out.' },
-      {
-        headers: [
-          ['Set-Cookie', clearCookieHeader(REFRESH_COOKIE, true)],
-          ['Set-Cookie', clearCookieHeader(CSRF_COOKIE)],
-        ],
-      },
-    )
-  }),
+  http.post('/api/auth/refresh', () => passthrough()),
+  http.post('/api/auth/logout', () => passthrough()),
 
   http.get('/api/auth/oauth/:provider/start', ({ params }) => {
     const provider = String(params.provider)
@@ -389,7 +319,7 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
     }
 
-    const email = `${provider}.user@aios.dev`
+    const email = provider === 'google' ? 'demo@aios.dev' : `${provider}.user@aios.dev`
     let user = findUserByEmail(email)
     if (!user) {
       user = {

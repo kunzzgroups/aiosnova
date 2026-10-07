@@ -27,7 +27,7 @@ export type KnowledgeDocumentType = 'contract' | 'invoice' | 'policy' | 'record'
 
 export type KnowledgeBase = {
   id: string
-  tenantId: string
+  merchantId: string
   /** Owning company. Never null - a base belongs to exactly one company. */
   companyId: string
   name: string

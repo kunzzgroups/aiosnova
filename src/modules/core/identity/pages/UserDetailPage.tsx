@@ -1,576 +1,162 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useCallback, useContext, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { IconButton } from '@/components/ui/IconButton'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
+import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { AppShellHeaderContext } from '@/layouts/AppShell'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
-import {
-  IconBan,
-  IconCircleCheck,
-  IconShield,
-  IconShieldOff,
-  IconTrash,
-} from '@/components/icons/Icons'
-import {
-  isIdentityProfileComplete,
-  formatStatusLabel,
-  type IdentityUser,
-} from '@/modules/core/identity/types/identity'
-import { PasswordField } from '@/modules/core/auth/components/PasswordField'
-import {
-  isValidPassword,
-  PASSWORD_CONFIRM_PLACEHOLDER,
-  PASSWORD_CURRENT_PLACEHOLDER,
-  PASSWORD_MISMATCH_MESSAGE,
-} from '@/modules/core/auth/utils/passwordPolicy'
-import {
-  changeOwnPassword,
-  deleteUser,
-  fetchUser,
-  updateUser,
-  type MembershipWithLabels,
-} from '@/modules/core/identity/services/identityService'
+import { isIdentityProfileComplete, type IdentityUser, type InvitationOptions } from '@/modules/core/identity/types/identity'
+import { fetchUser, fetchUsers, fetchInvitationOptions, updateUser, type MembershipWithLabels } from '@/modules/core/identity/services/identityService'
 import './IdentityPage.css'
-
-function profileInitials(user: IdentityUser) {
-  const source = (user.fullName || user.displayName || user.email).trim()
-  const parts = source.split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) {
-    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
-  }
-  return source.slice(0, 2).toUpperCase()
-}
 
 export function UserDetailPage() {
   const { t } = useTranslation()
   const { userId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const sessionUser = useAuthStore((state) => state.user)
+  const setShellHeader = useContext(AppShellHeaderContext)
+  const sessionUser = useAuthStore(state => state.user)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const [user,setUser] = useState<IdentityUser|null>(null)
+  const [memberships,setMemberships] = useState<MembershipWithLabels[]>([])
+  const [options,setOptions] = useState<InvitationOptions|null>(null)
+  const [isOwner,setIsOwner] = useState(false)
+  const [isAdmin,setIsAdmin] = useState(false)
+  const [isEditing,setIsEditing] = useState(searchParams.get('edit') === '1')
+  const [email,setEmail] = useState('')
+  const [fullName,setFullName] = useState('')
+  const [phone,setPhone] = useState('')
+  const [departmentId,setDepartmentId] = useState('')
+  const [positionId,setPositionId] = useState('')
+  const [companyIds,setCompanyIds] = useState<string[]>([])
+  const [requireMfa,setRequireMfa] = useState(false)
+  const [canInvite,setCanInvite] = useState(false)
+  const [error,setError] = useState<string|null>(null)
+  const [message,setMessage] = useState<string|null>(null)
+  const [isLoading,setIsLoading] = useState(true)
+  const [isSaving,setIsSaving] = useState(false)
+  const canManage = isOwner || isAdmin
+  const canEdit = canManage || sessionUser?.id === userId
+  const department = options?.departments.find(item => item.id === departmentId)
+  const policyMfa = companyIds.some(id => options?.companies.find(company => company.id === id)?.requireMfa)
 
-  const [user, setUser] = useState<IdentityUser | null>(null)
-  const [memberships, setMemberships] = useState<MembershipWithLabels[]>([])
-  const [displayName, setDisplayName] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
-  const [isEditing, setIsEditing] = useState(searchParams.get('edit') === '1')
-  const [showPasswordForm, setShowPasswordForm] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  const isSelf = Boolean(sessionUser && user && sessionUser.id === user.id)
-  const confirmPasswordMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword
+  function applyProfileForm(nextUser: IdentityUser, assignments: MembershipWithLabels[]) {
+    setEmail(nextUser.email)
+    setFullName(nextUser.fullName || nextUser.displayName)
+    setPhone(nextUser.phone)
+    setDepartmentId(nextUser.departmentId ?? assignments[0]?.organizationId ?? '')
+    setPositionId(nextUser.positionId ?? assignments[0]?.positionId ?? '')
+    setCompanyIds(assignments.map(item => item.companyId).filter((id): id is string => Boolean(id)))
+    setRequireMfa(Boolean(nextUser.requireMfa))
+    setCanInvite(Boolean(nextUser.canInvite))
+  }
 
   const loadUser = useCallback(async () => {
-    if (!userId) {
-      return
-    }
     setIsLoading(true)
-    setError(null)
     try {
-      const result = await fetchUser(userId)
+      const [result,invitationOptions,directory] = await Promise.all([fetchUser(userId),fetchInvitationOptions(),fetchUsers()])
       setUser(result.user)
       setMemberships(result.memberships)
-      applyProfileForm(result.user)
+      setOptions(invitationOptions)
+      setIsOwner(directory.items.some(item => item.id === sessionUser?.id && item.isOwner))
+      setIsAdmin(directory.items.some(item => item.id === sessionUser?.id && item.canManageUsers))
+      applyProfileForm(result.user,result.memberships)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('users.errLoadUser'))
       setUser(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [userId])
-
+    } finally { setIsLoading(false) }
+  },[userId,sessionUser?.id])
+  useEffect(() => { void loadUser() },[loadUser])
   useEffect(() => {
-    void loadUser()
-  }, [loadUser])
-
+    setShellHeader({ titleKey: isEditing ? 'users.editUserTitle' : 'users.viewUserTitle', descriptionKey: 'users.profileDescription' })
+    return () => setShellHeader(null)
+  },[isEditing,setShellHeader])
   useEffect(() => {
-    if (!message) {
-      return
+    const footer = document.querySelector<HTMLElement>('.sidebar__footer')
+    const page = pageRef.current
+    if (!footer || !page) return
+    const align = () => {
+      const height = window.innerHeight - footer.getBoundingClientRect().top
+      page.style.setProperty('--invitation-footer-height',height + 'px')
+      const control = footer.querySelector<HTMLElement>('.sidebar__logout')?.getBoundingClientRect()
+      if (control) page.style.setProperty('--invitation-footer-offset',(control.top + control.height / 2 - (window.innerHeight - height / 2)) + 'px')
     }
-
-    const timeoutId = window.setTimeout(() => {
-      setMessage(null)
-    }, 1000)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [message])
-
-  function applyProfileForm(nextUser: IdentityUser) {
-    setDisplayName(nextUser.displayName)
-    setFullName(nextUser.fullName)
-    setEmail(nextUser.email)
-    setPhone(nextUser.phone)
-    setAvatarUrl(nextUser.avatarUrl)
-  }
-
-  function syncSessionIfSelf(nextUser: IdentityUser) {
-    if (sessionUser?.id === nextUser.id) {
-      useAuthStore.getState().setUser({
-        ...sessionUser,
-        email: nextUser.email,
-        name: nextUser.displayName,
-        mfaEnabled: nextUser.mfaEnabled,
-        profileComplete: isIdentityProfileComplete(nextUser),
-      })
-    }
-  }
+    const observer = new ResizeObserver(align)
+    observer.observe(footer)
+    window.addEventListener('resize',align)
+    align()
+    return () => { observer.disconnect(); window.removeEventListener('resize',align) }
+  },[])
 
   async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!user) {
-      return
-    }
+    if (!user || !canEdit || isSaving) return
     setIsSaving(true)
     setError(null)
-    setMessage(null)
     try {
-      const updated = await updateUser(user.id, {
-        displayName,
-        fullName,
-        email,
-        phone,
-        avatarUrl,
+      const updated = await updateUser(user.id,{
+        email: email.trim(), fullName: fullName.trim(), displayName: fullName.trim(), phone: phone.trim(),
+        ...(canManage ? { requireMfa, canInvite } : {}),
+        ...(canManage ? { departmentId, positionId,
+          assignments: companyIds.map(companyId => {
+            const existing = memberships.find(item => item.companyId === companyId)
+            const teamChanged = departmentId !== (user.departmentId ?? memberships[0]?.organizationId ?? '') || positionId !== (user.positionId ?? memberships[0]?.positionId ?? '')
+            return { companyId, organizationId: existing && !teamChanged ? (existing.organizationId ?? '') : departmentId, positionId: existing && !teamChanged ? (existing.positionId ?? '') : positionId, roleIds: existing?.roleIds ?? [] }
+          }) } : {}),
       })
+      const result = await fetchUser(user.id)
       setUser(updated)
-      applyProfileForm(updated)
-      syncSessionIfSelf(updated)
+      setMemberships(result.memberships)
+      applyProfileForm(updated,result.memberships)
+      if (sessionUser?.id === updated.id) useAuthStore.getState().setUser({ ...sessionUser,email: updated.email,name: updated.displayName,mfaEnabled: updated.mfaEnabled,profileComplete: isIdentityProfileComplete(updated),isOwner: updated.isOwner,canManageUsers: updated.canManageUsers })
       setIsEditing(false)
       setMessage(t('users.msgProfileSaved'))
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('users.errSaveProfile'))
-    } finally {
-      setIsSaving(false)
-    }
+    } catch (err) { setError(err instanceof ApiError ? err.message : t('users.errSaveProfile')) }
+    finally { setIsSaving(false) }
   }
 
-  function handleCancelEdit() {
-    if (user) {
-      applyProfileForm(user)
-    }
-    setIsEditing(false)
-  }
-
-  async function handleToggleStatus() {
-    if (!user) {
-      return
-    }
-    const nextStatus = user.status === 'disabled' ? 'active' : 'disabled'
-    setError(null)
-    setMessage(null)
-    try {
-      const updated = await updateUser(user.id, { status: nextStatus })
-      setUser(updated)
-      setMessage(nextStatus === 'disabled' ? t('users.msgUserDisabled') : t('users.msgUserActivated'))
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('users.errUpdateStatus'))
-    }
-  }
-
-  function requestDelete() {
-    if (isSelf) {
-      setError(t('users.deleteSelf'))
-      return
-    }
-    setError(null)
-    setShowDeleteConfirm(true)
-  }
-
-  async function handleConfirmDelete() {
-    if (!user) {
-      return
-    }
-    setError(null)
-    setMessage(null)
-    setIsDeleting(true)
-    try {
-      await deleteUser(user.id)
-      navigate('/system/core/employees')
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('users.errDelete'))
-      setIsDeleting(false)
-    }
-  }
-
-  async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!isValidPassword(newPassword)) {
-      setError(t('auth.newPasswordPolicyError'))
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      return
-    }
-    setIsSaving(true)
-    setError(null)
-    setMessage(null)
-    try {
-      const result = await changeOwnPassword({ currentPassword, newPassword })
-      setMessage(result.message)
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-      setShowPasswordForm(false)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('users.errChangePassword'))
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="identity-page">
-        <p className="identity-empty">{t('users.loading')}</p>
+  return <div ref={pageRef} className="identity-page identity-users-page identity-users-page--inviting">
+    <FlashToasts error={error} message={message} onClearError={() => setError(null)} onClearMessage={() => setMessage(null)} />
+    {isLoading ? <p className="identity-empty">{t('users.loading')}</p> : !user ? <Button variant="secondary" onClick={() => navigate('/system/core/employees')}>{t('users.backToUsers')}</Button> :
+    <form className="identity-invite identity-invite--page" onSubmit={event => void handleSaveProfile(event)}>
+      <div className="identity-invite-content">
+        <fieldset className="identity-invite-sections" disabled={!isEditing || !canEdit || isSaving}>
+          <section className="identity-panel">
+            <h3>{t('users.basicInformation')}</h3>
+            <div className="identity-invite-fields">
+              <FormField label={t('users.workEmail')} htmlFor="profile-email"><TextField id="profile-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} /></FormField>
+              <FormField label={t('users.fieldFullName')} htmlFor="profile-name"><TextField id="profile-name" required value={fullName} onChange={event => setFullName(event.target.value)} /></FormField>
+              <FormField label={t('users.optionalPhone')} htmlFor="profile-phone"><TextField id="profile-phone" type="tel" value={phone && !canEdit ? '••••••••' : phone} onChange={event => setPhone(event.target.value)} /></FormField>
+              <FormField label={t('users.optionalDepartment')} htmlFor="profile-department"><SidebarSelect id="profile-department" hideLabel label={t('users.department')} value={departmentId} disabled={!canManage} options={[{value:'',label:t('users.selectDepartment')},...(options?.departments.map(item => ({value:item.id,label:item.name})) ?? [])]} onChange={id => {setDepartmentId(id); const positions = options?.departments.find(item => item.id === id)?.positions ?? []; setPositionId(positions.length === 1 ? positions[0]!.id : '')}} /></FormField>
+              <FormField label={t('users.optionalPosition')} htmlFor="profile-position"><SidebarSelect id="profile-position" hideLabel label={t('users.colPosition')} value={positionId} disabled={!canManage || !department} options={[{value:'',label:t('users.selectPosition')},...(department?.positions.map(item => ({value:item.id,label:item.name})) ?? [])]} onChange={setPositionId} /></FormField>
+            </div>
+            {canManage ? <>
+              <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={requireMfa || policyMfa} disabled={policyMfa} onChange={event => setRequireMfa(event.target.checked)} />{t('users.actionRequireMfa')}</label>
+              {policyMfa ? <p className="identity-directory-muted">{t('users.companyPolicyMfa')}</p> : null}
+              <p className="identity-directory-muted">{t('users.profileMfaHint')}</p>
+            </> : null}
+          </section>
+          <section className="identity-panel">
+            <h3>{t('users.companySelection')}</h3>
+            <p className="identity-directory-muted">{t('users.companySelectionHint')}</p>
+            <div className="identity-company-buttons">{options?.companies.map(company => {
+              const selected = companyIds.includes(company.id)
+              return <Button key={company.id} disabled={!canManage} variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} onClick={() => setCompanyIds(current => selected ? current.filter(id => id !== company.id) : [...current,company.id])}>{company.name}</Button>
+            })}</div>
+            {canManage ? <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={canInvite} onChange={event => setCanInvite(event.target.checked)} />{t('users.canInvite')}</label> : null}
+          </section>
+        </fieldset>
       </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="identity-page">
-        <FlashToasts error={error} onClearError={() => setError(null)} />
-        <Button variant="secondary" onClick={() => navigate('/system/core/employees')}>
-          Back to users
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="identity-page">
-      <header className="identity-page__header identity-page__header--row identity-page__header--toolbar">
-        <nav className="identity-breadcrumb" aria-label={t('users.breadcrumb')}>
-          <Link to="/system/core/employees">{t('users.title')}</Link>
-          <span aria-hidden="true"> / </span>
-          <h1>{user.displayName}</h1>
-        </nav>
-        <Button variant="ghost" onClick={() => navigate('/system/core/employees')}>
-          Back
-        </Button>
-      </header>
-
-      <FlashToasts
-        error={error}
-        message={message}
-        onClearError={() => setError(null)}
-        onClearMessage={() => setMessage(null)}
-      />
-
-      <section className="identity-panel">
-        <div className="identity-panel__title-row">
-          <h2>{t('users.profile')}</h2>
-          <div className="identity-inline-actions">
-            {!isEditing ? (
-              <Button variant="secondary" onClick={() => setIsEditing(true)}>
-                Edit Profile
-              </Button>
-            ) : (
-              <>
-                <Button type="submit" form="profile-edit-form" disabled={isSaving}>
-                  {isSaving ? t('users.saving') : t('users.save')}
-                </Button>
-                <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                  Cancel
-                </Button>
-              </>
-            )}
-            {isSelf ? (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setShowPasswordForm((open) => !open)
-                  setError(null)
-                }}
-              >
-                {showPasswordForm ? t('users.hideChangePassword') : t('users.changePassword')}
-              </Button>
-            ) : null}
-            <IconButton
-              label={user.mfaEnabled ? t('users.actionResetMfa') : t('users.actionRequireMfa')}
-              onClick={() => navigate(`/mfa/setup?userId=${user.id}&mode=${user.mfaEnabled ? 'reset' : 'require'}`)}
-            >
-              {user.mfaEnabled ? <IconShieldOff /> : <IconShield />}
-            </IconButton>
-            <IconButton
-              label={user.status === 'active' ? t('users.statusActive') : t('users.statusInactive')}
-              variant={user.status === 'active' ? 'secondary' : 'danger'}
-              onClick={() => void handleToggleStatus()}
-            >
-              {user.status === 'active' ? <IconCircleCheck /> : <IconBan />}
-            </IconButton>
-            <IconButton
-              label={isSelf ? t('users.deleteSelf') : t('users.actionDelete')}
-              variant="danger"
-              onClick={requestDelete}
-              disabled={isSelf}
-            >
-              <IconTrash />
-            </IconButton>
-          </div>
-        </div>
-
-        {isEditing ? (
-          <form
-            id="profile-edit-form"
-            className="identity-profile-glance"
-            onSubmit={(event) => void handleSaveProfile(event)}
-          >
-            <div className="identity-profile-hero">
-              <div className="identity-profile-avatar" aria-hidden>
-                {profileInitials({ ...user, displayName, fullName, email })}
-              </div>
-              <div className="identity-profile-hero__body">
-                <p className="identity-profile-hero__name">{fullName || displayName}</p>
-                <p className="identity-profile-hero__contact">
-                  <span>{email}</span>
-                  {phone ? <span>{phone}</span> : null}
-                </p>
-              </div>
-              <div className="identity-profile-hero__pills">
-                <span className={`identity-status identity-status--${user.status}`}>
-                  {formatStatusLabel(user.status, t)}
-                </span>
-                {isIdentityProfileComplete({ fullName, phone }) ? (
-                  <span className="identity-status identity-status--active">{t('users.complete')}</span>
-                ) : (
-                  <span className="identity-status identity-status--invited">{t('users.incomplete')}</span>
-                )}
-                <span className={`identity-status ${user.mfaEnabled ? 'identity-status--active' : 'identity-status--invited'}`}>
-                  MFA {user.mfaEnabled ? 'On' : 'Off'}
-                </span>
-              </div>
-            </div>
-
-            <div className="identity-profile-tiles">
-              <label className="identity-profile-tile" htmlFor="detail-name">
-                <span>{t('users.fieldDisplayName')}</span>
-                <TextField
-                  id="detail-name"
-                  className="identity-profile-tile__input"
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  required
-                  disabled={isSaving}
-                />
-              </label>
-              <label className="identity-profile-tile" htmlFor="detail-full">
-                <span>{t('users.fieldFullName')}</span>
-                <TextField
-                  id="detail-full"
-                  className="identity-profile-tile__input"
-                  value={fullName}
-                  onChange={(event) => setFullName(event.target.value)}
-                  required
-                  disabled={isSaving}
-                />
-              </label>
-              <label className="identity-profile-tile" htmlFor="detail-email">
-                <span>{t('users.fieldEmail')}</span>
-                <TextField
-                  id="detail-email"
-                  className="identity-profile-tile__input"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                  disabled={isSaving}
-                />
-              </label>
-              <label className="identity-profile-tile" htmlFor="detail-phone">
-                <span>{t('users.fieldPhone')}</span>
-                <TextField
-                  id="detail-phone"
-                  className="identity-profile-tile__input"
-                  type="tel"
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  required
-                  disabled={isSaving}
-                />
-              </label>
-              <div className="identity-profile-tile">
-                <span>{t('users.fieldCreated')}</span>
-                <strong>{new Date(user.createdAt).toLocaleString()}</strong>
-              </div>
-            </div>
-          </form>
-        ) : (
-          <div className="identity-profile-glance">
-            <div className="identity-profile-hero">
-              <div className="identity-profile-avatar" aria-hidden>
-                {profileInitials(user)}
-              </div>
-              <div className="identity-profile-hero__body">
-                <p className="identity-profile-hero__name">{user.fullName || user.displayName}</p>
-                <p className="identity-profile-hero__contact">
-                  <span>{user.email}</span>
-                  {user.phone ? <span>{user.phone}</span> : null}
-                </p>
-              </div>
-              <div className="identity-profile-hero__pills">
-                <span className={`identity-status identity-status--${user.status}`}>
-                  {formatStatusLabel(user.status, t)}
-                </span>
-                {isIdentityProfileComplete(user) ? (
-                  <span className="identity-status identity-status--active">{t('users.complete')}</span>
-                ) : (
-                  <span className="identity-status identity-status--invited">{t('users.incomplete')}</span>
-                )}
-                <span className={`identity-status ${user.mfaEnabled ? 'identity-status--active' : 'identity-status--invited'}`}>
-                  MFA {user.mfaEnabled ? 'On' : 'Off'}
-                </span>
-              </div>
-            </div>
-
-            <div className="identity-profile-tiles">
-              <div className="identity-profile-tile">
-                <span>{t('users.fieldDisplayName')}</span>
-                <strong>{user.displayName}</strong>
-              </div>
-              <div className="identity-profile-tile">
-                <span>{t('users.fieldFullName')}</span>
-                <strong>{user.fullName || '—'}</strong>
-              </div>
-              <div className="identity-profile-tile">
-                <span>{t('users.fieldEmail')}</span>
-                <strong>{user.email}</strong>
-              </div>
-              <div className="identity-profile-tile">
-                <span>{t('users.fieldPhone')}</span>
-                <strong>{user.phone || '—'}</strong>
-              </div>
-              <div className="identity-profile-tile">
-                <span>{t('users.fieldCreated')}</span>
-                <strong>{new Date(user.createdAt).toLocaleString()}</strong>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isSelf && showPasswordForm ? (
-          <form
-            className="identity-form identity-profile-password"
-            onSubmit={(event) => void handleChangePassword(event)}
-          >
-            <FormField label={t('users.fieldCurrentPassword')} htmlFor="current-password">
-              <PasswordField
-                id="current-password"
-                value={currentPassword}
-                onChange={setCurrentPassword}
-                placeholder={PASSWORD_CURRENT_PLACEHOLDER}
-                autoComplete="current-password"
-                disabled={isSaving}
-              />
-            </FormField>
-            <FormField label={t('users.fieldNewPassword')} htmlFor="new-password">
-              <PasswordField
-                id="new-password"
-                value={newPassword}
-                onChange={setNewPassword}
-                placeholder={t('auth.passwordCreatePlaceholder')}
-                autoComplete="new-password"
-                showRequirements
-                disabled={isSaving}
-              />
-            </FormField>
-            <FormField
-              label={t('users.fieldConfirmNewPassword')}
-              htmlFor="confirm-password"
-              error={confirmPasswordMismatch ? PASSWORD_MISMATCH_MESSAGE : undefined}
-            >
-              <PasswordField
-                id="confirm-password"
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-                placeholder={PASSWORD_CONFIRM_PLACEHOLDER}
-                autoComplete="new-password"
-                hasError={confirmPasswordMismatch}
-                disabled={isSaving}
-              />
-            </FormField>
-            <div className="identity-form__actions">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? t('users.updating') : t('users.updatePassword')}
-              </Button>
-            </div>
-          </form>
-        ) : null}
-      </section>
-
-      <section className="identity-panel">
-        <div className="identity-panel__title-row">
-          <h2>{t('users.memberships')}</h2>
-        </div>
-        {memberships.length === 0 ? (
-          <p className="identity-empty">{t('users.noMemberships')}</p>
-        ) : (
-          <div className="identity-table-wrap">
-            <table className="identity-table">
-              <thead>
-                <tr>
-                  <th>{t('users.colCompany')}</th>
-                  <th>{t('users.colOrganization')}</th>
-                  <th>{t('users.colPosition')}</th>
-                  <th>{t('users.colPrimary')}</th>
-                  <th>{t('users.colStatus')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {memberships.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.companyName ?? '—'}</td>
-                    <td>{item.organizationName ?? '—'}</td>
-                    <td>{item.positionName ?? '—'}</td>
-                    <td>{item.isPrimary ? 'Yes' : 'No'}</td>
-                    <td>
-                      <span className={`identity-status identity-status--${item.status}`}>
-                        {formatStatusLabel(item.status, t)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        title={t('users.deleteTitle')}
-        description={
-          <>
-            This will permanently remove{' '}
-            <strong>
-              {user.displayName} ({user.email})
-            </strong>{' '}
-            and their memberships.
-          </>
-        }
-        confirmLabel={t('users.deleteConfirm')}
-        busy={isDeleting}
-        onConfirm={() => void handleConfirmDelete()}
-        onCancel={() => {
-          if (!isDeleting) {
-            setShowDeleteConfirm(false)
-          }
-        }}
-      />
-    </div>
-  )
+      <footer className="identity-invite-page-footer">
+        {isEditing && canEdit ? <>
+          <Button variant="secondary" disabled={isSaving} onClick={() => navigate('/system/core/employees')}>{t('users.cancel')}</Button>
+          <Button type="submit" disabled={isSaving}>{t(isSaving ? 'users.saving' : 'users.saveChanges')}</Button>
+        </> : <Button variant="secondary" onClick={() => navigate('/system/core/employees')}>{t('users.backToUsers')}</Button>}
+      </footer>
+    </form>}
+  </div>
 }

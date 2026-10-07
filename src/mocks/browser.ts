@@ -8,6 +8,9 @@ import { knowledgeHandlers } from '@/mocks/handlers/knowledgeHandlers'
 const backendTacHandlers = [
   http.post('/api/auth/login/tac/send', () => passthrough()),
   http.get('/api/mock/inbox', () => passthrough()),
+  http.post('/api/mock/invitations', () => passthrough()),
+  http.get('/api/mock/invitations/:token', () => passthrough()),
+  http.post('/api/mock/invitations/:token/mfa/start', () => passthrough()),
 ]
 export const worker = setupWorker(
   ...backendTacHandlers,

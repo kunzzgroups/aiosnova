@@ -6,7 +6,7 @@ import type {
   KnowledgeDocument,
 } from '@/modules/ai/knowledge/types/knowledge'
 
-/** Bases of one company. `companyId` empty means "every base in the tenant". */
+/** Bases of one company. `companyId` empty means "every base in the merchant". */
 export async function fetchKnowledgeBases(companyId: string) {
   const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
   return apiRequest<{ items: KnowledgeBaseListItem[] }>(`/api/knowledge/bases${query}`, {

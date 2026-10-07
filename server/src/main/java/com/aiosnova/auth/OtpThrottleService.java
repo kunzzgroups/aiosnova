@@ -1,61 +1,56 @@
 package com.aiosnova.auth;
 
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Locale;
-import java.util.Map;
-
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class OtpThrottleService {
 
-    private final Map<String, Window> windows = new HashMap<>();
+    private final OtpThrottleRepository repository;
+    private final AuthSecretService secrets;
 
-    private record Window(Instant resetsAt, int count) {
+    public OtpThrottleService(OtpThrottleRepository repository, AuthSecretService secrets) {
+        this.repository = repository;
+        this.secrets = secrets;
     }
 
-    private record Limit(String key, int maximum, int seconds) {
-    }
-
-    public synchronized int checkSend(String email, String ip) {
+    public int checkSend(String email, String ip) {
         String recipient = email.trim().toLowerCase(Locale.ROOT);
-        return check(
-                new Limit("send-email:" + recipient, 5, 3600),
-                new Limit("send-ip:" + ip, 20, 3600));
+        return check(new Limit(secrets.tokenHash("send-email:" + recipient), 5, 3600),
+                new Limit(secrets.tokenHash("send-ip:" + ip), 20, 3600));
     }
 
-    public synchronized int checkVerify(String email) {
-        String recipient = email.trim().toLowerCase(Locale.ROOT);
-        return check(new Limit("verify-email:" + recipient, 20, 900));
+    public int checkVerify(String email) {
+        return check(new Limit(secrets.tokenHash("verify-email:" + email.trim().toLowerCase(Locale.ROOT)), 20, 900));
     }
 
     private int check(Limit... limits) {
+        // Use the same lock order across backend processes to avoid crossed bucket locks.
+        Arrays.sort(limits, Comparator.comparing(Limit::key));
         Instant now = Instant.now();
-        windows.entrySet().removeIf(entry -> !now.isBefore(entry.getValue().resetsAt()));
-
+        OtpThrottleRepository.Window[] windows = new OtpThrottleRepository.Window[limits.length];
         int retryAfter = 0;
-        for (Limit limit : limits) {
-            Window window = windows.get(limit.key());
-            if (window != null && window.count() >= limit.maximum()) {
-                int remaining = (int) Math.ceil(
-                        (window.resetsAt().toEpochMilli() - now.toEpochMilli()) / 1000.0);
-                retryAfter = Math.max(retryAfter, remaining);
+        for (int i = 0; i < limits.length; i++) {
+            Limit limit = limits[i];
+            OtpThrottleRepository.Window window = repository.lock(limit.key(), now.plusSeconds(limit.seconds()));
+            if (!now.isBefore(window.resetsAt())) window = new OtpThrottleRepository.Window(now.plusSeconds(limit.seconds()), 0);
+            windows[i] = window;
+            if (window.count() >= limit.maximum()) {
+                retryAfter = Math.max(retryAfter, (int) Math.ceil(
+                        (window.resetsAt().toEpochMilli() - now.toEpochMilli()) / 1000.0));
             }
         }
-
-        if (retryAfter > 0) {
-            return retryAfter;
+        if (retryAfter > 0) return retryAfter;
+        for (int i = 0; i < limits.length; i++) {
+            repository.save(limits[i].key(), windows[i].resetsAt(), windows[i].count() + 1);
         }
-
-        // Check all limits before incrementing any of their counters.
-        for (Limit limit : limits) {
-            Window window = windows.get(limit.key());
-            windows.put(limit.key(), window == null
-                    ? new Window(now.plusSeconds(limit.seconds()), 1)
-                    : new Window(window.resetsAt(), window.count() + 1));
-        }
-
         return 0;
     }
+
+    private record Limit(String key, int maximum, int seconds) { }
 }

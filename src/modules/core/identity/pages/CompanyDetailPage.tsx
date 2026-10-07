@@ -200,8 +200,8 @@ export function CompanyDetailPage() {
               <strong>{company.memberCount}</strong>
             </div>
             <div className="identity-profile-tile">
-              <span>{t('org.colTenant')}</span>
-              <strong>{company.tenantId}</strong>
+              <span>{t('org.colMerchant')}</span>
+              <strong>{company.merchantId}</strong>
             </div>
           </div>
         )}

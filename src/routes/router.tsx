@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { InvitationActivationPage } from '@/modules/core/auth/pages/InvitationActivationPage'
 import { GuestRoute } from '@/routes/GuestRoute'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { AppShell } from '@/layouts/AppShell'
@@ -29,6 +30,7 @@ export function AppRouter() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
 
+        <Route path="/activate" element={<InvitationActivationPage />} />
         <Route path="/mfa/challenge" element={<MfaChallengePage />} />
         <Route path="/oauth/:provider/callback" element={<OAuthCallbackPage />} />
 

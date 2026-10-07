@@ -5,10 +5,15 @@ import { FlashToasts } from '@/components/ui/FlashToasts'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { IconButton } from '@/components/ui/IconButton'
+import { Popover } from '@/components/ui/Popover'
+import { IconBuilding } from '@/components/navigation/SidebarIcons'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import {
+  IconShieldCheck,
+  IconClock,
+  IconShieldOff,
   IconEye,
   IconPencil,
   IconTrash,
@@ -16,12 +21,9 @@ import {
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
 import type { CompanyListItem } from '@/modules/core/identity/services/identityService'
-import type { IdentityUser,SignInMethod,UserStatus,InvitationOptions,InvitationAssignment,InvitationPayload } from '@/modules/core/identity/types/identity'
+import type { IdentityUser,UserStatus,InvitationOptions,InvitationAssignment,InvitationPayload } from '@/modules/core/identity/types/identity'
 import {
-  formatDirectoryMfa,
-  formatSignInMethod,
   formatStatusLabel,
-  isIdentityProfileComplete,
 } from '@/modules/core/identity/types/identity'
 import {
   createUser,
@@ -35,16 +37,17 @@ import {
 } from '@/modules/core/identity/services/identityService'
 import { AppShellHeaderContext } from '@/layouts/AppShell'
 import './IdentityPage.css'
+import './UsersDirectoryDesign.css'
 
 
 type InviteField = 'email' | 'name' | 'department' | 'position' | 'company'
 const INVITE_FIELD_IDS: Record<InviteField, string> = { email: 'user-email', name: 'user-name', department: 'user-department', position: 'user-position', company: 'user-company' }
 
+type SortKey = 'employee' | 'companies' | 'status' | 'mfa' | 'created' | 'createdBy'
 const STATUS_FILTERS=['all','active','invited','draft','disabled'] as const
 
 const MFA_FILTERS=['all','enabled','disabled'] as const
 
-const SIGN_IN_FILTERS=['all','otp','password','google','facebook','apple','none'] as const
 
 function paginationItems(current: number, total: number): (number | 'backward' | 'forward')[] {
   if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
@@ -62,12 +65,12 @@ function matchesSearch(user: IdentityUser,query: string) {
   if(!query) {
     return true
   }
-  const haystack=`${user.displayName} ${user.fullName} ${user.email} ${user.phone}`.toLowerCase()
+  const haystack=`${user.displayName} ${user.fullName} ${user.email}`.toLowerCase()
   return haystack.includes(query)
 }
 
 export function UsersPage() {
-  const { t }=useTranslation()
+  const { t, i18n }=useTranslation()
   const setShellHeader = useContext(AppShellHeaderContext)
   const invitationMessage = (locale: string) => t('users.defaultInvitationMessage', { lng: locale })
   const navigate=useNavigate()
@@ -82,12 +85,6 @@ export function UsersPage() {
       :value==='enabled'
         ? t('users.mfaEnabled')
         :t('users.mfaDisabled')
-  const signInLabel=(value: string) =>
-    value==='all'
-      ? t('users.filterAll')
-      :value==='none'
-        ? t('users.methodNone')
-        :formatSignInMethod(value as SignInMethod,t)
   const sessionUser=useAuthStore((state) => state.user)
   const [users,setUsers]=useState<IdentityUser[]>([])
   const [companies,setCompanies]=useState<CompanyListItem[]>([])
@@ -105,6 +102,7 @@ export function UsersPage() {
   const [memberships,setMemberships]=useState<Awaited<ReturnType<typeof fetchMemberships>>['items']>([])
   // Zero represents automatic sizing; numeric choices keep their explicit limit.
   const [pageSize,setPageSize]=useState(0)
+  const [sort,setSort]=useState<{ key: SortKey; descending: boolean }>({ key:'employee',descending:false })
   const [autoPageSize,setAutoPageSize]=useState(10)
   const autoFitRowMeasurement=useRef({ width: 0, height: 0 })
   const [page,setPage]=useState(1)
@@ -113,11 +111,12 @@ export function UsersPage() {
   const invitePageRef=useRef<HTMLDivElement>(null)
   const mfaRequiredByPolicy=assignments.some(a => inviteOptions?.companies.find(c => c.id===a.companyId)?.requireMfa)
   const isOwner=users.some(u => u.id===sessionUser?.id&&u.isOwner)
+  const canManageUsers=isOwner||users.some(u => u.id===sessionUser?.id&&u.canManageUsers)
   // Replace the owner fallback with the Permissions-module capability when available.
   const canManageUserStatus = isOwner
   const [query,setQuery]=useState('')
-  const [statusFilter,setStatusFilter]=useState('all')
-  const [signInFilter,setSignInFilter]=useState('all')
+  const [statusFilter,setStatusFilter]=useState('active')
+  const [companyFilter,setCompanyFilter]=useState('all')
   const [mfaFilter,setMfaFilter]=useState('all')
   const [showInvite,setShowInvite]=useState(false)
   const [fieldErrors,setFieldErrors]=useState<Partial<Record<InviteField,string>>>({})
@@ -163,20 +162,21 @@ export function UsersPage() {
     return () => window.clearTimeout(timeoutId)
   },[message])
 
+  const companyNamesFor=(userId: string) => memberships.filter(m => m.userId===userId).map(m => companies.find(c => c.id===m.companyId)?.name||'').filter(Boolean)
+
+  function sortHeading(key: SortKey,label: string) {
+    return <button className="directory-design-sort" onClick={() => setSort({ key,descending:sort.key===key&&!sort.descending })}>{label}<span aria-hidden="true">{sort.key===key&&sort.descending ? '↓' : '↑'}</span></button>
+  }
+
   const filteredUsers=useMemo(() => {
     const normalizedQuery=query.trim().toLowerCase()
     return users.filter((user) => {
-      if(user.isOwner&&user.id!==sessionUser?.id) return false
+      if(user.isOwner&&user.id!==sessionUser?.id&&!canManageUsers) return false
       if(!matchesSearch(user,normalizedQuery)) {
         return false
       }
+      if(companyFilter!=='all'&&!memberships.some(m => m.userId===user.id&&m.companyId===companyFilter)) return false
       if(statusFilter!=='all'&&user.status!==statusFilter) {
-        return false
-      }
-      if(signInFilter==='none'&&user.signInMethod) {
-        return false
-      }
-      if(signInFilter!=='all'&&signInFilter!=='none'&&user.signInMethod!==signInFilter) {
         return false
       }
       if(mfaFilter==='enabled'&&(!user.signInMethod||!user.mfaEnabled)) {
@@ -186,8 +186,24 @@ export function UsersPage() {
         return false
       }
       return true
-    }).sort((a,b) => Number(Boolean(b.isOwner && b.id===sessionUser?.id)) - Number(Boolean(a.isOwner && a.id===sessionUser?.id)))
-  },[users,query,statusFilter,signInFilter,mfaFilter,sessionUser?.id])
+    }).sort((a,b) => {
+      const self=Number(b.id===sessionUser?.id)-Number(a.id===sessionUser?.id)
+      if (self) return self
+      const value=(user: IdentityUser) => {
+        switch(sort.key) {
+          case 'employee': return user.displayName
+          case 'companies': return companyNamesFor(user.id).join(', ')
+          case 'status': return formatStatusLabel(user.status,t)
+          case 'mfa': return user.signInMethod ? mfaLabel(user.mfaEnabled ? 'enabled' : 'disabled') : ''
+          case 'createdBy': return user.createdBy||''
+          case 'created': return new Date(user.createdAt).getTime()
+        }
+      }
+      const left=value(a),right=value(b)
+      const order=typeof left==='number'&&typeof right==='number' ? left-right : String(left).localeCompare(String(right),i18n.language)
+      return sort.descending ? -order : order
+    })
+  },[users,query,statusFilter,companyFilter,mfaFilter,memberships,companies,sessionUser?.id,canManageUsers,sort,i18n.language,t])
 
   function clearFieldError(field: InviteField) {
     setFieldErrors(current => ({ ...current, [field]: undefined }))
@@ -238,7 +254,7 @@ export function UsersPage() {
   const pageCount=Math.max(1,Math.ceil(filteredUsers.length/effectivePageSize))
   const currentPage=Math.min(page,pageCount)
   const visibleUsers=filteredUsers.slice((currentPage-1)*effectivePageSize,currentPage*effectivePageSize)
-  useEffect(() => { setPage(1) },[query,statusFilter,signInFilter,mfaFilter,effectivePageSize])
+  useEffect(() => { setPage(1) },[query,statusFilter,companyFilter,mfaFilter,effectivePageSize,sort])
   useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,effectivePageSize])
   useEffect(() => {
     if (showInvite || isLoading || !filteredUsers.length || pageSize !== 0) return
@@ -412,7 +428,7 @@ export function UsersPage() {
         onClearMessage={() => setMessage(null)}
       />
 
-      <section className="identity-panel identity-directory-panel" hidden={showInvite}>
+      <section className="identity-panel identity-directory-panel identity-directory-design" hidden={showInvite}>
         <div className="identity-directory-toolbar">
           <TextField
             className="identity-directory-toolbar__search"
@@ -423,30 +439,17 @@ export function UsersPage() {
             aria-label={t('users.directorySearchAria')}
           />
           <div className="identity-directory-toolbar__filters">
-            <SidebarSelect
-              id="directory-status"
-              label={t('users.filterStatus')}
-              value={statusFilter}
-              options={STATUS_FILTERS.map((value) => ({ value,label: statusLabel(value) }))}
-              onChange={setStatusFilter}
-            />
-            <SidebarSelect
-              id="directory-signin"
-              label={t('users.filterSignInMethod')}
-              value={signInFilter}
-              options={SIGN_IN_FILTERS.map((value) => ({ value,label: signInLabel(value) }))}
-              onChange={setSignInFilter}
-            />
-            <SidebarSelect
-              id="directory-mfa"
-              label={t('users.filterMfa')}
-              value={mfaFilter}
-              options={MFA_FILTERS.map((value) => ({ value,label: mfaLabel(value) }))}
-              onChange={setMfaFilter}
-            />
+            <SidebarSelect id="directory-company" className="directory-design-company-filter" label={t('users.filterCompany')} value={companyFilter}
+              options={[{ value:'all',label:t('users.filterAll') },...companies.map(company => ({ value:company.id,label:company.name }))]} onChange={setCompanyFilter} />
+            <SidebarSelect id="directory-status" label={t('users.filterStatus')} value={statusFilter}
+              options={STATUS_FILTERS.map((value) => ({ value,label:statusLabel(value) }))} onChange={setStatusFilter} />
+            <SidebarSelect id="directory-mfa" label={t('users.filterMfa')} value={mfaFilter}
+              options={MFA_FILTERS.map((value) => ({ value,label:mfaLabel(value) }))} onChange={setMfaFilter} />
           </div>
           {inviteOptions?.canInvite? <Button className="identity-directory-invite-button" onClick={handleToggleInvite}>{t('users.inviteUser')}</Button>:null}
         </div>
+
+
 
         {isLoading? <p className="identity-empty">{t('users.loading')}</p>:null}
         {!isLoading&&users.length===0? <p className="identity-empty">{t('users.empty')}</p>:null}
@@ -455,37 +458,50 @@ export function UsersPage() {
         ):null}
         {filteredUsers.length>0? (
           <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('users.staffDirectory')}>
-            <table className="identity-table identity-table--packed">
+            <table className="identity-table identity-table--packed directory-design-table">
               <thead>
                 <tr>
-                  <th>{t('users.colName')}</th>
-                  <th>{t('users.colEmail')}</th>
-                  <th className="identity-table__status">{t('users.colStatus')}</th>
-                  <th>{t('users.fieldPhone')}</th>
-                  <th>{t('users.colPosition')}</th>
-                  <th>{t('users.colMfa')}</th>
-                  <th>{t('users.createdAt')}</th>
-                  <th className="identity-table__spacer" aria-hidden="true" />
+                  <th aria-sort={sort.key==='employee' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('employee',t('users.designEmployee'))}</th>
+                  <th aria-sort={sort.key==='companies' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('companies',t('users.designCompanies'))}</th>
+                  <th className="identity-table__status" aria-sort={sort.key==='status' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('status',t('users.colStatus'))}</th>
+                  <th aria-sort={sort.key==='mfa' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('mfa',t('users.colMfa'))}</th>
+                  <th aria-sort={sort.key==='created' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('created',t('users.createdAt'))}</th>
+                  <th aria-sort={sort.key==='createdBy' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('createdBy',t('users.createdBy'))}</th>
                   <th className="identity-table__actions">{t('users.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
-                {visibleUsers.map((user) => (
+                {visibleUsers.map((user) => {
+                  const assigned=memberships.filter(m => m.userId===user.id)
+                  const companyNames=assigned.map(m => companies.find(c => c.id===m.companyId)?.name||'').filter(Boolean)
+                  const positionNames=[...new Set(assigned.map(m => inviteOptions?.companies.find(c => c.id===m.companyId)?.departments.find(d => d.id===m.organizationId)?.positions.find(p => p.id===m.positionId)?.name).filter(Boolean))]
+                  const canEdit=user.status==='draft' ? isOwner : canManageUsers||sessionUser?.id===user.id
+                  return (
                   <tr key={user.id}>
                     <td>
-                      <div className="identity-directory-name">
-                      <Link className="identity-text-link" to={`/system/core/employees/${user.id}`}>
-                        {user.displayName}
-                      </Link>
-                      {!isIdentityProfileComplete(user)? (
-                        <span className="identity-status identity-status--invited identity-status--inline">
-                          {t('users.incomplete')}
-                        </span>
-                      ):null}
+                      <div className="directory-design-employee">
+                        <span className="directory-design-avatar" aria-hidden="true">{user.displayName.trim().split(/\s+/).slice(0,2).map(name => name[0]).join('').toUpperCase()}</span>
+                        <div className="directory-design-identity">
+                          <Link className="identity-text-link" to={'/system/core/employees/'+user.id}>{user.displayName}</Link>
+                          <span>{user.email}</span>
+                        </div>
+                        {sessionUser?.id===user.id ? <span className="directory-design-you">{t('users.designYou')}</span> : null}
                       </div>
-                      {user.isOwner? <span className="identity-directory-muted">{t('users.ownerYou')}</span>:null}
                     </td>
-                    <td>{user.email}</td>
+                    <td>
+                      <div className="directory-design-companies"><span>{companyNames[0]||'—'}</span>
+                        {companyNames.length>1 ? <Popover label={t('users.assignedCompanies')} trigger={<>+{companyNames.length-1}</>}>
+                          <header className="directory-company-popover__header">
+                            <h2>{t('users.assignedCompanies')}</h2>
+                            <span>{companyNames.length}</span>
+                          </header>
+                          <ul className="directory-company-popover__list" tabIndex={0} aria-label={t('users.assignedCompanies')}>
+                            {companyNames.map((name,index) => <li key={index}><IconBuilding aria-hidden="true" /><span>{name}</span></li>)}
+                          </ul>
+                        </Popover> : null}
+                      </div>
+                      {positionNames.length ? <span className="directory-design-position">{positionNames.join(', ')}</span> : null}
+                    </td>
                     <td className="identity-table__status">
                       {canManageUserStatus && !user.isOwner && ['active','disabled'].includes(user.status) ? (
                         <button type="button" className={`identity-status identity-status--${user.status} identity-status--interactive`}
@@ -497,38 +513,42 @@ export function UsersPage() {
                         </button>
                       ) : <span className={`identity-status identity-status--${user.status}`}>{formatStatusLabel(user.status,t)}</span>}
                     </td>
-                    <td>{user.phone||'—'}</td>
-                    <td>{memberships.filter(m => m.userId===user.id).map(m => companies.find(c => c.id===m.companyId)?.name||'').filter(Boolean).join(', ')||'—'}<span className="identity-directory-muted">{memberships.filter(m => m.userId===user.id).map(m => inviteOptions?.companies.find(c => c.id===m.companyId)?.departments.find(d => d.id===m.organizationId)?.positions.find(p => p.id===m.positionId)?.name).filter(Boolean).join(', ')||'—'}</span>
+                    <td><span className={'directory-design-mfa'+(user.mfaEnabled ? ' directory-design-mfa--enabled' : '')}>
+                      {user.mfaEnabled ? <IconShieldCheck /> : <IconShieldOff />}
+                      {user.signInMethod ? t(user.mfaEnabled ? 'users.mfaEnabled' : 'users.designMfaNotEnabled') : '—'}
+                    </span></td>
+                    <td className="directory-design-date">
+                      <IconButton className="directory-design-created" variant="ghost"
+                        label={t('users.createdAt')+': '+new Date(user.createdAt).toLocaleString(i18n.language,{ day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short' })}>
+                        <IconClock aria-hidden="true" />
+                        <time dateTime={user.createdAt}>{new Date(user.createdAt).toLocaleDateString(i18n.language,{ day:'numeric',month:'short',year:'numeric' })}</time>
+                      </IconButton>
                     </td>
-                    <td>{formatDirectoryMfa(user,t)}</td>
-                    <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-                    <td className="identity-table__spacer" aria-hidden="true" />
+                    <td>
+                      {user.createdBy ? <span className="directory-design-creator">
+                        <span className="directory-design-creator__avatar" aria-hidden="true">{user.createdBy.trim().split(/\s+/).slice(0,2).map(name => name[0]).join('').toUpperCase()}</span>
+                        <span>{user.createdBy}</span>
+                      </span> : <span className="directory-design-date">—</span>}
+                    </td>
                     <td className="identity-table__actions">
-                      <div className="identity-inline-actions">
-                        <IconButton
-                          label={t('users.actionView')}
-                          onClick={() => navigate(`/system/core/employees/${user.id}`)}
-                        >
+                      <div className="identity-inline-actions identity-directory-actions">
+                        <span style={{ visibility: canEdit ? 'visible' : 'hidden' }}>
+                          <IconButton label={t(user.status==='draft' ? 'users.continueDraft' : 'users.actionEdit')}
+                            onClick={() => user.status==='draft' ? openDraft(user) : navigate('/system/core/employees/'+user.id+'?edit=1')}>
+                            <IconPencil />
+                          </IconButton>
+                        </span>
+                        <IconButton label={t('users.actionView')} onClick={() => navigate('/system/core/employees/'+user.id)}>
                           <IconEye />
                         </IconButton>
-                        <IconButton
-                          label={user.status==='draft'? t('users.continueDraft'):t('users.actionEdit')}
-                          onClick={() => user.status==='draft'? openDraft(user):navigate(`/system/core/employees/${user.id}?edit=1`)}
-                        >
-                          <IconPencil />
-                        </IconButton>
-                        <IconButton
-                          label={sessionUser?.id===user.id? t('users.deleteSelf'):t('users.actionDelete')}
-                          variant="danger"
-                          onClick={() => requestDelete(user)}
-                          disabled={!isOwner||deletingId===user.id||sessionUser?.id===user.id}
-                        >
+                        {isOwner ? <IconButton label={t(sessionUser?.id===user.id ? 'users.deleteSelf' : 'users.actionDelete')}
+                          variant="danger" disabled={deletingId===user.id||sessionUser?.id===user.id} onClick={() => requestDelete(user)}>
                           <IconTrash />
-                        </IconButton>
+                        </IconButton> : null}
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -536,7 +556,7 @@ export function UsersPage() {
         <footer className="identity-directory-footer">
           <div className="identity-directory-footer__listing">
             <label htmlFor="directory-page-size">{t('users.rowsPerPage')}</label>
-            <SidebarSelect id="directory-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} title={pageSize===0? t('users.autoRowsHint', { count: autoPageSize }):undefined} value={String(pageSize)} options={[{ value: '0', label: '–' }, ...[25,50,100,200].map(n => ({ value: String(n), label: String(n) }))]} onChange={value => setPageSize(Number(value))} />
+            <SidebarSelect id="directory-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} title={pageSize===0? t('users.autoRowsHint', { count: autoPageSize }):undefined} value={String(pageSize)} options={[{ value: '0', label: '–' }, ...[10,25,50,100,200].map(n => ({ value: String(n), label: String(n) }))]} onChange={value => setPageSize(Number(value))} />
             <span>{t('users.listingRange', { start: filteredUsers.length ? (currentPage-1)*effectivePageSize+1 : 0, end: Math.min(currentPage*effectivePageSize,filteredUsers.length), total: filteredUsers.length })}</span>
           </div>
           <nav className="identity-pagination" aria-label={t('users.directoryPages')}>

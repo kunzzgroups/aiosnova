@@ -1,5 +1,5 @@
 import type { KnowledgeBase, KnowledgeDocument } from '@/modules/ai/knowledge/types/knowledge'
-import { DEMO_TENANT_ID } from '@/mocks/data/identity'
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 
 /**
  * Knowledge bases are seeded per company so the sidebar company switcher visibly
@@ -16,7 +16,7 @@ function base(
   description: string,
   createdAt: string,
 ): KnowledgeBase {
-  return { id, tenantId: DEMO_TENANT_ID, companyId, name, description, createdAt, updatedAt: createdAt }
+  return { id, merchantId: DEMO_MERCHANT_ID, companyId, name, description, createdAt, updatedAt: createdAt }
 }
 
 export const knowledgeBases: KnowledgeBase[] = [

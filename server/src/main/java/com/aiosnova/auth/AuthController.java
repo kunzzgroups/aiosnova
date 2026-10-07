@@ -1,5 +1,7 @@
 package com.aiosnova.auth;
 
+import java.security.GeneralSecurityException;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -14,16 +17,26 @@ public class AuthController {
 
     private final TacService tacService;
     private final OtpThrottleService otpThrottleService;
+    private final InvitationService invitationService;
+    private final SessionService sessions;
 
-    public AuthController(TacService tacService, OtpThrottleService otpThrottleService) {
+    public AuthController(TacService tacService, OtpThrottleService otpThrottleService,
+                          InvitationService invitationService, SessionService sessions) {
         this.tacService = tacService;
         this.otpThrottleService = otpThrottleService;
+        this.invitationService = invitationService;
+        this.sessions = sessions;
     }
 
     @PostMapping("/login/tac/send")
     public ResponseEntity<TacSendResponse> sendTac(
             @RequestBody TacSendRequest request,
             HttpServletRequest httpRequest) {
+
+        if (!invitationService.canRequestOtp(request.email())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new TacSendResponse("Complete invitation activation before requesting OTP.", 0));
+        }
 
         int retryAfter = otpThrottleService.checkSend(
                 request.email(), httpRequest.getRemoteAddr());
@@ -51,7 +64,12 @@ public class AuthController {
     }
 
     @PostMapping("/login/tac/verify")
-    public ResponseEntity<MessageResponse> verifyTac(@RequestBody TacVerifyRequest request) {
+    @Transactional
+    public ResponseEntity<?> verifyTac(@RequestBody TacVerifyRequest request, HttpServletRequest httpRequest) {
+        if (!invitationService.canRequestOtp(request.email())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new MessageResponse("Complete invitation activation before signing in."));
+        }
         int retryAfter = otpThrottleService.checkVerify(request.email());
 
         if (retryAfter > 0) {
@@ -78,7 +96,31 @@ public class AuthController {
                     .body(new MessageResponse("Incorrect OTP."));
         }
 
-        return ResponseEntity.ok(new MessageResponse("OTP verified."));
+        String ticket = invitationService.loginMfaTicket(request.email());
+        if (ticket != null) return ResponseEntity.ok(new MfaRequiredResponse("mfa_required", ticket));
+        return sessions.issue(invitationService.account(request.email()).userId(), httpRequest);
+    }
+
+    @PostMapping("/mfa/verify")
+    public ResponseEntity<SessionService.Login> verifyMfa(@RequestBody MfaVerifyRequest request, HttpServletRequest httpRequest)
+            throws GeneralSecurityException {
+        return sessions.issue(invitationService.verifyLoginMfa(request.mfaTicket(), request.code()).userId(), httpRequest);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<SessionService.Login> refresh(HttpServletRequest request) {
+        return sessions.refresh(request);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<MessageResponse> logout(HttpServletRequest request) {
+        return sessions.logout(request);
+    }
+
+    public record MfaRequiredResponse(String status, String mfaTicket) {
+    }
+
+    public record MfaVerifyRequest(String mfaTicket, String code) {
     }
 
 public record TacVerifyRequest(String email, String code) {

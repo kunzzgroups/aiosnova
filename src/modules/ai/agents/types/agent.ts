@@ -11,7 +11,7 @@ export type AgentStatus = 'active' | 'draft' | 'disabled'
 
 export type AiAgent = {
   id: string
-  tenantId: string
+  merchantId: string
   companyId: string
   name: string
   description: string

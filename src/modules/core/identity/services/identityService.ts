@@ -12,7 +12,7 @@ import type {
 } from '@/modules/core/identity/types/identity'
 
 export async function fetchIdentityMeta() {
-  return apiRequest<{ tenantId: string; companies: CompanyOption[] }>('/api/identity/meta', {
+  return apiRequest<{ merchantId: string; companies: CompanyOption[] }>('/api/identity/meta', {
     auth: true,
   })
 }

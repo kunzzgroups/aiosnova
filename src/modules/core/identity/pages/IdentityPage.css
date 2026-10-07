@@ -1288,6 +1288,16 @@
   }
 }
 
+.identity-directory-actions {
+  justify-content: center;
+}
+
+.identity-directory-assignment {
+  width: 26.5rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* Compact invitation spacing keeps the stacked sections within desktop height. */
 .identity-invite-content { padding: 1rem var(--space-5); }
 .identity-invite-sections { gap: .75rem; }

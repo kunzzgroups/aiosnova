@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError } from '@/services/httpClient'
-import { postAuthPath } from '@/modules/core/auth/types/auth'
+import { isMfaRequired, postAuthPath } from '@/modules/core/auth/types/auth'
 import { requestLoginTac, verifyLoginTac } from '@/modules/core/auth/services/authService'
 
 export function useLogin() {
@@ -32,8 +32,8 @@ export function useLogin() {
     setIsSubmitting(true)
     setError(null)
     try {
-      await verifyLoginTac(payload)
-      navigate(postAuthPath())
+      const result = await verifyLoginTac(payload)
+      navigate(isMfaRequired(result) ? '/mfa/challenge' : postAuthPath())
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to sign in.')
     } finally {

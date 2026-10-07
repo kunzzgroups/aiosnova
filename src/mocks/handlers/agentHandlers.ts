@@ -1,7 +1,7 @@
 import { HttpResponse, http } from 'msw'
 import { agents, agentKnowledgeLinks } from '@/mocks/data/agents'
 import type { AgentListItem, AgentStatus } from '@/modules/ai/agents/types/agent'
-import { DEMO_TENANT_ID } from '@/mocks/data/identity'
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 
 /**
  * Agent CRUD, plus the agent-side half of the agent <-> knowledge relation.
@@ -85,7 +85,7 @@ export const agentHandlers = [
 
     const created = {
       id: createId(),
-      tenantId: DEMO_TENANT_ID,
+      merchantId: DEMO_MERCHANT_ID,
       companyId: body.companyId ?? '',
       name,
       description: (body.description ?? '').trim(),

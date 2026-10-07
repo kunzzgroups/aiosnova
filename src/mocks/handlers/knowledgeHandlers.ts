@@ -1,7 +1,7 @@
 import { HttpResponse, http } from 'msw'
 import { knowledgeBases, knowledgeDocuments } from '@/mocks/data/knowledge'
 import { agentDocumentLinks, agentKnowledgeLinks } from '@/mocks/data/agents'
-import { DEMO_TENANT_ID } from '@/mocks/data/identity'
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import {
   deriveBaseStatus,
   type KnowledgeBase,
@@ -128,7 +128,7 @@ export const knowledgeHandlers = [
     const createdAt = new Date().toISOString()
     const created: KnowledgeBase = {
       id: `kb_${crypto.randomUUID().replace(/-/g, '').slice(0, 10)}`,
-      tenantId: DEMO_TENANT_ID,
+      merchantId: DEMO_MERCHANT_ID,
       companyId: body.companyId,
       name,
       description: (body.description ?? '').trim(),
