@@ -14,6 +14,7 @@ import { AiAssistantPage } from '@/modules/ai/assistant/pages/AiAssistantPage'
 import { AgentsPage } from '@/modules/ai/agents/pages/AgentsPage'
 import { KnowledgeBasesPage } from '@/modules/ai/knowledge/pages/KnowledgeBasesPage'
 import { KnowledgeBaseDetailPage } from '@/modules/ai/knowledge/pages/KnowledgeBaseDetailPage'
+import { TemplatesPage } from '@/modules/ai/knowledge/pages/TemplatesPage'   // ← 新增
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
@@ -40,9 +41,14 @@ export function AppRouter() {
             <Route path="/mfa/setup" element={<MfaSetupPage />} />
             <Route path="/ai/ai/ai-assistant" element={<AiAssistantPage />} />
             <Route path="/ai/ai/ai-agents" element={<AgentsPage />} />
+
             <Route path="/ai/ai/knowledge" element={<KnowledgeBasesPage />} />
+            {/* Templates route MUST come before :baseId, otherwise
+                "templates" is captured as a baseId. */}
+            <Route path="/ai/ai/knowledge/templates" element={<TemplatesPage />} />
             <Route path="/ai/ai/knowledge/:baseId" element={<KnowledgeBaseDetailPage />} />
             <Route path="/ai/ai/knowledge/:baseId/:tab" element={<KnowledgeBaseDetailPage />} />
+
             <Route path="/system/core/employees" element={<UsersPage />} />
             <Route path="/system/core/employees/:userId" element={<UserDetailPage />} />
             <Route path="/system/core/organization" element={<OrganizationPage />} />

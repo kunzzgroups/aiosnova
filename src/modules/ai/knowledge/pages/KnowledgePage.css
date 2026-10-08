@@ -6,6 +6,80 @@
  * `src/modules/ai/shared/AiConsole.css`.
  */
 
+/* Wrapper for the three kind sections (Documents / Skills / Data). */
+.knowledge-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.knowledge-kind {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.knowledge-kind__header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.knowledge-kind__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.knowledge-kind__count {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+}
+
+/* Wrapper for all category groups inside a kind. */
+.knowledge-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* One category. */
+.knowledge-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.knowledge-group__header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0 0.15rem;
+}
+
+.knowledge-group__title {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.knowledge-group__count {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+}
+
 .knowledge-bases {
   list-style: none;
   margin: 0;
@@ -82,4 +156,207 @@
 
 .knowledge-base__status {
   flex-shrink: 0;
+}
+
+.template-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.template-list__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.template-list__item.is-selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+
+.template-list__item input[type='radio'] {
+  flex-shrink: 0;
+  margin: 0.2rem 0 0;
+  accent-color: var(--color-brand);
+}
+
+/* IMPORTANT: column layout so name / description / meta stack */
+.template-list__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.template-list__name {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.template-list__description {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.template-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Promote / visibility picker                                        */
+/* ------------------------------------------------------------------ */
+
+.promote-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.promote-toolbar--bulk {
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+  /* Align the "Copy from…" select to the right edge, same as the count. */
+  justify-content: flex-start;
+}
+
+.promote-toolbar__search {
+  flex: 1 1 14rem;
+  min-width: 10rem;
+}
+
+.promote-toolbar__count {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* Pushes the "Copy from…" select to the far right of the bulk row. */
+.promote-toolbar__spacer {
+  margin-left: auto;
+  min-width: 12rem;
+}
+
+/* Make sure the toolbar's SidebarSelect trigger matches the button height. */
+.promote-toolbar--bulk .sidebar-select__trigger {
+  min-height: 2.2rem;
+  border-radius: var(--radius-sm);
+}
+
+.promote-visibility {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.35rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.promote-visibility__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.promote-visibility__item:hover {
+  border-color: var(--color-brand);
+}
+
+.promote-visibility__item.is-checked {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.promote-visibility__item.is-locked {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.promote-visibility__item input[type='checkbox'] {
+  flex-shrink: 0;
+  accent-color: var(--color-brand);
+}
+
+.promote-visibility__name {
+  flex: 1 1 auto;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promote-visibility__badge {
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+/* Edit drawer's table cell for the "Read only" tag. */
+.console-table__actions .console-table__muted {
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Template table: "Read only" pill + owner chip                      */
+/* ------------------------------------------------------------------ */
+
+.console-readonly {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* ------------------------------------------------------------------ */
+/* Template actions column                                            */
+/* ------------------------------------------------------------------ */
+
+.template-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-end;
 }

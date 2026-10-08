@@ -21,6 +21,9 @@ export type AssistantSource = {
   snippet: string
   /** 0-100, rendered as the small bar on the right of the row. */
   relevance: number
+  /** Where this evidence came from - used to build the "open" link. */
+  baseId?: string
+  documentId?: string
 }
 
 export type AssistantAnswer = {
@@ -40,9 +43,22 @@ export type AssistantAnswer = {
   }
 }
 
+/**
+ * Which kind of reply this turn is.
+ *
+ * - `'chat'`     - a plain conversational reply, no sources by design.
+ * - `'grounded'` - a search-backed answer; an empty `sources` array means the
+ *                  search ran and matched nothing (the no-match state).
+ *
+ * Older persisted turns without this field are treated as `'chat'` by the page.
+ */
+export type TurnKind = 'chat' | 'grounded'
+
 export type AssistantTurn = {
   id: string
   question: string
+  /** Defaults to `'chat'` when missing on turns loaded from storage. */
+  kind?: TurnKind
   answer: AssistantAnswer
   /** Empty means the search matched nothing - rendered as the no-match state. */
   sources: AssistantSource[]
@@ -56,5 +72,8 @@ export type AssistantThread = {
   group: ThreadGroup
   updated: string
   pinned?: boolean
+  companyId: string
+  /** Which agent this thread last used. Falls back to Auto when absent. */
+  agentId?: string
   turns: AssistantTurn[]
 }

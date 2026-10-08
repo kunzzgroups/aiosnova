@@ -59,7 +59,7 @@ export function CheckList({
                 disabled={disabled}
                 onChange={() => onToggle(item.value)}
               />
-              <span>
+              <span className="check-list__body">
                 <span className="check-list__label">{item.label}</span>
                 {item.hint ? <span className="check-list__hint">{item.hint}</span> : null}
               </span>
