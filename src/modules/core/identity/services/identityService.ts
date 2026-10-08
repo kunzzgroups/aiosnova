@@ -129,13 +129,16 @@ export async function changeOwnPassword(payload: {
   })
 }
 
-export async function fetchOrganizations() {
-  return apiRequest<{ items: OrganizationNode[] }>('/api/identity/organizations', { auth: true })
+export async function fetchOrganizations(companyId?: string) {
+  return apiRequest<{ items: OrganizationNode[] }>('/api/identity/organizations'+(companyId ? '?companyId='+encodeURIComponent(companyId) : ''), { auth: true })
 }
 
 export async function createOrganization(payload: {
+  managerPositionId?: string | null
+  status?: OrganizationNode['status']
+  companyId?: string
   parentId?: string | null
-  code: string
+  code?: string
   name: string
   type?: OrganizationNode['type']
 }) {
@@ -148,7 +151,7 @@ export async function createOrganization(payload: {
 
 export async function updateOrganization(
   id: string,
-  payload: Partial<Pick<OrganizationNode, 'name' | 'status' | 'parentId' | 'type'>>,
+  payload: Partial<Pick<OrganizationNode, 'name' | 'status' | 'parentId' | 'type' | 'managerPositionId'>>,
 ) {
   return apiRequest<OrganizationNode>(`/api/identity/organizations/${id}`, {
     method: 'PATCH',
@@ -164,12 +167,14 @@ export async function deleteOrganization(id: string) {
   })
 }
 
-export async function fetchPositions() {
-  return apiRequest<{ items: PositionRecord[] }>('/api/identity/positions', { auth: true })
+export async function fetchPositions(companyId?: string) {
+  return apiRequest<{ items: PositionRecord[] }>('/api/identity/positions'+(companyId ? '?companyId='+encodeURIComponent(companyId) : ''), { auth: true })
 }
 
 export async function createPosition(payload: {
-  code: string
+  companyId?: string
+  organizationId?: string | null
+  code?: string
   name: string
   description?: string
 }) {
@@ -182,13 +187,17 @@ export async function createPosition(payload: {
 
 export async function updatePosition(
   id: string,
-  payload: Partial<Pick<PositionRecord, 'name' | 'description' | 'status'>>,
+  payload: Partial<Pick<PositionRecord, 'name' | 'description' | 'status' | 'organizationId'>>,
 ) {
   return apiRequest<PositionRecord>(`/api/identity/positions/${id}`, {
     method: 'PATCH',
     auth: true,
     body: payload,
   })
+}
+
+export async function deletePosition(id: string) {
+  return apiRequest<void>(`/api/identity/positions/${id}`, { method:'DELETE',auth:true })
 }
 
 export async function fetchMemberships() {

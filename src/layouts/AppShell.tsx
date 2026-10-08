@@ -10,7 +10,7 @@ import { ModuleTabs } from './ModuleTabs'
 import { CompanyTabs } from './CompanyTabs'
 import './AppShell.css'
 
-type PageHeader = { titleKey: string; descriptionKey: string } | null
+type PageHeader = { titleKey: string; titleValues?: Record<string,string>; descriptionKey?: string; titleAside?: ReactNode } | null
 export const AppShellHeaderContext = createContext<(header: PageHeader) => void>(() => {})
 
 type AppShellProps = {
@@ -41,8 +41,11 @@ export function AppShell({ children }: AppShellProps) {
       <div className="app-shell__workspace">
         <header className="app-shell__header">
           <div className="app-shell__header-copy">
-            <div className="app-shell__header-title">{header ? t(header.titleKey) : pageTitle}</div>
-            {header ? <p className="app-shell__header-description">{t(header.descriptionKey)}</p> : null}
+            <div className={header?.titleAside ? 'app-shell__header-title-row' : undefined}>
+              <div className="app-shell__header-title">{header ? t(header.titleKey,header.titleValues) : pageTitle}</div>
+              {header?.titleAside}
+            </div>
+            {header?.descriptionKey ? <p className="app-shell__header-description">{t(header.descriptionKey)}</p> : null}
           </div>
           <div className="app-shell__actions">
             <LanguageSwitcher />

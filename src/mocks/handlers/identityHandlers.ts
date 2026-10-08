@@ -402,28 +402,36 @@ export const identityHandlers = [
     return HttpResponse.json(withMemberCount(company))
   }),
 
-  http.get('/api/identity/organizations', () => {
-    const items = [...identityOrganizations].sort((a, b) => a.sortOrder - b.sortOrder)
+  http.get('/api/identity/organizations', ({ request }) => {
+    const companyId = new URL(request.url).searchParams.get('companyId')
+    const items = identityOrganizations.filter(item => !companyId || item.companyId===companyId).sort((a, b) => a.sortOrder - b.sortOrder)
     return HttpResponse.json({ items })
   }),
 
   http.post('/api/identity/organizations', async ({ request }) => {
+    await loadSavedDirectory()
+    const actor=directoryActor(request)
+    if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const body = (await request.json()) as {
+      companyId?: string
       parentId?: string | null
       code?: string
       name?: string
       type?: OrganizationNode['type']
+      managerPositionId?: string | null
+      status?: OrganizationNode['status']
     }
 
-    const code = body.code?.trim().toUpperCase() ?? ''
+    const code = body.code?.trim().toUpperCase() || createId('dept').toUpperCase()
     const name = body.name?.trim() ?? ''
     const parentId = body.parentId ?? null
+    const companyId = body.companyId ?? 'company-retail'
 
     if (!code || !name) {
       return HttpResponse.json({ message: 'Code and name are required.' }, { status: 400 })
     }
 
-    if (identityOrganizations.some((item) => item.code === code)) {
+    if (identityOrganizations.some((item) => item.code === code && item.companyId === companyId)) {
       return HttpResponse.json({ message: 'Organization code already exists in this merchant.' }, { status: 409 })
     }
 
@@ -433,12 +441,14 @@ export const identityHandlers = [
 
     const node: OrganizationNode = {
       id: createId('org'),
+      companyId,
       merchantId: DEMO_MERCHANT_ID,
       parentId,
+      managerPositionId: body.managerPositionId ?? null,
       code,
       name,
       type: body.type ?? 'department',
-      status: 'active',
+      status: body.status ?? 'active',
       sortOrder: identityOrganizations.length + 1,
     }
 
@@ -447,13 +457,16 @@ export const identityHandlers = [
   }),
 
   http.patch('/api/identity/organizations/:id', async ({ params, request }) => {
+    await loadSavedDirectory()
+    const actor=directoryActor(request)
+    if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const node = identityOrganizations.find((item) => item.id === params.id)
     if (!node) {
       return HttpResponse.json({ message: 'Organization not found.' }, { status: 404 })
     }
 
     const body = (await request.json()) as Partial<
-      Pick<OrganizationNode, 'name' | 'status' | 'parentId' | 'type'>
+      Pick<OrganizationNode, 'name' | 'status' | 'parentId' | 'type' | 'managerPositionId'>
     >
 
     if (body.parentId !== undefined) {
@@ -475,11 +488,15 @@ export const identityHandlers = [
     if (body.type !== undefined) {
       node.type = body.type
     }
+    if (body.managerPositionId !== undefined) node.managerPositionId = body.managerPositionId
 
     return HttpResponse.json(node)
   }),
 
-  http.delete('/api/identity/organizations/:id', ({ params }) => {
+  http.delete('/api/identity/organizations/:id', async ({ params, request }) => {
+    await loadSavedDirectory()
+    const actor=directoryActor(request)
+    if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const index = identityOrganizations.findIndex((item) => item.id === params.id)
     if (index < 0) {
       return HttpResponse.json({ message: 'Organization not found.' }, { status: 404 })
@@ -500,34 +517,44 @@ export const identityHandlers = [
       )
     }
 
+    if (identityPositions.some(item => item.organizationId===id)) return HttpResponse.json({ message:'Remove the department positions first.' }, { status:409 })
     identityOrganizations.splice(index, 1)
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.get('/api/identity/positions', () => {
-    return HttpResponse.json({ items: identityPositions })
+  http.get('/api/identity/positions', ({ request }) => {
+    const companyId = new URL(request.url).searchParams.get('companyId')
+    return HttpResponse.json({ items: identityPositions.filter(item => !companyId || item.companyId===companyId) })
   }),
 
   http.post('/api/identity/positions', async ({ request }) => {
+    await loadSavedDirectory()
+    const actor=directoryActor(request)
+    if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const body = (await request.json()) as {
       code?: string
       name?: string
+      companyId?: string
+      organizationId?: string | null
       description?: string
     }
 
-    const code = body.code?.trim().toUpperCase() ?? ''
+    const code = body.code?.trim().toUpperCase() || createId('pos-code').toUpperCase()
     const name = body.name?.trim() ?? ''
 
-    if (!code || !name) {
-      return HttpResponse.json({ message: 'Code and name are required.' }, { status: 400 })
+    if (!name) {
+      return HttpResponse.json({ message: 'Name is required.' }, { status: 400 })
     }
 
-    if (identityPositions.some((item) => item.code === code)) {
+    const companyId = body.companyId ?? 'company-retail'
+    if (identityPositions.some((item) => item.code === code && item.companyId===companyId)) {
       return HttpResponse.json({ message: 'Position code already exists in this merchant.' }, { status: 409 })
     }
 
     const position: PositionRecord = {
       id: createId('pos'),
+      companyId,
+      organizationId:body.organizationId,
       merchantId: DEMO_MERCHANT_ID,
       code,
       name,
@@ -540,13 +567,16 @@ export const identityHandlers = [
   }),
 
   http.patch('/api/identity/positions/:id', async ({ params, request }) => {
+    await loadSavedDirectory()
+    const actor=directoryActor(request)
+    if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const position = identityPositions.find((item) => item.id === params.id)
     if (!position) {
       return HttpResponse.json({ message: 'Position not found.' }, { status: 404 })
     }
 
     const body = (await request.json()) as Partial<
-      Pick<PositionRecord, 'name' | 'description' | 'status'>
+      Pick<PositionRecord, 'name' | 'description' | 'status' | 'organizationId'>
     >
 
     if (body.name !== undefined) {
@@ -558,8 +588,21 @@ export const identityHandlers = [
     if (body.status !== undefined) {
       position.status = body.status
     }
+    if (body.organizationId !== undefined) position.organizationId = body.organizationId
 
     return HttpResponse.json(position)
+  }),
+
+  http.delete('/api/identity/positions/:id', async ({ params, request }) => {
+    await loadSavedDirectory()
+    const actor=directoryActor(request)
+    if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
+    const index=identityPositions.findIndex(item => item.id===params.id)
+    if (index<0) return HttpResponse.json({ message:'Position not found.' }, { status:404 })
+    if (identityMemberships.some(item => item.positionId===params.id && item.status==='active')) return HttpResponse.json({ message:'Position has active memberships.' }, { status:409 })
+    if (identityOrganizations.some(item => item.managerPositionId===params.id)) return HttpResponse.json({ message:'Reassign managed departments first.' }, { status:409 })
+    identityPositions.splice(index,1)
+    return new HttpResponse(null,{ status:204 })
   }),
 
   http.get('/api/identity/memberships', async ({ request }) => {
