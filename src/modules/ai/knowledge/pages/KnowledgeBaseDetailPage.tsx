@@ -330,7 +330,7 @@ export function KnowledgeBaseDetailPage() {
     }
   }
 
-  async function cycleSkillStatus(skillId: string, current: 'ready' | 'failed') {
+  async function cycleSkillStatus(skillId: string, current: 'draft' | 'ready' | 'failed') {
     const next = current === 'ready' ? 'failed' : 'ready'
     try {
       await updateKnowledgeSkillStatus(skillId, next)
@@ -612,7 +612,7 @@ export function KnowledgeBaseDetailPage() {
                                   <Link
                                     key={agentId}
                                     className="console-chip console-chip--link"
-                                    to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
+                                    to={`/ai/ai/ai-agents?agentId=${encodeURIComponent(agentId)}`}
                                   >
                                     {agentName(agentId)}
                                   </Link>
@@ -846,7 +846,7 @@ export function KnowledgeBaseDetailPage() {
                                         <Link
                                           key={agentId}
                                           className="console-chip console-chip--link"
-                                          to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
+                                          to={`/ai/ai/ai-agents?agentId=${encodeURIComponent(agentId)}`}
                                         >
                                           {agentName(agentId)}
                                         </Link>
