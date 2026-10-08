@@ -2,7 +2,20 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import './SidebarSelect.css'
 
-export type SidebarSelectOption = string | { value: string; label: string }
+/**
+ * One entry in the picker. A plain string is enough for simple lists; pass an
+ * object when the option needs a second line (a short description, a status,
+ * etc.). `hint` renders below the label in a smaller muted font and turns the
+ * option into a two-line card.
+ */
+export type SidebarSelectOption =
+  | string
+  | {
+      value: string
+      label: string
+      /** Optional second line. When present, the option grows to two rows. */
+      hint?: string
+    }
 
 type SidebarSelectProps = {
   label: string
@@ -18,13 +31,20 @@ type SidebarSelectProps = {
   /**
    * Controlled open state. When provided, the component no longer owns it —
    * the parent is then responsible for opening, closing, and enforcing
-   * "only one popover at a time" alongside the model picker and settings panel.
+   * "only one popover at a time" alongside the model picker and settings
+   * panel.
    */
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
 
-function normalizeOptions(options: SidebarSelectOption[]) {
+type NormalizedOption = {
+  value: string
+  label: string
+  hint?: string
+}
+
+function normalizeOptions(options: SidebarSelectOption[]): NormalizedOption[] {
   return options.map((option) =>
     typeof option === 'string' ? { value: option, label: option } : option,
   )
@@ -43,9 +63,9 @@ export function SidebarSelect({
   open: controlledOpen,
   onOpenChange,
 }: SidebarSelectProps) {
-  // `open` above is now potentially controlled. The uncontrolled path keeps
-  // its own state under a distinct name, and `setOpen` below fans out to both
-  // the parent (via onOpenChange) and the internal store.
+  // `open` is potentially controlled. The uncontrolled path keeps its own
+  // state under a distinct name; `setOpen` fans out to both the parent (via
+  // onOpenChange) and the internal store.
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = controlledOpen ?? uncontrolledOpen
   const setOpen = (next: boolean) => {
@@ -58,9 +78,12 @@ export function SidebarSelect({
   const rootRef = useRef<HTMLDivElement>(null)
   const generatedId = useId()
   const listId = id ? `${id}-list` : generatedId
-  const items = normalizeOptions(options)
-  const selectedLabel = items.find((item) => item.value === value)?.label ?? value
 
+  const items = normalizeOptions(options)
+  const selected = items.find((item) => item.value === value) ?? null
+  const selectedLabel = selected?.label ?? value
+
+  // Close on outside click and on Escape.
   useEffect(() => {
     if (!open) {
       return
@@ -91,11 +114,16 @@ export function SidebarSelect({
       className={['sidebar-select', className].filter(Boolean).join(' ')}
       ref={rootRef}
     >
-      {hideLabel ? null : <span className="sidebar-select__label">{label}</span>}
+      {hideLabel ? null : (
+        <span className="sidebar-select__label">{label}</span>
+      )}
+
       <button
         type="button"
         id={id}
-        className={['sidebar-select__trigger', open ? 'is-open' : ''].filter(Boolean).join(' ')}
+        className={['sidebar-select__trigger', open ? 'is-open' : '']
+          .filter(Boolean)
+          .join(' ')}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
@@ -111,16 +139,26 @@ export function SidebarSelect({
       </button>
 
       {open ? (
-        <ul className="sidebar-select__menu" id={listId} role="listbox" aria-label={label}>
+        <ul
+          className="sidebar-select__menu"
+          id={listId}
+          role="listbox"
+          aria-label={label}
+        >
           {items.map((option) => {
-            const selected = option.value === value
+            const isSelected = option.value === value
+            const hasHint = Boolean(option.hint)
             return (
               <li key={option.value} role="presentation">
                 <button
                   type="button"
                   role="option"
-                  aria-selected={selected}
-                  className={['sidebar-select__option', selected ? 'is-selected' : '']
+                  aria-selected={isSelected}
+                  className={[
+                    'sidebar-select__option',
+                    isSelected ? 'is-selected' : '',
+                    hasHint ? 'has-hint' : '',
+                  ]
                     .filter(Boolean)
                     .join(' ')}
                   onClick={() => {
@@ -128,7 +166,14 @@ export function SidebarSelect({
                     setOpen(false)
                   }}
                 >
-                  {option.label}
+                  <span className="sidebar-select__option-label">
+                    {option.label}
+                  </span>
+                  {hasHint ? (
+                    <span className="sidebar-select__option-hint">
+                      {option.hint}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             )

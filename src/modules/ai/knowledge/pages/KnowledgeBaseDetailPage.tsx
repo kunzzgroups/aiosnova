@@ -1,5 +1,18 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react'
+import {
+  Link,
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import { CheckList } from '@/components/ui/CheckList'
@@ -11,26 +24,39 @@ import { SearchableCheckList } from '@/components/ui/SearchableCheckList'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { IconFolder, IconPaperclip } from '@/components/icons/Icons'
+import { FileDropZone } from '@/components/ui/FileDropZone'
+import { useCompanyStore } from '@/stores/companyStore'
+import {
+  KeyValueEditor,
+  keyValuePairsToObject,
+  type KeyValuePair,
+} from '@/components/ui/KeyValueEditor'
 import { fetchAgents } from '@/modules/ai/agents/services/agentService'
 import type { AgentListItem } from '@/modules/ai/agents/types/agent'
 import { ApiError } from '@/services/httpClient'
 import {
   addKnowledgeDocument,
+  addKnowledgeDataSource,
+  addKnowledgeSkill,
   fetchKnowledgeBase,
   setDocumentAgents,
   setKnowledgeBaseAgents,
+  updateKnowledgeDocumentStatus,
+  updateKnowledgeDataSourceStatus,
+  updateKnowledgeSkillStatus,
 } from '../services/knowledgeService'
 import type {
   DocumentEffectiveAgents,
   KnowledgeBaseDetail,
+  KnowledgeBaseKind,
   KnowledgeDocumentStatus,
   KnowledgeDocumentType,
 } from '../types/knowledge'
 import '@/modules/ai/shared/AiConsole.css'
 import './KnowledgePage.css'
 
-const TAB_IDS = ['documents', 'agents'] as const
-type TabId = (typeof TAB_IDS)[number]
+const ALL_TABS = ['documents', 'skills', 'data', 'agents'] as const
+type TabId = (typeof ALL_TABS)[number]
 
 const ADD_FORM_ID = 'knowledge-source-form'
 
@@ -49,11 +75,9 @@ const TYPE_LABEL_KEY: Record<KnowledgeDocumentType, string> = {
 
 const DOCUMENT_TYPES: KnowledgeDocumentType[] = ['policy', 'contract', 'invoice', 'record']
 
-/** `all` plus every ingestion state the filter can narrow to. */
 const STATUS_FILTERS = ['all', 'ready', 'processing', 'failed'] as const
 type StatusFilter = (typeof STATUS_FILTERS)[number]
 
-/** Chips shown per row before collapsing into "+N". */
 const MAX_CHIPS = 2
 
 function formatUploaded(value: string): string {
@@ -64,18 +88,35 @@ function formatUploaded(value: string): string {
   return date.toLocaleDateString()
 }
 
-/**
- * L2: one knowledge base, split into sections by its own tab strip.
- *
- * Sections live in the URL (`\u2026/:baseId/:tab`) rather than in component state, so a
- * section can be linked and survives a reload. `PageTabs` is the generic strip and
- * carries the Back action; `ModuleTabs` above stays on "Knowledge" because its
- * matcher is prefix-based.
- */
+function tabsForKind(kind: KnowledgeBaseKind): TabId[] {
+  switch (kind) {
+    case 'skill':
+      return ['skills', 'agents']
+    case 'data':
+      return ['data', 'agents']
+    case 'document':
+    default:
+      return ['documents', 'agents']
+  }
+}
+
+function defaultTabForKind(kind: KnowledgeBaseKind): TabId {
+  return tabsForKind(kind)[0]
+}
+
+const TAB_LABEL_KEY: Record<TabId, string> = {
+  documents: 'ai.knowledge.tabDocuments',
+  skills: 'ai.knowledge.tabSkills',
+  data: 'ai.knowledge.tabData',
+  agents: 'ai.knowledge.tabAgents',
+}
+
 export function KnowledgeBaseDetailPage() {
   const { baseId = '', tab } = useParams()
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const activeCompanyId = useCompanyStore((state) => state.companyId)
 
   const [detail, setDetail] = useState<KnowledgeBaseDetail | null>(null)
   const [agents, setAgents] = useState<AgentListItem[]>([])
@@ -88,11 +129,27 @@ export function KnowledgeBaseDetailPage() {
   const [expandedDocumentId, setExpandedDocumentId] = useState<string | null>(null)
 
   const [addOpen, setAddOpen] = useState(false)
-  const [docTitle, setDocTitle] = useState('')
-  const [docType, setDocType] = useState<KnowledgeDocumentType>('policy')
   const [inheritAgents, setInheritAgents] = useState(true)
   const [docAgentIds, setDocAgentIds] = useState<string[]>([])
   const [isAdding, setIsAdding] = useState(false)
+
+  // ---- Document form
+  const [docTitle, setDocTitle] = useState('')
+  const [docType, setDocType] = useState<KnowledgeDocumentType>('policy')
+  const [docFile, setDocFile] = useState<File[]>([])
+
+  // ---- Skill form
+  const [skillName, setSkillName] = useState('')
+  const [skillDescription, setSkillDescription] = useState('')
+  const [skillFile, setSkillFile] = useState<File[]>([])
+
+  // ---- Data source form
+  const [dsName, setDsName] = useState('')
+  const [dsKind, setDsKind] = useState<'table' | 'api' | 'database'>('table')
+  const [dsFile, setDsFile] = useState<File[]>([])
+  const [dsConfig, setDsConfig] = useState<KeyValuePair[]>([])
+
+  const highlightDocumentId = searchParams.get('highlight')
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -110,29 +167,6 @@ export function KnowledgeBaseDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
-
-  /** Only agents of the base's OWN company may be assigned. */
-  const baseCompanyId = detail?.base.companyId ?? ''
-  useEffect(() => {
-    if (!baseCompanyId) {
-      return
-    }
-    let cancelled = false
-    fetchAgents(baseCompanyId)
-      .then((result) => {
-        if (!cancelled) {
-          setAgents(result.items)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAgents([])
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [baseCompanyId])
 
   const effectiveByDocument = useMemo(() => {
     const map = new Map<string, DocumentEffectiveAgents>()
@@ -168,6 +202,39 @@ export function KnowledgeBaseDetailPage() {
     })
   }, [documents, query, statusFilter])
 
+  /* Agents this page can tick: the ACTIVE company's agents, not the base
+   owner's. A company that can read a shared base may want its own agents
+   to use it; ticking writes `agentKnowledgeLinks` on the ACTIVE company's
+   agents. */
+  useEffect(() => {
+    if (!activeCompanyId) {
+      setAgents([])
+      return
+    }
+    let cancelled = false
+    fetchAgents(activeCompanyId)
+      .then((result) => {
+        if (!cancelled) setAgents(result.items)
+      })
+      .catch(() => {
+        if (!cancelled) setAgents([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeCompanyId])
+
+  /* Scroll to + highlight the document the assistant linked to. */
+  useEffect(() => {
+    if (!highlightDocumentId) return
+    if (tab !== undefined && tab !== 'documents') return
+    const handle = window.setTimeout(() => {
+      const row = document.getElementById(`doc-row-${highlightDocumentId}`)
+      row?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 200)
+    return () => window.clearTimeout(handle)
+  }, [highlightDocumentId, tab, visible])
+
   async function toggleBaseAgent(agentId: string) {
     if (!detail || isSaving) {
       return
@@ -188,11 +255,6 @@ export function KnowledgeBaseDetailPage() {
     }
   }
 
-  /**
-   * Ticking a document always WRITES an override - never merges with the base.
-   * An override that ends up empty is kept as an empty override, which is how a
-   * document is deliberately withheld from every agent while its base is shared.
-   */
   async function toggleDocumentAgent(documentId: string, agentId: string) {
     if (isSaving) {
       return
@@ -213,7 +275,6 @@ export function KnowledgeBaseDetailPage() {
     }
   }
 
-  /** `null` clears the override, so the document inherits its base again. */
   async function clearDocumentOverride(documentId: string) {
     if (isSaving) {
       return
@@ -232,8 +293,18 @@ export function KnowledgeBaseDetailPage() {
   function openAddSource() {
     setDocTitle('')
     setDocType('policy')
+    setDocFile([])
+
+    setSkillName('')
+    setSkillDescription('')
+    setSkillFile([])
+
+    setDsName('')
+    setDsKind('table')
+    setDsFile([])
+    setDsConfig([])
+
     setInheritAgents(true)
-    // Pre-filled so unticking "inherit" starts from what the base already shares.
     setDocAgentIds(detail?.baseAgentIds ?? [])
     setError(null)
     setAddOpen(true)
@@ -245,22 +316,105 @@ export function KnowledgeBaseDetailPage() {
     )
   }
 
+  async function cycleDocumentStatus(
+    documentId: string,
+    current: KnowledgeDocumentStatus,
+  ) {
+    const next: KnowledgeDocumentStatus =
+      current === 'processing' ? 'ready' : current === 'ready' ? 'failed' : 'processing'
+    try {
+      await updateKnowledgeDocumentStatus(documentId, next)
+      await load()
+    } catch {
+      setError(t('ai.knowledge.errStatus'))
+    }
+  }
+
+  async function cycleSkillStatus(skillId: string, current: 'ready' | 'failed') {
+    const next = current === 'ready' ? 'failed' : 'ready'
+    try {
+      await updateKnowledgeSkillStatus(skillId, next)
+      await load()
+    } catch {
+      setError(t('ai.knowledge.errStatus'))
+    }
+  }
+
+  async function cycleDataSourceStatus(
+    dsId: string,
+    current: 'connected' | 'disconnected' | 'error',
+  ) {
+    const next =
+      current === 'disconnected' ? 'connected' : current === 'connected' ? 'error' : 'disconnected'
+    try {
+      await updateKnowledgeDataSourceStatus(dsId, next)
+      await load()
+    } catch {
+      setError(t('ai.knowledge.errStatus'))
+    }
+  }
+
   async function handleAddSource(event: FormEvent) {
     event.preventDefault()
-    if (!docTitle.trim()) {
-      setError(t('ai.knowledge.errTitleRequired'))
-      return
-    }
+    const kind: KnowledgeBaseKind = detail?.base.kind ?? 'document'
 
     setIsAdding(true)
     setError(null)
     try {
-      await addKnowledgeDocument(baseId, {
-        title: docTitle,
-        type: docType,
-        // `null` means "no override": the document inherits the base's agents.
-        agentIds: inheritAgents ? null : docAgentIds,
-      })
+      if (kind === 'document') {
+        if (!docTitle.trim() && docFile.length === 0) {
+          setError(t('ai.knowledge.errTitleRequired'))
+          return
+        }
+
+        if (docFile.length > 0) {
+          // Upload every picked file as its own document row.
+          for (const file of docFile) {
+            await addKnowledgeDocument(baseId, {
+              title: file.name,
+              type: docType,
+              agentIds: inheritAgents ? null : docAgentIds,
+              file,
+            })
+          }
+        } else {
+          // No file: create a record-only entry from the title.
+          await addKnowledgeDocument(baseId, {
+            title: docTitle,
+            type: docType,
+            agentIds: inheritAgents ? null : docAgentIds,
+          })
+        }
+      } else if (kind === 'skill') {
+        if (!skillName.trim()) {
+          setError(t('ai.knowledge.errSkillNameRequired'))
+          return
+        }
+        const inputSchema: Record<string, unknown> | undefined =
+          skillFile.length > 0 ? { sourceFile: skillFile[0].name } : undefined
+        await addKnowledgeSkill(baseId, {
+          name: skillName,
+          description: skillDescription,
+          inputSchema,
+          agentIds: inheritAgents ? null : docAgentIds,
+        })
+      } else {
+        if (!dsName.trim()) {
+          setError(t('ai.knowledge.errDataSourceNameRequired'))
+          return
+        }
+        const config = keyValuePairsToObject(dsConfig)
+        if (dsFile.length > 0) {
+          config.sourceFile = dsFile[0].name
+        }
+        await addKnowledgeDataSource(baseId, {
+          name: dsName,
+          kind: dsKind,
+          config,
+          agentIds: inheritAgents ? null : docAgentIds,
+        })
+      }
+
       setMessage(t('ai.knowledge.msgSourceAdded'))
       setAddOpen(false)
       await load()
@@ -271,19 +425,62 @@ export function KnowledgeBaseDetailPage() {
     }
   }
 
+  const kind: KnowledgeBaseKind = detail?.base.kind ?? 'document'
+  const visibleTabs = useMemo(() => tabsForKind(kind), [kind])
+
   const tabs: PageTab[] = useMemo(
-    () => [
-      { id: 'documents', label: t('ai.knowledge.tabDocuments'), to: `/ai/ai/knowledge/${baseId}/documents` },
-      { id: 'agents', label: t('ai.knowledge.tabAgents'), to: `/ai/ai/knowledge/${baseId}/agents` },
-    ],
-    [baseId, t],
+    () =>
+      visibleTabs.map((id) => ({
+        id,
+        label: t(TAB_LABEL_KEY[id]),
+        to: `/ai/ai/knowledge/${baseId}/${id}`,
+      })),
+    [visibleTabs, baseId, t],
   )
 
-  // Hooks above run unconditionally, so redirecting here is safe.
-  if (tab !== undefined && !TAB_IDS.includes(tab as TabId)) {
-    return <Navigate to={`/ai/ai/knowledge/${baseId}/documents`} replace />
+  if (tab !== undefined && !visibleTabs.includes(tab as TabId)) {
+    return <Navigate to={`/ai/ai/knowledge/${baseId}/${defaultTabForKind(kind)}`} replace />
   }
-  const activeTab: TabId = (tab as TabId | undefined) ?? 'documents'
+  const activeTab: TabId = (tab as TabId | undefined) ?? defaultTabForKind(kind)
+
+  function renderAgentsSection() {
+    return (
+      <div className="console-form__section">
+        <label className="console-toggle">
+          <input
+            type="checkbox"
+            checked={inheritAgents}
+            disabled={isAdding}
+            onChange={(event) => setInheritAgents(event.target.checked)}
+          />
+          <span>
+            <span className="console-toggle__label">
+              {t('ai.knowledge.inheritAgents', { count: detail?.baseAgentIds.length ?? 0 })}
+            </span>
+            <span className="console-toggle__hint">
+              {t('ai.knowledge.agentsHint')}
+            </span>
+          </span>
+        </label>
+        {inheritAgents ? null : (
+          <div className="console-toggle__reveal">
+            <h4>{t('ai.knowledge.docAgentsTitle')}</h4>
+            <SearchableCheckList
+              items={agentItems}
+              selected={docAgentIds}
+              onToggle={toggleDocAgent}
+              emptyLabel={t('ai.knowledge.noAgentsInCompany')}
+              noMatchLabel={t('ai.knowledge.agentsSearchNoMatch')}
+              searchPlaceholder={t('ai.knowledge.agentsSearchPlaceholder')}
+              searchAriaLabel={t('ai.knowledge.agentsSearchAria')}
+              listAriaLabel={t('ai.knowledge.docAgentsTitle')}
+              disabled={isAdding}
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="console-page">
@@ -341,7 +538,14 @@ export function KnowledgeBaseDetailPage() {
               </p>
             ) : (
               <div className="console-table-wrap">
-                <table className="console-table">
+                <table className="console-table console-table--fixed">
+                  <colgroup>
+                    <col style={{ width: '34%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '26%' }} />
+                    <col style={{ width: '14%' }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>{t('ai.knowledge.colName')}</th>
@@ -356,20 +560,46 @@ export function KnowledgeBaseDetailPage() {
                       const effective = effectiveByDocument.get(document.id)
                       const agentIds = effective?.agentIds ?? []
                       return (
-                        <tr key={document.id}>
+                        <tr
+                          key={document.id}
+                          id={`doc-row-${document.id}`}
+                          className={
+                            document.id === highlightDocumentId
+                              ? 'console-table__row--highlight'
+                              : undefined
+                          }
+                        >
                           <td>
                             <span className="console-table__name">
                               {document.kind === 'file' ? <IconPaperclip /> : <IconFolder />}
                               <span>{document.title}</span>
                             </span>
+                            {document.fileUrl ? (
+                              <a
+                                className="console-file-link"
+                                href={document.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={document.title}
+                              >
+                                {t('ai.knowledge.download')}
+                              </a>
+                            ) : null}
                           </td>
                           <td className="console-table__muted">
                             {t(TYPE_LABEL_KEY[document.type])}
                           </td>
                           <td>
-                            <span className={`console-status console-status--${document.status}`}>
+                            <button
+                              type="button"
+                              className={`console-status console-status--${document.status} console-status--clickable`}
+                              onClick={() =>
+                                void cycleDocumentStatus(document.id, document.status)
+                              }
+                              title={t('ai.knowledge.statusClickHint')}
+                            >
                               {t(STATUS_LABEL_KEY[document.status])}
-                            </span>
+                            </button>
                           </td>
                           <td>
                             {agentIds.length === 0 ? (
@@ -379,9 +609,13 @@ export function KnowledgeBaseDetailPage() {
                             ) : (
                               <span className="console-chips">
                                 {agentIds.slice(0, MAX_CHIPS).map((agentId) => (
-                                  <span className="console-chip" key={agentId}>
+                                  <Link
+                                    key={agentId}
+                                    className="console-chip console-chip--link"
+                                    to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
+                                  >
                                     {agentName(agentId)}
-                                  </span>
+                                  </Link>
                                 ))}
                                 {agentIds.length > MAX_CHIPS ? (
                                   <span className="console-chip console-chip--muted">
@@ -409,6 +643,134 @@ export function KnowledgeBaseDetailPage() {
           </>
         ) : null}
 
+        {activeTab === 'skills' ? (
+          <>
+            <div className="console-subhead">
+              <div>
+                <h3>{t('ai.knowledge.skillsTitle')}</h3>
+                <p>{t('ai.knowledge.skillsHint')}</p>
+              </div>
+              <Button className="console-toolbar__action" onClick={openAddSource}>
+                {t('ai.knowledge.addSource')}
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <p className="console-empty">{t('ai.knowledge.loading')}</p>
+            ) : (detail?.skills.length ?? 0) === 0 ? (
+              <p className="console-empty">{t('ai.knowledge.skillsEmpty')}</p>
+            ) : (
+              <div className="console-table-wrap">
+                <table className="console-table">
+                  <thead>
+                    <tr>
+                      <th>{t('ai.knowledge.colName')}</th>
+                      <th>{t('ai.knowledge.colDescription')}</th>
+                      <th>{t('ai.knowledge.colSchema')}</th>
+                      <th>{t('ai.knowledge.colStatus')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail?.skills.map((skill) => (
+                      <tr key={skill.id}>
+                        <td>
+                          <span className="console-table__name">{skill.name}</span>
+                        </td>
+                        <td className="console-table__muted">{skill.description}</td>
+                        <td className="console-table__muted">
+                          <code className="console-code">
+                            {skill.inputSchema
+                              ? Object.entries(skill.inputSchema)
+                                .map(([k, v]) => `${k}: ${String(v)}`)
+                                .join(', ')
+                              : '—'}
+                          </code>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={`console-status console-status--${skill.status} console-status--clickable`}
+                            onClick={() => void cycleSkillStatus(skill.id, skill.status)}
+                            title={t('ai.knowledge.statusClickHint')}
+                          >
+                            {skill.status}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : null}
+
+        {activeTab === 'data' ? (
+          <>
+            <div className="console-subhead">
+              <div>
+                <h3>{t('ai.knowledge.dataTitle')}</h3>
+                <p>{t('ai.knowledge.dataHint')}</p>
+              </div>
+              <Button className="console-toolbar__action" onClick={openAddSource}>
+                {t('ai.knowledge.addSource')}
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <p className="console-empty">{t('ai.knowledge.loading')}</p>
+            ) : (detail?.dataSources.length ?? 0) === 0 ? (
+              <p className="console-empty">{t('ai.knowledge.dataEmpty')}</p>
+            ) : (
+              <div className="console-table-wrap">
+                <table className="console-table">
+                  <thead>
+                    <tr>
+                      <th>{t('ai.knowledge.colName')}</th>
+                      <th>{t('ai.knowledge.colKind')}</th>
+                      <th>{t('ai.knowledge.colConfig')}</th>
+                      <th>{t('ai.knowledge.colSynced')}</th>
+                      <th>{t('ai.knowledge.colStatus')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail?.dataSources.map((ds) => (
+                      <tr key={ds.id}>
+                        <td>
+                          <span className="console-table__name">{ds.name}</span>
+                        </td>
+                        <td className="console-table__muted">{ds.kind}</td>
+                        <td className="console-table__muted">
+                          <span className="console-chips">
+                            {Object.entries(ds.config).map(([k, v]) => (
+                              <span className="console-chip console-chip--muted" key={k}>
+                                {k}: {v}
+                              </span>
+                            ))}
+                          </span>
+                        </td>
+                        <td className="console-table__muted">
+                          {ds.lastSyncedAt ? formatUploaded(ds.lastSyncedAt) : '—'}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={`console-status console-status--${ds.status} console-status--clickable`}
+                            onClick={() => void cycleDataSourceStatus(ds.id, ds.status)}
+                            title={t('ai.knowledge.statusClickHint')}
+                          >
+                            {ds.status}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : null}
+
         {activeTab === 'agents' ? (
           <>
             <div className="console-subhead">
@@ -428,111 +790,129 @@ export function KnowledgeBaseDetailPage() {
               disabled={isSaving || isLoading}
             />
 
-            <div className="console-subhead console-subhead--spaced">
-              <div>
-                <h3>{t('ai.knowledge.overridesTitle')}</h3>
-                <p>{t('ai.knowledge.overridesHint')}</p>
-              </div>
-            </div>
+            {kind === 'document' ? (
+              <>
+                <div className="console-subhead console-subhead--spaced">
+                  <div>
+                    <h3>{t('ai.knowledge.overridesTitle')}</h3>
+                    <p>{t('ai.knowledge.overridesHint')}</p>
+                  </div>
+                </div>
 
-            {documents.length === 0 ? (
-              <p className="console-empty">{t('ai.knowledge.documentsEmpty')}</p>
-            ) : (
-              <div className="console-table-wrap">
-                <table className="console-table">
-                  <thead>
-                    <tr>
-                      <th>{t('ai.knowledge.colName')}</th>
-                      <th>{t('ai.knowledge.colAgents')}</th>
-                      <th>{t('ai.knowledge.colSource')}</th>
-                      <th className="console-table__actions">{t('ai.knowledge.colActions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documents.map((document) => {
-                      const effective = effectiveByDocument.get(document.id)
-                      const agentIds = effective?.agentIds ?? []
-                      const overridden = effective?.source === 'document'
-                      const expanded = expandedDocumentId === document.id
-                      return (
-                        <Fragment key={document.id}>
-                          <tr>
-                            <td>
-                              <span className="console-table__name">
-                                {document.kind === 'file' ? <IconPaperclip /> : <IconFolder />}
-                                <span>{document.title}</span>
-                              </span>
-                            </td>
-                            <td>
-                              {agentIds.length === 0 ? (
-                                <span className="console-chip console-chip--muted">
-                                  {t('ai.knowledge.noAgentsReach')}
-                                </span>
-                              ) : (
-                                <span className="console-chips">
-                                  {agentIds.map((agentId) => (
-                                    <span className="console-chip" key={agentId}>
-                                      {agentName(agentId)}
+                {documents.length === 0 ? (
+                  <p className="console-empty">{t('ai.knowledge.documentsEmpty')}</p>
+                ) : (
+                  <div className="console-table-wrap">
+                    <table className="console-table console-table--fixed">
+                      <colgroup>
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '40%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '15%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th>{t('ai.knowledge.colName')}</th>
+                          <th>{t('ai.knowledge.colAgents')}</th>
+                          <th>{t('ai.knowledge.colSource')}</th>
+                          <th className="console-table__actions">
+                            {t('ai.knowledge.colActions')}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {documents.map((document) => {
+                          const effective = effectiveByDocument.get(document.id)
+                          const agentIds = effective?.agentIds ?? []
+                          const overridden = effective?.source === 'document'
+                          const expanded = expandedDocumentId === document.id
+                          return (
+                            <Fragment key={document.id}>
+                              <tr>
+                                <td>
+                                  <span className="console-table__name">
+                                    {document.kind === 'file' ? <IconPaperclip /> : <IconFolder />}
+                                    <span>{document.title}</span>
+                                  </span>
+                                </td>
+                                <td>
+                                  {agentIds.length === 0 ? (
+                                    <span className="console-chip console-chip--muted">
+                                      {t('ai.knowledge.noAgentsReach')}
                                     </span>
-                                  ))}
-                                </span>
-                              )}
-                            </td>
-                            <td className="console-table__muted">
-                              {overridden
-                                ? t('ai.knowledge.sourceOverride')
-                                : t('ai.knowledge.sourceInherited')}
-                            </td>
-                            <td className="console-table__actions">
-                              <Button
-                                variant="secondary"
-                                onClick={() =>
-                                  setExpandedDocumentId(expanded ? null : document.id)
-                                }
-                              >
-                                {expanded
-                                  ? t('ai.knowledge.overrideClose')
-                                  : t('ai.knowledge.overrideEdit')}
-                              </Button>
-                            </td>
-                          </tr>
-                          {expanded ? (
-                            <tr>
-                              <td colSpan={4}>
-                                <p className="console-hint console-hint--flat">
-                                  {t('ai.knowledge.overrideHint')}
-                                </p>
-                                <CheckList
-                                  items={agentItems}
-                                  selected={agentIds}
-                                  onToggle={(agentId) =>
-                                    void toggleDocumentAgent(document.id, agentId)
-                                  }
-                                  emptyLabel={t('ai.knowledge.noAgentsInCompany')}
-                                  ariaLabel={t('ai.knowledge.overrideEdit')}
-                                  columns
-                                  disabled={isSaving}
-                                />
-                                {overridden ? (
-                                  <div className="console-form__actions">
-                                    <Button
-                                      variant="ghost"
-                                      onClick={() => void clearDocumentOverride(document.id)}
-                                    >
-                                      {t('ai.knowledge.overrideReset')}
-                                    </Button>
-                                  </div>
-                                ) : null}
-                              </td>
-                            </tr>
-                          ) : null}
-                        </Fragment>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                                  ) : (
+                                    <span className="console-chips">
+                                      {agentIds.map((agentId) => (
+                                        <Link
+                                          key={agentId}
+                                          className="console-chip console-chip--link"
+                                          to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
+                                        >
+                                          {agentName(agentId)}
+                                        </Link>
+                                      ))}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="console-table__muted">
+                                  {overridden
+                                    ? t('ai.knowledge.sourceOverride')
+                                    : t('ai.knowledge.sourceInherited')}
+                                </td>
+                                <td className="console-table__actions">
+                                  <Button
+                                    variant="secondary"
+                                    onClick={() =>
+                                      setExpandedDocumentId(expanded ? null : document.id)
+                                    }
+                                  >
+                                    {expanded
+                                      ? t('ai.knowledge.overrideClose')
+                                      : t('ai.knowledge.overrideEdit')}
+                                  </Button>
+                                </td>
+                              </tr>
+                              {expanded ? (
+                                <tr>
+                                  <td colSpan={4}>
+                                    <p className="console-hint console-hint--flat">
+                                      {t('ai.knowledge.overrideHint')}
+                                    </p>
+                                    <CheckList
+                                      items={agentItems}
+                                      selected={agentIds}
+                                      onToggle={(agentId) =>
+                                        void toggleDocumentAgent(document.id, agentId)
+                                      }
+                                      emptyLabel={t('ai.knowledge.noAgentsInCompany')}
+                                      ariaLabel={t('ai.knowledge.overrideEdit')}
+                                      columns
+                                      disabled={isSaving}
+                                    />
+                                    {overridden ? (
+                                      <div className="console-form__actions">
+                                        <Button
+                                          variant="ghost"
+                                          onClick={() =>
+                                            void clearDocumentOverride(document.id)
+                                          }
+                                        >
+                                          {t('ai.knowledge.overrideReset')}
+                                        </Button>
+                                      </div>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </Fragment>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : null}
           </>
         ) : null}
       </section>
@@ -561,67 +941,170 @@ export function KnowledgeBaseDetailPage() {
         }
       >
         <form id={ADD_FORM_ID} onSubmit={(event) => void handleAddSource(event)}>
-          <div className="console-form__grid">
-            <FormField label={t('ai.knowledge.fieldTitle')} htmlFor="doc-title">
-              <TextField
-                id="doc-title"
-                value={docTitle}
-                onChange={(event) => setDocTitle(event.target.value)}
-                placeholder={t('ai.knowledge.titlePlaceholder')}
-                disabled={isAdding}
-                autoComplete="off"
-                autoFocus
-              />
-            </FormField>
-            <FormField label={t('ai.knowledge.fieldType')} htmlFor="doc-type">
-              <SidebarSelect
-                id="doc-type"
-                label={t('ai.knowledge.fieldType')}
-                hideLabel
-                value={docType}
-                options={DOCUMENT_TYPES.map((value) => ({
-                  value,
-                  label: t(TYPE_LABEL_KEY[value]),
-                }))}
-                onChange={(value) => setDocType(value as KnowledgeDocumentType)}
-                disabled={isAdding}
-              />
-            </FormField>
-          </div>
+          {kind === 'document' ? (
+            <>
+              <div className="console-form__grid">
+                <FormField label={t('ai.knowledge.fieldTitle')} htmlFor="doc-title">
+                  <TextField
+                    id="doc-title"
+                    value={docTitle}
+                    onChange={(event) => setDocTitle(event.target.value)}
+                    placeholder={t('ai.knowledge.titlePlaceholder')}
+                    disabled={isAdding}
+                    autoComplete="off"
+                    autoFocus
+                  />
+                </FormField>
+                <FormField label={t('ai.knowledge.fieldType')} htmlFor="doc-type">
+                  <SidebarSelect
+                    id="doc-type"
+                    label={t('ai.knowledge.fieldType')}
+                    hideLabel
+                    value={docType}
+                    options={DOCUMENT_TYPES.map((value) => ({
+                      value,
+                      label: t(TYPE_LABEL_KEY[value]),
+                    }))}
+                    onChange={(value) => setDocType(value as KnowledgeDocumentType)}
+                    disabled={isAdding}
+                  />
+                </FormField>
+              </div>
 
-          <div className="console-form__section">
-            <label className="console-toggle">
-              <input
-                type="checkbox"
-                checked={inheritAgents}
-                disabled={isAdding}
-                onChange={(event) => setInheritAgents(event.target.checked)}
-              />
-              <span>
-                <span className="console-toggle__label">
-                  {t('ai.knowledge.inheritAgents', { count: detail?.baseAgentIds.length ?? 0 })}
-                </span>
-                <span className="console-toggle__hint">{t('ai.knowledge.inheritAgentsHint')}</span>
-              </span>
-            </label>
-
-            {inheritAgents ? null : (
-              <div className="console-toggle__reveal">
-                <h4>{t('ai.knowledge.docAgentsTitle')}</h4>
-                <SearchableCheckList
-                  items={agentItems}
-                  selected={docAgentIds}
-                  onToggle={toggleDocAgent}
-                  emptyLabel={t('ai.knowledge.noAgentsInCompany')}
-                  noMatchLabel={t('ai.knowledge.agentsSearchNoMatch')}
-                  searchPlaceholder={t('ai.knowledge.agentsSearchPlaceholder')}
-                  searchAriaLabel={t('ai.knowledge.agentsSearchAria')}
-                  listAriaLabel={t('ai.knowledge.docAgentsTitle')}
+              <div className="console-form__section">
+                <h4>{t('ai.knowledge.fieldFile')}</h4>
+                <FileDropZone
+                  value={docFile}
+                  onChange={(files) => {
+                    setDocFile(files)
+                    const first = files[0]
+                    if (first && !docTitle.trim()) {
+                      setDocTitle(first.name)
+                    }
+                  }}
                   disabled={isAdding}
+                  multiple
+                  hint={t('common.fileDropHint', 'PDF, DOCX, XLSX, PNG, JPG, TXT up to 10 MB')}
                 />
               </div>
-            )}
-          </div>
+            </>
+          ) : null}
+
+          {kind === 'skill' ? (
+            <>
+              <div className="console-form__grid">
+                <FormField label={t('ai.knowledge.fieldSkillName')} htmlFor="skill-name">
+                  <TextField
+                    id="skill-name"
+                    value={skillName}
+                    onChange={(event) => setSkillName(event.target.value)}
+                    placeholder="e.g. calculate_tax"
+                    disabled={isAdding}
+                    autoComplete="off"
+                    autoFocus
+                  />
+                </FormField>
+                <FormField
+                  label={t('ai.knowledge.fieldSkillDescription')}
+                  htmlFor="skill-description"
+                >
+                  <TextField
+                    id="skill-description"
+                    value={skillDescription}
+                    onChange={(event) => setSkillDescription(event.target.value)}
+                    placeholder={t('ai.knowledge.fieldSkillDescriptionPlaceholder')}
+                    disabled={isAdding}
+                    autoComplete="off"
+                  />
+                </FormField>
+              </div>
+
+              <div className="console-form__section">
+                <h4>{t('ai.knowledge.fieldFile')}</h4>
+                <FileDropZone
+                  value={skillFile}
+                  onChange={(files) => {
+                    setSkillFile(files)
+                    const first = files[0]
+                    if (first && !skillName.trim()) {
+                      setSkillName(first.name.replace(/\.[^.]+$/, ''))
+                    }
+                  }}
+                  disabled={isAdding}
+                  hint={t(
+                    'ai.knowledge.skillFileHint',
+                    'Optional: attach a spec, sample, or screenshot.',
+                  )}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {kind === 'data' ? (
+            <>
+              <div className="console-form__grid">
+                <FormField label={t('ai.knowledge.fieldDataSourceName')} htmlFor="ds-name">
+                  <TextField
+                    id="ds-name"
+                    value={dsName}
+                    onChange={(event) => setDsName(event.target.value)}
+                    placeholder="e.g. customers"
+                    disabled={isAdding}
+                    autoComplete="off"
+                    autoFocus
+                  />
+                </FormField>
+                <FormField label={t('ai.knowledge.fieldDataSourceKind')} htmlFor="ds-kind">
+                  <SidebarSelect
+                    id="ds-kind"
+                    label={t('ai.knowledge.fieldDataSourceKind')}
+                    hideLabel
+                    value={dsKind}
+                    options={[
+                      { value: 'table', label: 'Table' },
+                      { value: 'api', label: 'API' },
+                      { value: 'database', label: 'Database' },
+                    ]}
+                    onChange={(value) => setDsKind(value as 'table' | 'api' | 'database')}
+                    disabled={isAdding}
+                  />
+                </FormField>
+              </div>
+
+              <div className="console-form__section">
+                <h4>{t('ai.knowledge.fieldFile')}</h4>
+                <FileDropZone
+                  value={dsFile}
+                  onChange={(files) => {
+                    setDsFile(files)
+                    const first = files[0]
+                    if (first && !dsName.trim()) {
+                      setDsName(first.name.replace(/\.[^.]+$/, ''))
+                    }
+                  }}
+                  disabled={isAdding}
+                  hint={t(
+                    'ai.knowledge.dataFileHint',
+                    'Optional: a schema dump, sample export, or screenshot.',
+                  )}
+                />
+              </div>
+
+              <div className="console-form__section">
+                <h4>{t('ai.knowledge.fieldDataSourceConfig')}</h4>
+                <KeyValueEditor
+                  items={dsConfig}
+                  onChange={setDsConfig}
+                  disabled={isAdding}
+                  keyPlaceholder="table"
+                  valuePlaceholder="customers"
+                  addLabel={t('ai.knowledge.addConfigField', 'Add config field')}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {renderAgentsSection()}
         </form>
       </Drawer>
     </div>

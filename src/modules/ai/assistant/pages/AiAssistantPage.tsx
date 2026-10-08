@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import {
   IconAlertTriangle,
   IconChevronDown,
@@ -19,11 +20,13 @@ import {
   IconStop,
   IconThumbDown,
   IconThumbUp,
+  IconSettings,
 } from '@/components/icons/Icons'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import { TextField } from '@/components/ui/TextField'
 import { useCompanyStore } from '@/stores/companyStore'
+import { AttachMenu } from '../components/AttachMenu'
 import type {
   AssistantSource,
   AssistantThread,
@@ -32,20 +35,29 @@ import type {
   ThreadGroup,
 } from '../types/assistant'
 import './AiAssistantPage.css'
+import { fetchAgents } from '@/modules/ai/agents/services/agentService'
+import type {
+  AgentListItem,
+  AgentModelConfig,
+  AgentModelProvider,
+} from '@/modules/ai/agents/types/agent'
+import { retrieveEvidence } from '../services/assistantService'
+import {
+  readAssistantPrefs,
+  writeAssistantPrefs,
+  type AssistantPreferences,
+} from '../preferences'
+import { AssistantSettingsDrawer } from '../components/AssistantSettingsDrawer'
 
 /** Which side rails the reader has folded away. Session-scoped, like the sidebar. */
 const PANELS_STORAGE_KEY = 'aios.ai.panels'
-const THREADS_STORAGE_KEY = 'aios.ai.threads'
+/** v2: threads carry a companyId. v1 data is discarded on read. */
+const THREADS_STORAGE_KEY = 'aios.ai.threads.v2'
 /** Versioned so the old full-catalogue cache is discarded automatically. */
 const MODELS_STORAGE_KEY = 'aios.ai.models.v2'
 /** Full provider catalogue, kept separately so search has something to reach into. */
 const ALL_MODELS_STORAGE_KEY = 'aios.ai.models.all.v1'
 
-/**
- * Curated shortlist shown by default. OpenRouter exposes hundreds of ids;
- * showing them all buries the ones worth using. Readers who want something
- * else can search, which opens the full catalogue (`allModels`).
- */
 const PREFERRED_MODELS = [
   'openai/gpt-4o',
   'anthropic/claude-sonnet-4',
@@ -57,34 +69,36 @@ const PREFERRED_MODELS = [
 
 const FALLBACK_MODELS = PREFERRED_MODELS
 
-/**
- * Agents the composer can route a request through. "Auto" lets the assistant
- * pick; the rest hand the turn to a department agent. This is a local list
- * for now - later it will be populated from the Agent Manager service.
- */
-const AI_AGENTS = [
-  { id: 'auto', label: 'Auto' },
-  { id: 'hr', label: 'HR Agent' },
-  { id: 'marketing', label: 'Marketing Agent' },
-  { id: 'finance', label: 'Finance Agent' },
-  { id: 'sales', label: 'Sales Agent' },
-  { id: 'support', label: 'Support Agent' },
-] as const
+/** Sentinel value meaning "let the assistant route". */
+const AUTO_AGENT_ID = 'auto'
 
-type AgentId = (typeof AI_AGENTS)[number]['id']
-
-/**
- * System prompt is fixed: the composer only exposes temperature, model, and
- * agent. Kept as a constant so nothing in the UI has to manage it.
- */
 const SYSTEM_PROMPT = 'You are a helpful assistant.'
-
-/** Starting temperature for a new session. */
 const DEFAULT_TEMPERATURE = 0.7
 
-type PanelState = { history: boolean; evidence: boolean }
+/** OpenRouter expects "provider/model". Map our enum to its prefix. */
+const PROVIDER_PREFIX: Record<AgentModelProvider, string> = {
+  auto: '',
+  openai: 'openai/',
+  anthropic: 'anthropic/',
+  google: 'google/',
+  azure: 'openai/',
+}
 
-/** Which composer popover is currently expanded. At most one at a time. */
+function resolveAgentModelId(config?: AgentModelConfig): string | null {
+  if (!config) return null
+  if (config.provider === 'auto') return null
+  if (!config.model) return null
+  const prefix = PROVIDER_PREFIX[config.provider] ?? ''
+  return `${prefix}${config.model}`
+}
+
+function pickDefaultAgentId(agents: AgentListItem[]): string | null {
+  if (agents.length === 0) return null
+  const management = agents.find((a) => /management/i.test(a.name))
+  return (management ?? agents[0]).id
+}
+
+type PanelState = { history: boolean; evidence: boolean }
 type PopoverId = 'model' | 'agent' | null
 
 function readPanelState(): PanelState {
@@ -109,11 +123,12 @@ function readPanelState(): PanelState {
 function readThreads(): AssistantThread[] {
   try {
     const raw = window.localStorage.getItem(THREADS_STORAGE_KEY)
-    if (!raw) {
-      return []
-    }
+    if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as AssistantThread[]) : []
+    if (!Array.isArray(parsed)) return []
+    return (parsed as AssistantThread[]).filter(
+      (t) => t && typeof t.id === 'string' && typeof t.companyId === 'string',
+    )
   } catch {
     return []
   }
@@ -128,7 +143,6 @@ const SOURCE_LABEL_KEY: Record<SourceType, string> = {
   record: 'ai.assistant.typeRecord',
 }
 
-/** Plain text of an answer, for the copy action (emphasis markers stripped). */
 function answerText(turn: AssistantTurn): string {
   const strip = (value: string) => value.replace(/\*\*/g, '')
   return [
@@ -140,10 +154,6 @@ function answerText(turn: AssistantTurn): string {
     .join('\n')
 }
 
-/**
- * Demo copy carries **emphasis** markers; this turns them into <strong> so the
- * transcript keeps its hierarchy without pulling in a markdown renderer.
- */
 function rich(text: string): ReactNode[] {
   return text.split('**').map((chunk, index) =>
     index % 2 === 1 ? <strong key={index}>{chunk}</strong> : <Fragment key={index}>{chunk}</Fragment>,
@@ -154,21 +164,48 @@ function toggleId(ids: string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]
 }
 
-/** A question that is waiting on a retry, and how to re-ask it. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+async function readFileForLLM(
+  file: File,
+): Promise<
+  | { kind: 'image'; name: string; dataUrl: string }
+  | { kind: 'text'; name: string; text: string }
+> {
+  if (file.type.startsWith('image/')) {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+    return { kind: 'image', name: file.name, dataUrl }
+  }
+
+  const isTexty =
+    file.type.startsWith('text/') ||
+    /\.(txt|md|csv|json|log|ya?ml|xml|html?)$/i.test(file.name)
+
+  if (isTexty) {
+    return { kind: 'text', name: file.name, text: await file.text() }
+  }
+
+  return {
+    kind: 'text',
+    name: file.name,
+    text: `[Binary file: ${file.name} (${file.type || 'unknown'}), ${file.size} bytes. Contents not extractable in the browser.]`,
+  }
+}
+
 type PendingReply = { question: string; mode: 'append' | 'replace' }
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
 
-/**
- * Composer-side model picker.
- *
- * The panel has three stacked sections, top to bottom:
- *   1. Temperature - a compact one-line slider, tuned before the model.
- *   2. Search      - filters the list; empty shows the six recommended ids.
- *   3. List        - always exactly six rows tall. Fewer results leave empty
- *                    space rather than shrinking, so the panel never jumps.
- */
 function AiModelPicker(props: {
   value: string
   recommended: string[]
@@ -178,6 +215,9 @@ function AiModelPicker(props: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onChange: (id: string) => void
+  lockedFromAgent?: boolean
+  lockedFromAgentLabel?: string
+  lockedFromAgentHint?: string
 }) {
   const {
     value,
@@ -188,6 +228,9 @@ function AiModelPicker(props: {
     open,
     onOpenChange,
     onChange,
+    lockedFromAgent = false,
+    lockedFromAgentLabel = 'from agent',
+    lockedFromAgentHint,
   } = props
 
   const [query, setQuery] = useState('')
@@ -211,11 +254,22 @@ function AiModelPicker(props: {
     <div className="ai-model-picker" data-popover>
       <button
         type="button"
-        className="ai-model-picker__trigger"
+        className={[
+          'ai-model-picker__trigger',
+          lockedFromAgent ? 'is-agent-locked' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
+        title={lockedFromAgent ? lockedFromAgentHint : undefined}
       >
+        {lockedFromAgent ? (
+          <span className="ai-model-picker__lock" aria-label={lockedFromAgentLabel}>
+            <IconSpark />
+          </span>
+        ) : null}
         {value}
         <span className="sidebar-select__chevron" aria-hidden>
           <IconChevron />
@@ -224,7 +278,6 @@ function AiModelPicker(props: {
 
       {open ? (
         <div className="ai-model-picker__menu" role="dialog">
-          {/* Temperature: a single compact row - label, slider, readout. */}
           <div className="ai-model-picker__temperature">
             <span className="ai-model-picker__label">Temp</span>
             <input
@@ -250,7 +303,6 @@ function AiModelPicker(props: {
             />
           </div>
 
-          {/* The list keeps a fixed six-row height regardless of result count. */}
           <ul className="ai-model-picker__list" role="listbox">
             {items.length === 0 ? (
               <li className="ai-model-picker__empty">No models match “{query}”</li>
@@ -281,12 +333,9 @@ function AiModelPicker(props: {
   )
 }
 
-/**
- * AI Assistant: three panes - chats grouped by time, the conversation, and the
- * evidence behind the answer you are reading.
- */
 export function AiAssistantPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const companyId = useCompanyStore((state) => state.companyId)
   const companies = useCompanyStore((state) => state.companies)
   const companyLabel = companies.find((item) => item.value === companyId)?.label ?? null
@@ -300,8 +349,10 @@ export function AiAssistantPage() {
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null)
   const [evidenceTurnId, setEvidenceTurnId] = useState<string | null>(null)
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
-  /** Which AI Agent handles the next turn. Local list until wired to Agent Manager. */
-  const [agentId, setAgentId] = useState<AgentId>('auto')
+  const [agentId, setAgentId] = useState<string>(AUTO_AGENT_ID)
+  const [agents, setAgents] = useState<AgentListItem[]>([])
+  const [prefs, setPrefs] = useState<AssistantPreferences>(readAssistantPrefs)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>({})
   const [copiedTurnId, setCopiedTurnId] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<PanelState>(readPanelState)
@@ -315,11 +366,14 @@ export function AiAssistantPage() {
   const [recommendedModels, setRecommendedModels] = useState<string[]>(FALLBACK_MODELS)
   const [allModels, setAllModels] = useState<string[]>(FALLBACK_MODELS)
   const [model, setModel] = useState<string>(PREFERRED_MODELS[0])
-  /** Sampling temperature, edited inside the model picker. */
   const [temperature, setTemperature] = useState<number>(DEFAULT_TEMPERATURE)
 
   const [openPopover, setOpenPopover] = useState<PopoverId>(null)
   const [streamingText, setStreamingText] = useState<string | null>(null)
+
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([])
+  const [message, setMessage] = useState<string | null>(null)
+  const [isComposerDragging, setIsComposerDragging] = useState(false)
 
   const modelRef = useRef(model)
   const temperatureRef = useRef(temperature)
@@ -343,6 +397,16 @@ export function AiAssistantPage() {
   const sources = evidenceTurn?.sources ?? []
   const allSourcesOpen = sources.length > 0 && openSourceIds.length === sources.length
 
+  const effectiveModel = useMemo(() => {
+    const selected =
+      agentId !== AUTO_AGENT_ID ? agents.find((a) => a.id === agentId) : null
+    const override = resolveAgentModelId(selected?.model)
+    return {
+      id: override ?? model,
+      fromAgent: override !== null,
+    }
+  }, [agentId, agents, model])
+
   const announcement =
     pendingQuestion !== null
       ? t('ai.assistant.liveSearching')
@@ -358,13 +422,20 @@ export function AiAssistantPage() {
                 : t('ai.assistant.liveAnswered', { count: lastTurn.sources.length })
               : ''
 
+  const visibleThreads = useMemo(
+    () => threads.filter((thread) => thread.companyId === companyId),
+    [threads, companyId],
+  )
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) {
-      return threads
+      return visibleThreads
     }
-    return threads.filter((thread) => thread.title.toLowerCase().includes(needle))
-  }, [threads, query])
+    return visibleThreads.filter((thread) =>
+      thread.title.toLowerCase().includes(needle),
+    )
+  }, [visibleThreads, query])
 
   const pinned = filtered.filter((thread) => thread.pinned)
   const grouped = GROUP_ORDER.map((group) => ({
@@ -511,6 +582,64 @@ export function AiAssistantPage() {
       ?.scrollIntoView({ block: 'center' })
   }, [activeSourceId, evidenceTurnId])
 
+  useEffect(() => {
+    if (message === null) {
+      return
+    }
+    const handle = window.setTimeout(() => setMessage(null), 3200)
+    return () => window.clearTimeout(handle)
+  }, [message])
+
+  useEffect(() => {
+    function reset() {
+      setIsComposerDragging(false)
+    }
+    window.addEventListener('blur', reset)
+    window.addEventListener('focus', reset)
+    document.addEventListener('visibilitychange', reset)
+    return () => {
+      window.removeEventListener('blur', reset)
+      window.removeEventListener('focus', reset)
+      document.removeEventListener('visibilitychange', reset)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchAgents(companyId)
+      .then((result) => {
+        if (!cancelled) setAgents(result.items)
+      })
+      .catch(() => {
+        if (!cancelled) setAgents([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [companyId])
+
+  useEffect(() => {
+    writeAssistantPrefs(prefs)
+  }, [prefs])
+
+  useEffect(() => {
+    setActiveThreadId(null)
+    setActiveSourceId(null)
+    setEvidenceTurnId(null)
+    setAgentId(AUTO_AGENT_ID)
+  }, [companyId])
+
+  useEffect(() => {
+    if (!activeThreadId) return
+    setThreads((current) =>
+      current.map((thread) =>
+        thread.id === activeThreadId && thread.agentId !== agentId
+          ? { ...thread, agentId }
+          : thread,
+      ),
+    )
+  }, [agentId, activeThreadId])
+
   function cancelPendingReply() {
     abortRef.current?.abort()
     abortRef.current = null
@@ -523,6 +652,11 @@ export function AiAssistantPage() {
     setActiveThreadId(threadId)
     setActiveSourceId(null)
     setEvidenceTurnId(null)
+    setErrorQuestion(null)
+    setInterrupted(null)
+    setNotConnected(null)
+    const thread = threads.find((t) => t.id === threadId)
+    setAgentId(thread?.agentId ?? AUTO_AGENT_ID)
   }
 
   function deleteThread(threadId: string) {
@@ -530,6 +664,9 @@ export function AiAssistantPage() {
       cancelPendingReply()
     }
     setThreads((current) => current.filter((thread) => thread.id !== threadId))
+    setErrorQuestion(null)
+    setInterrupted(null)
+    setNotConnected(null)
     if (threadId === activeThreadId) {
       setActiveThreadId(null)
       setActiveSourceId(null)
@@ -545,6 +682,11 @@ export function AiAssistantPage() {
     setActiveSourceId(null)
     setEvidenceTurnId(null)
     setDraft('')
+    setAttachedFiles([])
+    setErrorQuestion(null)
+    setInterrupted(null)
+    setNotConnected(null)
+    setAgentId(AUTO_AGENT_ID)
     inputRef.current?.focus()
   }
 
@@ -554,6 +696,18 @@ export function AiAssistantPage() {
     setActiveSourceId(sourceId)
     setOpenTraceIds((ids) => (ids.includes(turnId) ? ids : [...ids, turnId]))
     setOpenSourceIds((ids) => (ids.includes(sourceId) ? ids : [...ids, sourceId]))
+  }
+
+  function openSource(source: AssistantSource) {
+    if (!source.baseId) return
+    const target = `/ai/ai/knowledge/${source.baseId}/documents${
+      source.documentId ? `?highlight=${encodeURIComponent(source.documentId)}` : ''
+    }`
+    if (prefs.evidenceAction === 'newTab') {
+      window.open(target, '_blank', 'noopener,noreferrer')
+    } else {
+      void navigate(target)
+    }
   }
 
   function copyAnswer(turn: AssistantTurn) {
@@ -590,7 +744,12 @@ export function AiAssistantPage() {
     )
   }
 
-  async function requestReply(threadId: string, question: string, mode: 'append' | 'replace') {
+  async function requestReply(
+    threadId: string,
+    question: string,
+    mode: 'append' | 'replace',
+    files: File[] = [],
+  ) {
     const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined
     if (!apiKey) {
       setNotConnected({ question, mode })
@@ -606,8 +765,15 @@ export function AiAssistantPage() {
     const controller = new AbortController()
     abortRef.current = controller
     const started = performance.now()
-    const selectedModel = modelRef.current
-    const selectedTemperature = temperatureRef.current
+
+    const selectedAgent =
+      agentId !== AUTO_AGENT_ID ? agents.find((a) => a.id === agentId) : null
+    const effectiveAgentId = selectedAgent?.id ?? pickDefaultAgentId(agents)
+
+    const agentModelId = resolveAgentModelId(selectedAgent?.model)
+    const selectedModel = agentModelId ?? modelRef.current
+    const selectedTemperature =
+      selectedAgent?.model?.temperature ?? temperatureRef.current
 
     try {
       const history = (threads.find((thread) => thread.id === threadId)?.turns ?? []).flatMap(
@@ -616,6 +782,42 @@ export function AiAssistantPage() {
           { role: 'assistant' as const, content: answerText(turn) },
         ],
       )
+
+      const attachments = await Promise.all(files.map(readFileForLLM))
+
+      const parts: Array<
+        | { type: 'text'; text: string }
+        | { type: 'image_url'; image_url: { url: string } }
+      > = [{ type: 'text', text: question }]
+
+      for (const file of attachments) {
+        if (file.kind === 'image') {
+          parts.push({ type: 'image_url', image_url: { url: file.dataUrl } })
+        } else {
+          parts.push({
+            type: 'text',
+            text: `--- ${file.name} ---\n${file.text}`,
+          })
+        }
+      }
+
+      const evidence = effectiveAgentId
+        ? await retrieveEvidence({
+          agentId: effectiveAgentId,
+          question,
+          activeCompanyId: companyId,
+        })
+        : { sources: [], scanned: 0, matched: 0, scope: '' }
+
+      const systemWithContext =
+        evidence.sources.length === 0
+          ? SYSTEM_PROMPT
+          : `${SYSTEM_PROMPT}\n\nYou have access to the following company documents. Cite them when they answer the question:\n${evidence.sources
+            .map((s) => `- ${s.title} (${s.origin})`)
+            .join('\n')}`
+
+      const userContent =
+        parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts
 
       const response = await fetch(OPENROUTER_URL, {
         method: 'POST',
@@ -629,14 +831,17 @@ export function AiAssistantPage() {
           temperature: selectedTemperature,
           stream: true,
           messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: systemWithContext },
             ...history,
-            { role: 'user', content: question },
+            { role: 'user', content: userContent },
           ],
         }),
       })
 
       if (!response.ok || !response.body) {
+        const detail = await response.text().catch(() => '')
+        // eslint-disable-next-line no-console
+        console.error('[assistant] OpenRouter error', response.status, detail)
         throw new Error(`HTTP ${response.status}`)
       }
 
@@ -645,7 +850,7 @@ export function AiAssistantPage() {
       let buffer = ''
       let full = ''
 
-      for (;;) {
+      for (; ;) {
         const { done, value } = await reader.read()
         if (done) {
           break
@@ -676,20 +881,21 @@ export function AiAssistantPage() {
       const turn: AssistantTurn = {
         id: `turn-${Date.now()}`,
         question,
-        kind: 'chat',
+        kind: evidence.sources.length > 0 ? 'grounded' : 'chat',
         answer: {
           lead: full,
           facts: [],
           tail: '',
           model: selectedModel,
-          cites: [],
+          cites: evidence.sources.map((_, i) => i + 1),
           trace: {
-            scanned: 0,
-            matched: 0,
+            scanned: evidence.scanned,
+            matched: evidence.matched,
             seconds: Math.round(performance.now() - started) / 1000,
+            scope: evidence.scope || undefined,
           },
         },
-        sources: [],
+        sources: evidence.sources,
       }
 
       applyTurn(threadId, turn, mode)
@@ -725,6 +931,8 @@ export function AiAssistantPage() {
         title: question,
         group: 'today',
         updated: t('ai.assistant.justNow'),
+        companyId,
+        agentId,
         turns: [],
       },
       ...current,
@@ -756,17 +964,25 @@ export function AiAssistantPage() {
   }
 
   function submit() {
-    const question = draft.trim()
-    if (!question || pendingQuestion !== null) {
+    const trimmed = draft.trim()
+    const hasText = trimmed.length > 0
+    const hasFiles = attachedFiles.length > 0
+    if ((!hasText && !hasFiles) || pendingQuestion !== null) {
       return
     }
 
+    const question = hasText
+      ? trimmed
+      : t('ai.assistant.analyzeAttachments', 'Analyze the attached file(s).')
+
     const threadId = activeThreadId ?? createThread(question)
+    const filesToSend = attachedFiles
 
     setDraft('')
     setActiveSourceId(null)
     setEvidenceTurnId(null)
-    void requestReply(threadId, question, 'append')
+    setAttachedFiles([])
+    void requestReply(threadId, question, 'append', filesToSend)
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -873,9 +1089,15 @@ export function AiAssistantPage() {
         </button>
         {open ? (
           <div className="ai-source__actions">
-            <button type="button" className="ai-quiet" disabled title={t('ai.assistant.notWired')}>
+            <button
+              type="button"
+              className="ai-quiet"
+              disabled={!source.baseId}
+              title={source.baseId ? undefined : t('ai.assistant.notWired')}
+              onClick={() => openSource(source)}
+            >
               <IconExternalLink />
-              {source.kind === 'file' ? t('ai.assistant.openFile') : t('ai.assistant.openRecord')}
+              {t('ai.assistant.openFile', 'Open file')}
             </button>
           </div>
         ) : null}
@@ -938,9 +1160,9 @@ export function AiAssistantPage() {
           </span>
           {answer.model
             ? t('ai.assistant.byAssistantModel', {
-                model: answer.model,
-                count: turn.sources.length,
-              })
+              model: answer.model,
+              count: turn.sources.length,
+            })
             : t('ai.assistant.byAssistant', { count: turn.sources.length })}
         </span>
         {noMatch ? (
@@ -1002,30 +1224,30 @@ export function AiAssistantPage() {
         )}
         {turn.kind === 'grounded'
           ? renderTrace({
-              turnId: turn.id,
-              open,
-              steps: (
-                <>
-                  {t('ai.assistant.traceScanned', { count: answer.trace.scanned })}
-                  <span className="ai-trace__arrow">→</span>
-                  {t('ai.assistant.traceMatched', { count: answer.trace.matched })}
-                  <span className="ai-trace__arrow">→</span>
-                  {t('ai.assistant.traceCited', { count: turn.sources.length })}
-                  <span className="ai-trace__arrow">→</span>
-                  {t('ai.assistant.traceSeconds', { count: answer.trace.seconds })}
-                  {answer.trace.scope ? (
-                    <>
-                      <span className="ai-trace__arrow">·</span>
-                      {t('ai.assistant.traceScope', { scope: answer.trace.scope })}
-                    </>
-                  ) : null}
-                </>
-              ),
-              body:
-                turn.sources.length === 0
-                  ? null
-                  : turn.sources.map((source, index) => renderSource(source, index, 'trace')),
-            })
+            turnId: turn.id,
+            open,
+            steps: (
+              <>
+                {t('ai.assistant.traceScanned', { count: answer.trace.scanned })}
+                <span className="ai-trace__arrow">→</span>
+                {t('ai.assistant.traceMatched', { count: answer.trace.matched })}
+                <span className="ai-trace__arrow">→</span>
+                {t('ai.assistant.traceCited', { count: turn.sources.length })}
+                <span className="ai-trace__arrow">→</span>
+                {t('ai.assistant.traceSeconds', { count: answer.trace.seconds })}
+                {answer.trace.scope ? (
+                  <>
+                    <span className="ai-trace__arrow">·</span>
+                    {t('ai.assistant.traceScope', { scope: answer.trace.scope })}
+                  </>
+                ) : null}
+              </>
+            ),
+            body:
+              turn.sources.length === 0
+                ? null
+                : turn.sources.map((source, index) => renderSource(source, index, 'trace')),
+          })
           : null}
         {isLast ? (
           <div className="ai-actions">
@@ -1084,6 +1306,12 @@ export function AiAssistantPage() {
 
   return (
     <div className="ai-page">
+      {message !== null ? (
+        <div className="ai-toast" role="status">
+          {message}
+        </div>
+      ) : null}
+
       <div className="ai-workspace">
         {compact && (!collapsed.history || !collapsed.evidence) ? (
           <button
@@ -1173,6 +1401,15 @@ export function AiAssistantPage() {
               <button
                 type="button"
                 className="ai-quiet ai-quiet--icon"
+                aria-label={t('ai.assistant.settingsTitle', 'Assistant settings')}
+                title={t('ai.assistant.settingsTitle', 'Assistant settings')}
+                onClick={() => setSettingsOpen(true)}
+              >
+                <IconSettings />
+              </button>
+              <button
+                type="button"
+                className="ai-quiet ai-quiet--icon"
                 aria-pressed={!collapsed.evidence}
                 aria-label={
                   collapsed.evidence
@@ -1216,7 +1453,7 @@ export function AiAssistantPage() {
                       <span className="ai-msg__mark">
                         <IconSpark />
                       </span>
-                      {model}
+                      {effectiveModel.id}
                     </span>
                     {streamingText ? (
                       <div className="ai-prose">
@@ -1317,7 +1554,60 @@ export function AiAssistantPage() {
           </div>
 
           <div className="ai-chat__composer">
-            <div className="ai-composer">
+            <div
+              className={`ai-composer${isComposerDragging ? ' is-dragging' : ''}`}
+              onDragEnter={(event) => { event.preventDefault(); event.stopPropagation(); setIsComposerDragging(true) }}
+              onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); setIsComposerDragging(true) }}
+              onDragLeave={(event) => { event.preventDefault(); event.stopPropagation(); setIsComposerDragging(false) }}
+              onDrop={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                setIsComposerDragging(false)
+                const files = Array.from(event.dataTransfer.files ?? [])
+                if (files.length > 0) setAttachedFiles((prev) => [...prev, ...files])
+              }}
+              onPaste={(event) => {
+                const files = Array.from(event.clipboardData?.files ?? [])
+                if (files.length > 0) {
+                  event.preventDefault()
+                  setAttachedFiles((prev) => [...prev, ...files])
+                }
+              }}
+            >
+              {attachedFiles.length > 0 ? (
+                <ul
+                  className="ai-composer__attachments"
+                  aria-label={t('ai.assistant.attachedFiles')}
+                >
+                  {attachedFiles.map((file, index) => (
+                    <li key={`${file.name}-${index}`} className="ai-composer__file">
+                      <IconPaperclip />
+                      <span className="ai-composer__file-name" title={file.name}>
+                        {file.name}
+                      </span>
+                      <span className="ai-composer__file-size">{formatBytes(file.size)}</span>
+                      <button
+                        type="button"
+                        className="ai-composer__file-remove"
+                        aria-label={t('ai.assistant.removeFile', { name: file.name })}
+                        onClick={() =>
+                          setAttachedFiles((current) => current.filter((_, i) => i !== index))
+                        }
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              {isComposerDragging ? (
+                <div className="ai-composer__drop-overlay" aria-hidden>
+                  <IconPaperclip />
+                  <span>{t('ai.assistant.dropFilesHere', 'Drop files to attach')}</span>
+                </div>
+              ) : null}
+
               <textarea
                 ref={inputRef}
                 className="ai-composer__input"
@@ -1328,9 +1618,10 @@ export function AiAssistantPage() {
                 placeholder={t('ai.assistant.composerPlaceholder')}
                 aria-label={t('ai.assistant.composerPlaceholder')}
               />
+
               <div className="ai-composer__foot">
                 <AiModelPicker
-                  value={model}
+                  value={effectiveModel.id}
                   recommended={recommendedModels}
                   all={allModels}
                   temperature={temperature}
@@ -1338,37 +1629,41 @@ export function AiAssistantPage() {
                   open={openPopover === 'model'}
                   onOpenChange={(next) => setOpenPopover(next ? 'model' : null)}
                   onChange={setModel}
+                  lockedFromAgent={effectiveModel.fromAgent}
+                  lockedFromAgentLabel={t('ai.assistant.modelFromAgent', 'from agent')}
+                  lockedFromAgentHint={t(
+                    'ai.assistant.modelFromAgentHint',
+                    'This model is set by the selected agent. Clear the agent to use your own choice.',
+                  )}
                 />
 
-                {/* Agent picker: replaced the old "All sources" scope. "Auto"
-                    is the default; the rest route to department agents. Later
-                    this list will be fetched from the Agent Manager service. */}
                 <div className="ai-pill-select" data-popover>
                   <SidebarSelect
                     id="ai-agent"
                     label="Agent"
                     hideLabel
                     value={agentId}
-                    options={AI_AGENTS.map((agent) => ({
-                      value: agent.id,
-                      label: agent.label,
-                    }))}
-                    onChange={(value) => setAgentId(value as AgentId)}
+                    options={[
+                      { value: AUTO_AGENT_ID, label: t('ai.assistant.agentAuto', 'Auto') },
+                      ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
+                    ]}
+                    onChange={setAgentId}
                     open={openPopover === 'agent'}
                     onOpenChange={(next) => setOpenPopover(next ? 'agent' : null)}
                   />
                 </div>
 
                 <span className="ai-composer__spacer" />
-                <button
-                  type="button"
-                  className="ai-quiet"
-                  disabled
-                  title={t('ai.assistant.notWired')}
-                >
-                  <IconPaperclip />
-                  {t('ai.assistant.attach')}
-                </button>
+
+                <AttachMenu
+                  onAttachToChat={(file) => setAttachedFiles((prev) => [...prev, file])}
+                  onStored={({ baseName, fileName }) =>
+                    setMessage(
+                      t('ai.assistant.storedIn', { base: baseName, name: fileName }),
+                    )
+                  }
+                />
+
                 {pendingQuestion !== null ? (
                   <button
                     type="button"
@@ -1384,7 +1679,7 @@ export function AiAssistantPage() {
                     type="button"
                     className="ai-send"
                     aria-label={t('ai.assistant.send')}
-                    disabled={draft.trim().length === 0}
+                    disabled={draft.trim().length === 0 && attachedFiles.length === 0}
                     onClick={submit}
                   >
                     <IconSend />
@@ -1455,6 +1750,13 @@ export function AiAssistantPage() {
           </aside>
         )}
       </div>
+
+      <AssistantSettingsDrawer
+        open={settingsOpen}
+        prefs={prefs}
+        onChange={setPrefs}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   )
 }

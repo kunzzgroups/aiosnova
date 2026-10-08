@@ -3,9 +3,15 @@
    and the evidence rail for the answer you are reading.
 
    Full-bleed on purpose. This is a workspace, not a document: the three panes
-   already draw their own edges, so the page fills the content area edge to edge
-   instead of sitting inside another card (see `.app-shell__main:has(> .ai-page)`).
+   already draw their own edges, so the page fills the content area edge to
+   edge instead of sitting inside another card
+   (see `.app-shell__main:has(> .ai-page)`).
+
    Depth: borders only; the only surface that gets a lift is the composer.
+
+   NOTE: SidebarSelect's popover lives in `SidebarSelect.css` because that
+   component is used across the app (Knowledge, Agents, Settings) and must
+   render the same whether or not the AI Assistant stylesheet is loaded.
    --------------------------------------------------------------------------- */
 
 .ai-page {
@@ -17,6 +23,7 @@
 }
 
 .ai-workspace {
+  position: relative;
   flex: 1;
   display: flex;
   min-height: 0;
@@ -486,8 +493,12 @@
 }
 
 .ai-composer {
+  position: relative;
   max-width: 46rem;
   margin: 0 auto;
+  /* Keep this in sync with the composer's own padding so the chips row
+     aligns with the textarea above and the buttons below. */
+  padding: 0.75rem 0.9rem;
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-bg-elevated);
@@ -567,6 +578,147 @@
   background: var(--color-border);
 }
 
+/* --- attached files (chips above the textarea) ---------------------------- */
+
+.ai-composer__attachments {
+  list-style: none;
+  margin: 0 0 0.7rem;   /* gap between chips and textarea */
+  padding: 0;           /* left edge follows the composer padding */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-height: 7rem;
+  overflow-y: auto;
+}
+
+.ai-composer__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-muted);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  max-width: 18rem;
+}
+
+.ai-composer__file svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.ai-composer__file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.ai-composer__file-size {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.ai-composer__file-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ai-composer__file-remove:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+/* --- drag-and-drop hint --------------------------------------------------- */
+
+.ai-composer.is-dragging {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+
+.ai-composer__drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-brand-soft) 85%, transparent);
+  color: var(--color-brand);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ai-composer__drop-overlay svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* --- composer context controls (agent pill inside the composer) ----------- */
+
+.ai-composer__foot .sidebar-select {
+  width: auto;
+  flex: none;
+}
+
+.ai-composer__foot .sidebar-select__trigger {
+  height: auto;
+  min-height: 1.75rem;
+  padding: 0 0.4rem 0 0.7rem;
+  border-color: transparent;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.ai-composer__foot .sidebar-select__trigger:hover:not(:disabled),
+.ai-composer__foot .sidebar-select__trigger.is-open:not(:disabled) {
+  background: var(--color-bg-muted);
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+}
+
+.ai-composer__foot .sidebar-select__chevron {
+  color: inherit;
+  transform: none;
+}
+
+.ai-composer__foot .sidebar-select__menu {
+  top: auto;
+  bottom: calc(100% + 0.35rem);
+  left: 0;
+  right: auto;
+  min-width: 13rem;
+  border-radius: var(--radius-md);
+}
+
+.ai-composer__foot .ai-quiet {
+  min-height: 1.75rem;
+}
+
 /* --- evidence rail -------------------------------------------------------- */
 
 .ai-evidence {
@@ -599,6 +751,38 @@
   color: var(--color-text);
   font-weight: 650;
 }
+
+.ai-evidence__note {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: none;
+  padding: 0.45rem 0.6rem 0.45rem 0.95rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+}
+
+.ai-evidence__note svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: none;
+}
+
+.ai-evidence__note-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ai-evidence__note .ai-quiet {
+  flex: none;
+  font-size: 11.5px;
+}
+
+/* --- evidence card -------------------------------------------------------- */
 
 .ai-source {
   border: 1px solid transparent;
@@ -711,6 +895,8 @@
   height: 100%;
   background: var(--color-brand);
 }
+
+/* --- source type badges --------------------------------------------------- */
 
 .ai-badge {
   display: inline-flex;
@@ -837,63 +1023,6 @@
   white-space: nowrap;
 }
 
-/* --- composer context controls (agent pill) ------------------------------- */
-
-.ai-composer__foot .sidebar-select {
-  width: auto;
-  flex: none;
-}
-
-.ai-composer__foot .sidebar-select__trigger {
-  height: auto;
-  min-height: 1.75rem;
-  padding: 0 0.4rem 0 0.7rem;
-  border-color: transparent;
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  color: var(--color-text-muted);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.ai-composer__foot .sidebar-select__trigger:hover:not(:disabled),
-.ai-composer__foot .sidebar-select__trigger.is-open:not(:disabled) {
-  background: var(--color-bg-muted);
-  border-color: transparent;
-  box-shadow: none;
-  color: var(--color-text);
-}
-
-.ai-composer__foot .sidebar-select__chevron {
-  color: inherit;
-  transform: none;
-}
-
-.ai-composer__foot .sidebar-select__menu {
-  top: auto;
-  bottom: calc(100% + 0.35rem);
-  left: 0;
-  right: auto;
-  min-width: 13rem;
-  border-radius: var(--radius-md);
-}
-
-.ai-composer__foot .ai-quiet {
-  min-height: 1.75rem;
-}
-
-/* Unify the selected option with the rest of the app. */
-.sidebar-select__option.is-selected {
-  background: var(--color-brand-soft);
-  color: var(--color-brand);
-  font-weight: 650;
-}
-
-.sidebar-select__option.is-selected:hover {
-  background: var(--color-brand-soft);
-}
-
 /* --- answer actions ------------------------------------------------------- */
 
 .ai-actions {
@@ -920,36 +1049,6 @@
   height: 0.9rem;
 }
 
-.ai-evidence__note {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  flex: none;
-  padding: 0.45rem 0.6rem 0.45rem 0.95rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-muted);
-  color: var(--color-text-muted);
-  font-size: 11.5px;
-}
-
-.ai-evidence__note svg {
-  width: 0.85rem;
-  height: 0.85rem;
-  flex: none;
-}
-
-.ai-evidence__note-text {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.ai-evidence__note .ai-quiet {
-  flex: none;
-  font-size: 11.5px;
-}
-
 .ai-quiet--icon {
   width: 1.75rem;
   min-width: 1.75rem;
@@ -965,51 +1064,6 @@
 
 .ai-quiet--icon[aria-pressed='false'] {
   color: var(--color-text);
-}
-
-/* ---------------------------------------------------------------------------
-   Narrow windows: rails as overlays.
-   --------------------------------------------------------------------------- */
-
-.ai-workspace {
-  position: relative;
-}
-
-.ai-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-@media (max-width: 1180px) {
-  .ai-evidence {
-    position: absolute;
-    inset-block: 0;
-    right: 0;
-    z-index: 7;
-    width: min(20rem, 88vw);
-    background: var(--color-bg-elevated);
-    box-shadow: var(--shadow-md);
-  }
-}
-
-@media (max-width: 940px) {
-  .ai-history {
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    z-index: 7;
-    width: min(15.5rem, 88vw);
-    background: var(--color-bg-elevated);
-    box-shadow: var(--shadow-md);
-  }
 }
 
 /* --- reply states --------------------------------------------------------- */
@@ -1132,7 +1186,7 @@
   gap: 0.3rem;
   min-height: 1.75rem;
   padding: 0 0.4rem 0 0.7rem;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: var(--color-text-muted);
@@ -1141,7 +1195,7 @@
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .ai-model-picker__trigger:hover,
@@ -1150,19 +1204,39 @@
   color: var(--color-text);
 }
 
+/* Agent-locked variant: the selected agent determines the model. */
+.ai-model-picker__trigger.is-agent-locked {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.ai-model-picker__lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--color-brand);
+}
+
+.ai-model-picker__lock svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
 .ai-model-picker__menu {
   position: absolute;
-  bottom: calc(100% + 0.35rem);
+  bottom: calc(100% + 0.5rem);
   left: 0;
-  z-index: 8;
-  width: 18rem;
-  display: flex;
-  flex-direction: column;
+  z-index: 40;
+  background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg-elevated);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  padding: 0.3rem;
+  min-width: 20rem;
+  max-width: 24rem;
 }
 
 /* --- temperature (compact single row) ------------------------------------- */
@@ -1252,25 +1326,31 @@
   box-sizing: border-box;
 }
 
+/* Shorter windows: four rows so the panel fits without scrolling. */
+@media (max-height: 640px) {
+  .ai-model-picker__list {
+    height: 8.4rem;
+  }
+}
+
 .ai-model-picker__item {
   display: block;
 }
 
 .ai-model-picker__option {
-  width: 100%;
-  height: 2rem;
   display: flex;
-  align-items: center;
-  padding: 0 0.55rem;
-  border: 0;
-  border-radius: 6px;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.5rem 0.7rem;
+  border: none;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-text);
+  color: inherit;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .ai-model-picker__option:hover {
@@ -1294,9 +1374,7 @@
   text-align: center;
 }
 
-/* ---------------------------------------------------------------------------
-   Thread rows with a delete affordance.
-   --------------------------------------------------------------------------- */
+/* --- thread rows with a delete affordance --------------------------------- */
 
 .ai-thread-row {
   display: flex;
@@ -1358,4 +1436,73 @@
 .ai-thread__delete:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 1px;
+}
+
+/* --- toast (AttachMenu success) ------------------------------------------- */
+
+.ai-toast {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 60;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  animation: ai-toast-in 0.15s ease-out;
+}
+
+@keyframes ai-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Narrow windows: rails as overlays.
+   --------------------------------------------------------------------------- */
+
+.ai-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+@media (max-width: 1180px) {
+  .ai-evidence {
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    z-index: 7;
+    width: min(20rem, 88vw);
+    background: var(--color-bg-elevated);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+@media (max-width: 940px) {
+  .ai-history {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    z-index: 7;
+    width: min(15.5rem, 88vw);
+    background: var(--color-bg-elevated);
+    box-shadow: var(--shadow-md);
+  }
 }

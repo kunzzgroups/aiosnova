@@ -21,6 +21,9 @@ export type AssistantSource = {
   snippet: string
   /** 0-100, rendered as the small bar on the right of the row. */
   relevance: number
+  /** Where this evidence came from - used to build the "open" link. */
+  baseId?: string
+  documentId?: string
 }
 
 export type AssistantAnswer = {
@@ -69,5 +72,8 @@ export type AssistantThread = {
   group: ThreadGroup
   updated: string
   pinned?: boolean
+  companyId: string
+  /** Which agent this thread last used. Falls back to Auto when absent. */
+  agentId?: string
   turns: AssistantTurn[]
 }

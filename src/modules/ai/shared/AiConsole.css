@@ -357,3 +357,489 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+
+/* ------------------------------------------------------------------ */
+/* Deep-link affordances                                              */
+/* ------------------------------------------------------------------ */
+
+.console-chip--link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.console-chip--link:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.console-chip--link:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Row targeted by ?agentId= on AgentsPage. */
+.console-table__row--highlight {
+  background: var(--color-brand-soft);
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+/* Banner showing which filter a deep link applied, with a clear button. */
+.console-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 var(--space-3);
+  padding: 0.3rem 0.4rem 0.3rem 0.7rem;
+  border: 1px solid var(--color-brand);
+  border-radius: 999px;
+  background: var(--color-brand-soft);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.console-filter-chip__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.console-filter-chip__clear:hover {
+  background: var(--color-border);
+}
+
+/* ------------------------------------------------------------------ */
+/* Table category groups (AgentsPage)                                 */
+/* ------------------------------------------------------------------ */
+
+.console-table__group-row td {
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg-muted);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.console-table__group:first-of-type .console-table__group-row td {
+  border-top: none;
+}
+
+.console-table__group-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.console-table__group-count {
+  margin-left: 0.5rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------------------ */
+/* Fixed-size selection cards (no layout shift on toggle)             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The card never changes size when toggled:
+ *  - `grid-auto-rows` gives every row a fixed height, so a growing card in one
+ *    column can't stretch its neighbours.
+ *  - `overflow: hidden` + `white-space: nowrap` on the text stops content from
+ *    pushing the box open.
+ *  - Selection is drawn with `box-shadow: inset`, never with a border-width
+ *    change, so the outer box is identical in both states.
+ */
+.console-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-auto-rows: 4.75rem;
+  gap: var(--space-3);
+}
+
+.console-check-card {
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+  color: inherit;
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.console-check-card:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.console-check-card--selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  /* Inner ring instead of a bigger border: the outer box never grows. */
+  box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+
+.console-check-card:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.console-check-card input[type='checkbox'] {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin: 0.15rem 0 0;
+  accent-color: var(--color-brand);
+}
+
+.console-check-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.console-check-card__title {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.console-check-card__hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------------ */
+/* Drawer helpers: Advanced toggle, kind picker                       */
+/* ------------------------------------------------------------------ */
+
+.console-form__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.console-form__toggle:hover {
+  color: var(--color-text);
+  background: var(--color-bg-muted);
+}
+
+.console-form__toggle-caret {
+  display: inline-block;
+  width: 0.9rem;
+  text-align: center;
+}
+
+/* Kind picker inside the Knowledge create drawer. */
+.console-kind-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.console-kind-card {
+  box-sizing: border-box;
+  min-height: 5.5rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+  color: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.console-kind-card:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.console-kind-card--selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+
+.console-kind-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-brand);
+}
+
+.console-kind-card--selected .console-kind-card__icon {
+  background: var(--color-bg-elevated);
+}
+
+.console-kind-card__title {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.console-kind-card__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+/* Small inline code snippet, used for skill input schemas. */
+.console-code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Fixed-layout table: column widths are declared by <col>, so adding or
+   removing a chip inside a cell never pushes the other columns around. */
+.console-table--fixed {
+  table-layout: fixed;
+}
+
+.console-table--fixed td {
+  overflow: hidden;
+}
+
+.console-table--fixed .console-chips {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* File input inside the Add source drawer. */
+.console-file-input {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.console-file-input:hover {
+  border-color: var(--color-brand);
+  color: var(--color-text);
+}
+
+.console-file-input::file-selector-button {
+  margin-right: 0.6rem;
+  padding: 0.3rem 0.7rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+/* Small inline link next to a document's name. */
+.console-file-link {
+  display: inline-block;
+  margin-top: 0.15rem;
+  font-size: var(--text-xs);
+  color: var(--color-brand);
+  text-decoration: none;
+}
+
+.console-file-link:hover {
+  text-decoration: underline;
+}
+
+/* Skill statuses */
+.console-status--draft {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* Data source statuses */
+.console-status--connected {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.console-status--disconnected {
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+}
+
+.console-status--error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* Clickable status pill - cycles state on click (dev / demo affordance). */
+.console-status--clickable {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  transition: filter 0.15s ease;
+}
+
+.console-status--clickable:hover {
+  filter: brightness(1.15);
+}
+
+.console-status--clickable:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.console-error {
+  margin-top: var(--space-3);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+/* ------------------------------------------------------------------ */
+/* Promote / visibility picker                                          */
+/* ------------------------------------------------------------------ */
+
+.promote-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.promote-toolbar--bulk {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.promote-toolbar__search {
+  flex: 1 1 14rem;
+  min-width: 10rem;
+}
+
+.promote-toolbar__count {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.promote-visibility {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.35rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.promote-visibility__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.promote-visibility__item:hover {
+  border-color: var(--color-brand);
+}
+
+.promote-visibility__item.is-checked {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.promote-visibility__item.is-locked {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.promote-visibility__item input[type='checkbox'] {
+  flex-shrink: 0;
+  accent-color: var(--color-brand);
+}
+
+.promote-visibility__name {
+  flex: 1 1 auto;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promote-visibility__badge {
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
