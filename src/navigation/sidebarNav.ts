@@ -382,20 +382,6 @@ export const sidebarSections: SidebarSection[] = [
         ],
       },
       {
-        label: 'Security',
-        items: [
-          'MFA',
-          'SSO',
-          'RBAC',
-          'ABAC',
-          'Encryption',
-          'Security Audit',
-          'Device Management',
-          'Risk Detection',
-          'Zero Trust',
-        ],
-      },
-      {
         label: 'Cloud Platform',
         items: [
           'Multi-Region',

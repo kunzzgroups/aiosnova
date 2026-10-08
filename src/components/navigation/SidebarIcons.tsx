@@ -372,7 +372,6 @@ const MODULE_ICONS: Record<string, (props: IconProps) => ReactNode> = {
   'App Marketplace': IconApps,
   'Data Platform': IconDatabase,
   Core: IconSettings,
-  Security: IconShield,
   'Cloud Platform': IconCloud,
   'Admin / Super Admin': IconAdmin,
 }

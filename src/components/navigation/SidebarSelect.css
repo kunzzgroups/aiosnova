@@ -4,6 +4,11 @@
 
    Popover is styled here, not per-page, so it renders the same everywhere.
    Row height matches the model picker (2rem) so both lists line up.
+
+   Colours use the sidebar theme variables where they exist, falling back to
+   the base design tokens. That way the composer's compact variant (which
+   overrides --sidebar-*) picks up its own palette without a page-specific
+   stylesheet.
    --------------------------------------------------------------------------- */
 
 .sidebar-select {
@@ -17,7 +22,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: var(--sidebar-muted, var(--color-text-muted));
 }
 
 /* --- trigger -------------------------------------------------------------- */
@@ -70,7 +75,9 @@
   width: 0.9rem;
   height: 0.9rem;
   flex-shrink: 0;
-  color: var(--color-text-muted);
+  /* Down-chevron sits rotated 90° to point right when closed. */
+  color: var(--sidebar-muted, var(--color-text-muted));
+  transform: rotate(90deg);
   transition: transform 0.18s ease;
 }
 
@@ -80,7 +87,9 @@
 }
 
 .sidebar-select__trigger.is-open .sidebar-select__chevron {
-  color: var(--color-brand);
+  /* Flip to point down when the popover is open. */
+  transform: rotate(-90deg);
+  color: var(--sidebar-active-ink, var(--color-brand));
 }
 
 /* --- popover -------------------------------------------------------------- */
@@ -122,7 +131,7 @@
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: inherit;
+  color: var(--sidebar-ink, var(--color-text));
   font: inherit;
   font-size: var(--text-sm);
   text-align: left;
@@ -131,7 +140,7 @@
 }
 
 .sidebar-select__option:hover {
-  background: var(--color-bg-muted);
+  background: var(--sidebar-hover, var(--color-bg-muted));
 }
 
 .sidebar-select__option:focus-visible {
@@ -139,12 +148,16 @@
   outline-offset: -2px;
 }
 
-/* Selected: restrained — muted background, brand text, thin left rail.
-   ONLY one rule for this state, so nothing overrides it later. */
+/*
+ * Selected: restrained — muted background, brand text, thin left rail.
+ * One rule covers both the class and the ARIA state so the visible
+ * selection is correct whether the consumer sets `is-selected` or
+ * `aria-selected`.
+ */
 .sidebar-select__option.is-selected,
 .sidebar-select__option[aria-selected='true'] {
-  background: var(--color-bg-muted);
-  color: var(--color-brand);
+  background: var(--sidebar-active, var(--color-brand-soft));
+  color: var(--sidebar-active-ink, var(--color-brand));
   font-weight: 650;
   box-shadow: inset 2px 0 0 var(--color-brand);
 }
@@ -178,7 +191,7 @@
   opacity: 0.85;
 }
 
-/* --- scrollbar ----------------------------------------------------------- */
+/* --- scrollbar ------------------------------------------------------------ */
 
 .sidebar-select__menu::-webkit-scrollbar {
   width: 8px;

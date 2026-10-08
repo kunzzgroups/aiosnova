@@ -13,6 +13,7 @@ export const ai: Record<string, string> = {
   'ai.assistant.justNow': 'just now',
   'ai.assistant.noThreads': 'No chats yet',
   'ai.assistant.noMatches': 'No chats match that search.',
+  'ai.assistant.deleteThread': 'Delete chat',
 
   'ai.assistant.scope': 'Scope',
   'ai.assistant.scopeNote':
@@ -152,6 +153,7 @@ export const ai: Record<string, string> = {
   'ai.knowledge.renameAgentsNote':
     'Agent assignment is managed on the Agents tab, so it is not edited here.',
   'ai.knowledge.save': 'Save',
+  'ai.knowledge.edit': 'Edit',
   'ai.knowledge.rename': 'Rename',
   'ai.knowledge.delete': 'Delete',
   'ai.knowledge.rowActions': 'Actions for {{name}}',
