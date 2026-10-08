@@ -369,6 +369,9 @@ export const ai: Record<string, string> = {
   'ai.knowledge.deleteTemplateBody':
     'Existing adoptions are not affected. The template will no longer be available.',
 
+  'ai.knowledge.searchBasesPlaceholder': 'Search knowledge bases…',
+  'ai.knowledge.searchBasesAria': 'Search knowledge bases',
+
   // ---------- Category label (adopt drawer) ----------
   'ai.knowledge.fieldCategory': 'Category',
 
@@ -429,12 +432,18 @@ export const ai: Record<string, string> = {
   'ai.agents.msgCreated': 'Agent created.',
   'ai.agents.msgUpdated': 'Agent updated.',
 
+  'ai.agents.searchPlaceholder': 'Search agents…',
+  'ai.agents.searchAria': 'Search agents',
+  'ai.agents.statusClickHint': 'Click to change status',
+
   // Shared
   'common.dropFileHere': 'Drag files here from your desktop',
   'common.fileDropOr': 'Or click to browse · Or paste (Ctrl+V)',
   'common.addMoreFiles': 'Add more files',
   'common.fileDropHint': 'PDF, DOCX, XLSX, PNG, JPG, TXT up to 10 MB',
   'common.fileDropPasteHint': 'You can also paste a copied file (Ctrl+V).',
+  'common.cloudFileHint':
+  'Cloud-only files (OneDrive, iCloud) must be synced to disk first.',
   'common.remove': 'Remove',
   'common.kvEmpty': 'No fields yet.',
   'common.kvKey': 'key',

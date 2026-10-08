@@ -86,10 +86,16 @@ export function nextId(prefix: string): string {
 /* Relation reads                                                      */
 /* ------------------------------------------------------------------ */
 
-export function agentIdsForBase(baseId: string): string[] {
+export function agentIdsForBase(
+  baseId: string,
+  restrictToCompanyId?: string,
+): string[] {
   return state.agents
-    .filter((a) => a.knowledgeBaseIds.includes(baseId))
-    .map((a) => a.id)
+    .filter((agent) => agent.knowledgeBaseIds.includes(baseId))
+    .filter(
+      (agent) => !restrictToCompanyId || agent.companyId === restrictToCompanyId,
+    )
+    .map((agent) => agent.id)
 }
 
 export function effectiveAgentIdsForDocument(documentId: string): {
@@ -144,8 +150,8 @@ export function toAgentListItem(agent: SeedAgent) {
   }
 }
 
-export function toBaseListItem(base: SeedKnowledgeBase) {
-  const agentIds = agentIdsForBase(base.id)
+export function toBaseListItem(base: SeedKnowledgeBase, restrictToCompanyId?: string,) {
+  const agentIds = agentIdsForBase(base.id, restrictToCompanyId)
   const documents = state.documents.filter((d) => d.baseId === base.id)
   const skillCount = state.skills.filter((s) => s.baseId === base.id).length
   const dataSourceCount = state.dataSources.filter((d) => d.baseId === base.id).length

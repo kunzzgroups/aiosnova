@@ -23,7 +23,7 @@ import { PageTabs, type PageTab } from '@/components/ui/PageTabs'
 import { SearchableCheckList } from '@/components/ui/SearchableCheckList'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
-import { IconFolder, IconPaperclip } from '@/components/icons/Icons'
+import { IconFolder, IconPaperclip, IconPlus } from '@/components/icons/Icons'
 import { FileDropZone } from '@/components/ui/FileDropZone'
 import { useCompanyStore } from '@/stores/companyStore'
 import {
@@ -116,6 +116,12 @@ export function KnowledgeBaseDetailPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+
+  /**
+   * The active company. Used two ways:
+   *   1. To fetch the agents THIS user (as this company) can tick.
+   *   2. To filter out agent IDs from other companies when rendering.
+   */
   const activeCompanyId = useCompanyStore((state) => state.companyId)
 
   const [detail, setDetail] = useState<KnowledgeBaseDetail | null>(null)
@@ -168,44 +174,9 @@ export function KnowledgeBaseDetailPage() {
     void load()
   }, [load])
 
-  const effectiveByDocument = useMemo(() => {
-    const map = new Map<string, DocumentEffectiveAgents>()
-    for (const item of detail?.effective ?? []) {
-      map.set(item.documentId, item)
-    }
-    return map
-  }, [detail])
-
-  const agentName = useCallback(
-    (agentId: string) => agents.find((item) => item.id === agentId)?.name ?? agentId,
-    [agents],
-  )
-
-  const agentItems = useMemo(
-    () =>
-      agents.map((agent) => ({
-        value: agent.id,
-        label: agent.name,
-        hint: agent.description,
-      })),
-    [agents],
-  )
-
-  const documents = detail?.documents ?? []
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return documents.filter((document) => {
-      if (statusFilter !== 'all' && document.status !== statusFilter) {
-        return false
-      }
-      return !needle || document.title.toLowerCase().includes(needle)
-    })
-  }, [documents, query, statusFilter])
-
-  /* Agents this page can tick: the ACTIVE company's agents, not the base
-   owner's. A company that can read a shared base may want its own agents
-   to use it; ticking writes `agentKnowledgeLinks` on the ACTIVE company's
-   agents. */
+  /* Fetch the ACTIVE company's agents. Ticking writes `agentKnowledgeLinks`
+     on those agents, so a company that shares a base only ever sees and
+     manages its own agents here. */
   useEffect(() => {
     if (!activeCompanyId) {
       setAgents([])
@@ -223,6 +194,61 @@ export function KnowledgeBaseDetailPage() {
       cancelled = true
     }
   }, [activeCompanyId])
+
+  /** Set of the active company's agent IDs, for fast membership checks. */
+  const activeAgentIds = useMemo(
+    () => new Set(agents.map((agent) => agent.id)),
+    [agents],
+  )
+
+  /**
+   * Effective agents per document, filtered to the ACTIVE company.
+   *
+   * `detail.effective` may contain agent IDs from the base's owner company.
+   * A company reading a shared base must never see those IDs — only the
+   * ones belonging to its own agents are kept.
+   */
+  const effectiveByDocument = useMemo(() => {
+    const map = new Map<string, DocumentEffectiveAgents>()
+    for (const item of detail?.effective ?? []) {
+      const visible = item.agentIds.filter((id) => activeAgentIds.has(id))
+      map.set(item.documentId, { ...item, agentIds: visible })
+    }
+    return map
+  }, [detail, activeAgentIds])
+
+  /** Agent name lookup. Returns '' when the ID isn't in the active company. */
+  const agentName = useCallback(
+    (agentId: string) => agents.find((item) => item.id === agentId)?.name ?? '',
+    [agents],
+  )
+
+  const agentItems = useMemo(
+    () =>
+      agents.map((agent) => ({
+        value: agent.id,
+        label: agent.name,
+        hint: agent.description,
+      })),
+    [agents],
+  )
+
+  /** Base-level agent IDs, filtered to the ACTIVE company. */
+  const visibleBaseAgentIds = useMemo(
+    () => (detail?.baseAgentIds ?? []).filter((id) => activeAgentIds.has(id)),
+    [detail, activeAgentIds],
+  )
+
+  const documents = detail?.documents ?? []
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return documents.filter((document) => {
+      if (statusFilter !== 'all' && document.status !== statusFilter) {
+        return false
+      }
+      return !needle || document.title.toLowerCase().includes(needle)
+    })
+  }, [documents, query, statusFilter])
 
   /* Scroll to + highlight the document the assistant linked to. */
   useEffect(() => {
@@ -305,14 +331,16 @@ export function KnowledgeBaseDetailPage() {
     setDsConfig([])
 
     setInheritAgents(true)
-    setDocAgentIds(detail?.baseAgentIds ?? [])
+    setDocAgentIds(visibleBaseAgentIds)
     setError(null)
     setAddOpen(true)
   }
 
   function toggleDocAgent(agentId: string) {
     setDocAgentIds((current) =>
-      current.includes(agentId) ? current.filter((id) => id !== agentId) : [...current, agentId],
+      current.includes(agentId)
+        ? current.filter((id) => id !== agentId)
+        : [...current, agentId],
     )
   }
 
@@ -368,7 +396,6 @@ export function KnowledgeBaseDetailPage() {
         }
 
         if (docFile.length > 0) {
-          // Upload every picked file as its own document row.
           for (const file of docFile) {
             await addKnowledgeDocument(baseId, {
               title: file.name,
@@ -378,7 +405,6 @@ export function KnowledgeBaseDetailPage() {
             })
           }
         } else {
-          // No file: create a record-only entry from the title.
           await addKnowledgeDocument(baseId, {
             title: docTitle,
             type: docType,
@@ -455,7 +481,7 @@ export function KnowledgeBaseDetailPage() {
           />
           <span>
             <span className="console-toggle__label">
-              {t('ai.knowledge.inheritAgents', { count: detail?.baseAgentIds.length ?? 0 })}
+              {t('ai.knowledge.inheritAgents', { count: visibleBaseAgentIds.length })}
             </span>
             <span className="console-toggle__hint">
               {t('ai.knowledge.agentsHint')}
@@ -524,6 +550,7 @@ export function KnowledgeBaseDetailPage() {
                 onChange={(value) => setStatusFilter(value as StatusFilter)}
               />
               <Button className="console-toolbar__action" onClick={openAddSource}>
+                <IconPlus />
                 {t('ai.knowledge.addSource')}
               </Button>
             </div>
@@ -608,15 +635,19 @@ export function KnowledgeBaseDetailPage() {
                               </span>
                             ) : (
                               <span className="console-chips">
-                                {agentIds.slice(0, MAX_CHIPS).map((agentId) => (
-                                  <Link
-                                    key={agentId}
-                                    className="console-chip console-chip--link"
-                                    to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
-                                  >
-                                    {agentName(agentId)}
-                                  </Link>
-                                ))}
+                                {agentIds.slice(0, MAX_CHIPS).map((agentId) => {
+                                  const name = agentName(agentId)
+                                  if (!name) return null
+                                  return (
+                                    <Link
+                                      key={agentId}
+                                      className="console-chip console-chip--link"
+                                      to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
+                                    >
+                                      {name}
+                                    </Link>
+                                  )
+                                })}
                                 {agentIds.length > MAX_CHIPS ? (
                                   <span className="console-chip console-chip--muted">
                                     +{agentIds.length - MAX_CHIPS}
@@ -782,7 +813,7 @@ export function KnowledgeBaseDetailPage() {
             </div>
             <CheckList
               items={agentItems}
-              selected={detail?.baseAgentIds ?? []}
+              selected={visibleBaseAgentIds}
               onToggle={(agentId) => void toggleBaseAgent(agentId)}
               emptyLabel={t('ai.knowledge.noAgentsInCompany')}
               ariaLabel={t('ai.knowledge.agentsAppliedTitle')}
@@ -842,15 +873,19 @@ export function KnowledgeBaseDetailPage() {
                                     </span>
                                   ) : (
                                     <span className="console-chips">
-                                      {agentIds.map((agentId) => (
-                                        <Link
-                                          key={agentId}
-                                          className="console-chip console-chip--link"
-                                          to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
-                                        >
-                                          {agentName(agentId)}
-                                        </Link>
-                                      ))}
+                                      {agentIds.map((agentId) => {
+                                        const name = agentName(agentId)
+                                        if (!name) return null
+                                        return (
+                                          <Link
+                                            key={agentId}
+                                            className="console-chip console-chip--link"
+                                            to={`/ai/ai/agents?agentId=${encodeURIComponent(agentId)}`}
+                                          >
+                                            {name}
+                                          </Link>
+                                        )
+                                      })}
                                     </span>
                                   )}
                                 </td>

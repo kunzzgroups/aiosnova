@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconPaperclip, IconSpark, IconFolder } from '@/components/icons/Icons'
@@ -91,6 +92,12 @@ export function AttachMenu({ onAttachToChat, onStored }: AttachMenuProps) {
   const [error, setError] = useState<string | null>(null)
 
   const wrapperRef = useRef<HTMLDivElement>(null)
+  /**
+   * Hidden file input for "Attach to this chat". We use a React ref instead of
+   * `document.createElement('input')` because some browsers refuse to open the
+   * picker unless the click happens on an input that is already in the DOM.
+   */
+  const chatFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -132,15 +139,18 @@ export function AttachMenu({ onAttachToChat, onStored }: AttachMenuProps) {
 
   function pickForChat() {
     setMenuOpen(false)
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.multiple = true
-    input.addEventListener('change', () => {
-      const files = Array.from(input.files ?? [])
-      files.forEach((file) => onAttachToChat(file))
+    // `click()` runs synchronously inside the user's click handler, so the
+    // browser treats it as a genuine user gesture and opens the picker.
+    chatFileInputRef.current?.click()
+  }
+
+  function handleChatFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget
+    const files = Array.from(input.files ?? [])
+    files.forEach((file) => onAttachToChat(file))
+    window.setTimeout(() => {
       input.value = ''
-    })
-    input.click()
+    }, 0)
   }
 
   function pickForKnowledge() {
@@ -173,8 +183,7 @@ export function AttachMenu({ onAttachToChat, onStored }: AttachMenuProps) {
         }
       } else if (baseKind === 'skill') {
         const first = pendingFiles[0]
-        const strippedName =
-          skillName.trim() || first.name.replace(/\.[^.]+$/, '')
+        const strippedName = skillName.trim() || first.name.replace(/\.[^.]+$/, '')
         await addKnowledgeSkill(selectedBaseId, {
           name: strippedName,
           description: skillDescription,
@@ -211,6 +220,16 @@ export function AttachMenu({ onAttachToChat, onStored }: AttachMenuProps) {
 
   return (
     <>
+      {/* Hidden input for "Attach to this chat". Always mounted so the ref is
+          available synchronously inside the click handler. */}
+      <input
+        ref={chatFileInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={handleChatFileChange}
+      />
+
       <div className="attach-menu" ref={wrapperRef}>
         <button
           type="button"
@@ -294,7 +313,6 @@ export function AttachMenu({ onAttachToChat, onStored }: AttachMenuProps) {
           </>
         }
       >
-        {/* ---- Kind: distinct icon + label + hint ---- */}
         <div className="console-form__section">
           <h4>{t('ai.assistant.storeKind', 'Kind')}</h4>
           <div className="console-kind-picker" role="radiogroup">
@@ -465,7 +483,6 @@ export function AttachMenu({ onAttachToChat, onStored }: AttachMenuProps) {
   )
 }
 
-/** Inline icon used only by the kind picker. */
 function IconData() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
