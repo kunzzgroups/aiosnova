@@ -271,7 +271,7 @@ export function UsersPage() {
       rows.forEach(row => row.style.removeProperty('height'))
       const width = container.clientWidth
       const headerHeight = table.querySelector('thead')?.getBoundingClientRect().height ?? 0
-      const availableHeight = container.clientHeight - headerHeight - 8
+      const availableHeight = container.clientHeight - headerHeight
       if (availableHeight <= 0) return
       if (autoFitRowMeasurement.current.width !== width) {
         autoFitRowMeasurement.current = { width, height: 0 }
@@ -285,7 +285,6 @@ export function UsersPage() {
       const limit = Math.max(1, Math.floor(availableHeight / autoFitRowMeasurement.current.height))
       setAutoPageSize(current => current === limit ? current : limit)
       const uniformHeight = availableHeight / limit
-      // Even a short final page uses the same row height as every other page.
       rows.forEach(row => { row.style.height = uniformHeight + 'px' })
     }
     function scheduleMeasure() {
@@ -458,7 +457,7 @@ export function UsersPage() {
         ):null}
         {filteredUsers.length>0? (
           <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('users.staffDirectory')}>
-            <table className="identity-table identity-table--packed directory-design-table">
+            <table className={`identity-table identity-table--packed directory-design-table${pageSize===0 ? ' directory-design-table--auto-fit' : ''}`}>
               <thead>
                 <tr>
                   <th aria-sort={sort.key==='employee' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('employee',t('users.designEmployee'))}</th>

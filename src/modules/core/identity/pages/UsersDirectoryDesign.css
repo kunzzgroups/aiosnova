@@ -8,7 +8,18 @@
   align-items: flex-end;
   gap: var(--space-3);
   margin-bottom: 0;
+  padding-inline: var(--space-5);
   padding-bottom: var(--space-3);
+}
+
+.identity-directory-design .identity-directory-toolbar__search {
+  padding: 0.25rem 0.85rem;
+  min-height: 2.25rem;
+}
+
+.identity-directory-design .identity-directory-invite-button {
+  padding: 0.25rem 1rem;
+  min-height: 2.25rem;
 }
 
 .identity-directory-design .identity-directory-toolbar__filters {
@@ -29,7 +40,9 @@
 
 .identity-directory-design .identity-directory-toolbar__filters .sidebar-select__trigger {
   min-width: 0;
+  min-height: 2.25rem;
   box-sizing: border-box;
+  padding: 0.25rem 0.85rem;
 }
 
 .directory-design-company-filter .sidebar-select__option {
@@ -56,8 +69,17 @@
   width: 12rem;
 }
 
-.identity-directory-design .identity-directory-scroll {
+.identity-directory-panel.identity-directory-design .identity-directory-scroll {
   min-height: 16rem;
+  min-width: 0;
+  width: calc(100% - 2 * var(--directory-content-inset));
+  box-sizing: border-box;
+  margin-inline: var(--directory-content-inset);
+  overflow-x: auto;
+}
+
+.identity-directory-panel.identity-directory-design .identity-directory-footer {
+  padding: var(--space-4) var(--space-5);
 }
 
 .identity-directory-design .directory-design-table th {
@@ -283,4 +305,15 @@
 .directory-design-table tbody tr:nth-child(n+4):nth-last-child(-n+3) .row-menu__list {
   top: auto;
   bottom: calc(100% + var(--space-2));
+}
+.identity-directory-panel.identity-directory-design {
+  --directory-content-inset: 0px;
+}
+
+.identity-directory-design .directory-design-table th:first-child,
+.identity-directory-design .directory-design-table td:first-child {
+  padding-left: var(--space-5);
+}
+.directory-design-table--auto-fit tbody tr:last-child td {
+  border-bottom: 0;
 }
