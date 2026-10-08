@@ -13,6 +13,7 @@ import { fetchKnowledgeBases } from '@/modules/ai/knowledge/services/knowledgeSe
 import type { KnowledgeBaseListItem } from '@/modules/ai/knowledge/types/knowledge'
 import { ApiError } from '@/services/httpClient'
 import { createAgent, fetchAgent, fetchAgents, updateAgent } from '../services/agentService'
+import { IconPlus, IconPencil } from '@/components/icons/Icons'
 import {
   DEFAULT_AGENT_MODEL,
   type AgentListItem,
@@ -30,8 +31,6 @@ const STATUS_LABEL_KEY: Record<AgentStatus, string> = {
   disabled: 'ai.agents.statusDisabled',
 }
 
-const OTHER_CATEGORY = 'Other'
-
 const MODEL_PROVIDERS: Array<{ value: AgentModelProvider; label: string }> = [
   { value: 'auto', label: 'Auto (recommended)' },
   { value: 'openai', label: 'OpenAI' },
@@ -43,20 +42,17 @@ const MODEL_PROVIDERS: Array<{ value: AgentModelProvider; label: string }> = [
 const MODELS_BY_PROVIDER: Record<AgentModelProvider, string[]> = {
   auto: [''],
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'o3-mini'],
-  anthropic: ['claude-3.5-sonnet', 'claude-3.5-haiku', 'claude-3-opus'],
+  anthropic: ['claude-sonnet-4', 'claude-3.5-haiku', 'claude-3-opus'],
   google: ['gemini-2.0-pro', 'gemini-2.0-flash'],
   azure: ['gpt-4o-azure', 'gpt-4-turbo-azure'],
 }
 
 /**
- * The Agent screen, and one half of the agent <-> knowledge relation.
+ * The Agent screen.
  *
- * Rows are grouped by `agent.category` using one <tbody> per group, so the
- * table header still aligns across every category.
- *
- * Deep links:
- *   ?agentId=<id>  -> highlight that agent's row
- *   ?baseId=<id>   -> keep only agents linked to that knowledge base
+ * Flat, A–Z list. No category grouping: the category is metadata, not a
+ * navigation aid — a search box replaces it. Status is clickable so the
+ * operator can cycle active → draft → disabled.
  */
 export function AgentsPage() {
   const { t } = useTranslation()
@@ -72,6 +68,7 @@ export function AgentsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -80,7 +77,6 @@ export function AgentsPage() {
   const [selectedBaseIds, setSelectedBaseIds] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
 
-  // ---- Model configuration ----
   const [provider, setProvider] = useState<AgentModelProvider>('auto')
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState(0.3)
@@ -109,8 +105,6 @@ export function AgentsPage() {
     void load()
   }, [load])
 
-  const companyName = companies.find((item) => item.value === companyId)?.label ?? ''
-
   const baseItems = useMemo(
     () =>
       knowledgeBases.map((base) => ({
@@ -129,33 +123,22 @@ export function AgentsPage() {
     [baseIdFilter, knowledgeBases],
   )
 
+  /** Flat, filtered, A→Z sorted list. */
   const visibleAgents = useMemo(() => {
-    if (!baseIdFilter) {
-      return agents
+    let list = agents
+    if (baseIdFilter) {
+      list = list.filter((agent) => agent.knowledgeBaseIds?.includes(baseIdFilter))
     }
-    return agents.filter((agent) => agent.knowledgeBaseIds?.includes(baseIdFilter))
-  }, [agents, baseIdFilter])
-
-  const groupedAgents = useMemo(() => {
-    const buckets = new Map<string, AgentListItem[]>()
-    for (const agent of visibleAgents) {
-      const key = agent.category?.trim() || OTHER_CATEGORY
-      const bucket = buckets.get(key)
-      if (bucket) {
-        bucket.push(agent)
-      } else {
-        buckets.set(key, [agent])
-      }
+    const needle = query.trim().toLowerCase()
+    if (needle) {
+      list = list.filter(
+        (agent) =>
+          agent.name.toLowerCase().includes(needle) ||
+          agent.description.toLowerCase().includes(needle),
+      )
     }
-
-    const entries = [...buckets.entries()]
-    const otherIndex = entries.findIndex(([key]) => key === OTHER_CATEGORY)
-    if (otherIndex > -1 && otherIndex < entries.length - 1) {
-      const [other] = entries.splice(otherIndex, 1)
-      entries.push(other)
-    }
-    return entries
-  }, [visibleAgents])
+    return list.slice().sort((a, b) => a.name.localeCompare(b.name))
+  }, [agents, baseIdFilter, query])
 
   function clearBaseFilter() {
     const next = new URLSearchParams(searchParams)
@@ -217,6 +200,17 @@ export function AgentsPage() {
     setModel(MODELS_BY_PROVIDER[next][0] ?? '')
   }
 
+  async function cycleAgentStatus(agentId: string, current: AgentStatus) {
+    const next: AgentStatus =
+      current === 'active' ? 'draft' : current === 'draft' ? 'disabled' : 'active'
+    try {
+      await updateAgent(agentId, { status: next })
+      await load()
+    } catch {
+      setError(t('ai.agents.errSave'))
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim()) {
@@ -232,7 +226,7 @@ export function AgentsPage() {
       model,
       temperature,
       topP: 1,
-      maxTokens: 4096,
+      maxTokens: 2048,
     }
 
     try {
@@ -276,14 +270,21 @@ export function AgentsPage() {
 
       <section className="console-panel">
         <div className="console-panel__title-row">
-          <h2>{t('ai.agents.listTitle')}</h2>
-          <Button onClick={openCreate}>{t('ai.agents.newAgent')}</Button>
+          <TextField
+            className="console-panel__search console-panel__search--lead"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('ai.agents.searchPlaceholder', 'Search agents…')}
+            aria-label={t('ai.agents.searchAria', 'Search agents')}
+          />
+          <div className="console-panel__actions">
+            <Button onClick={openCreate}>
+              <IconPlus />
+              {t('ai.agents.newAgent')}
+            </Button>
+          </div>
         </div>
-        <p className="console-hint">
-          {companyName
-            ? t('ai.agents.companyScope', { company: companyName })
-            : t('ai.agents.companyScopeUnknown')}
-        </p>
 
         {activeBase ? (
           <div className="console-filter-chip">
@@ -303,7 +304,9 @@ export function AgentsPage() {
           <p className="console-empty">{t('ai.agents.loading')}</p>
         ) : isEmpty ? (
           <p className="console-empty">
-            {agents.length === 0 ? t('ai.agents.empty') : t('ai.agents.emptyFiltered')}
+            {agents.length === 0
+              ? t('ai.agents.empty')
+              : t('ai.agents.emptyFiltered')}
           </p>
         ) : (
           <div className="console-table-wrap">
@@ -318,70 +321,73 @@ export function AgentsPage() {
                   <th className="console-table__actions">{t('ai.agents.colActions')}</th>
                 </tr>
               </thead>
-              {groupedAgents.map(([category, items]) => (
-                <tbody key={category} className="console-table__group">
-                  <tr className="console-table__group-row">
-                    <td colSpan={6}>
-                      <span className="console-table__group-label">{category}</span>
-                      <span className="console-table__group-count">{items.length}</span>
+              <tbody>
+                {visibleAgents.map((agent) => (
+                  <tr
+                    key={agent.id}
+                    className={
+                      agent.id === highlightAgentId
+                        ? 'console-table__row--highlight'
+                        : undefined
+                    }
+                  >
+                    <td>
+                      <span className="console-table__name">
+                        <span>{agent.name}</span>
+                      </span>
+                    </td>
+                    <td className="console-table__muted">{agent.description || '—'}</td>
+                    <td>
+                      {agent.model && agent.model.provider !== 'auto' ? (
+                        <span className="console-chip">
+                          {agent.model.provider} · {agent.model.model || '—'}
+                        </span>
+                      ) : (
+                        <span className="console-chip console-chip--muted">
+                          {t('ai.agents.modelAuto', 'Auto')}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {agent.knowledgeBaseCount > 0 ? (
+                        <Link
+                          className="console-chip console-chip--link"
+                          to={`/ai/ai/knowledge?agentId=${encodeURIComponent(agent.id)}`}
+                        >
+                          {t('ai.agents.knowledgeCount', {
+                            count: agent.knowledgeBaseCount,
+                          })}
+                        </Link>
+                      ) : (
+                        <span className="console-chip console-chip--muted">
+                          {t('ai.agents.knowledgeCountNone')}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={`console-status console-status--${agent.status} console-status--clickable`}
+                        onClick={() => void cycleAgentStatus(agent.id, agent.status)}
+                        title={t('ai.agents.statusClickHint', 'Click to change status')}
+                      >
+                        {t(STATUS_LABEL_KEY[agent.status])}
+                      </button>
+                    </td>
+                    <td className="console-table__actions">
+                      <button
+                        type="button"
+                        className="console-icon-button"
+                        aria-label={t('ai.agents.edit')}
+                        title={t('ai.agents.edit')}
+                        onClick={() => void openEdit(agent)}
+                      >
+                        <IconPencil />
+                      </button>
                     </td>
                   </tr>
-                  {items.map((agent) => (
-                    <tr
-                      key={agent.id}
-                      className={
-                        agent.id === highlightAgentId
-                          ? 'console-table__row--highlight'
-                          : undefined
-                      }
-                    >
-                      <td>
-                        <span className="console-table__name">
-                          <span>{agent.name}</span>
-                        </span>
-                      </td>
-                      <td className="console-table__muted">{agent.description || '—'}</td>
-                      <td>
-                        {agent.model && agent.model.provider !== 'auto' ? (
-                          <span className="console-chip">
-                            {agent.model.provider} · {agent.model.model || '—'}
-                          </span>
-                        ) : (
-                          <span className="console-chip console-chip--muted">
-                            {t('ai.agents.modelAuto', 'Auto')}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {agent.knowledgeBaseCount > 0 ? (
-                          <Link
-                            className="console-chip console-chip--link"
-                            to={`/ai/ai/knowledge?agentId=${encodeURIComponent(agent.id)}`}
-                          >
-                            {t('ai.agents.knowledgeCount', {
-                              count: agent.knowledgeBaseCount,
-                            })}
-                          </Link>
-                        ) : (
-                          <span className="console-chip console-chip--muted">
-                            {t('ai.agents.knowledgeCountNone')}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`console-status console-status--${agent.status}`}>
-                          {t(STATUS_LABEL_KEY[agent.status])}
-                        </span>
-                      </td>
-                      <td className="console-table__actions">
-                        <Button variant="secondary" onClick={() => void openEdit(agent)}>
-                          {t('ai.agents.edit')}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              ))}
+                ))}
+              </tbody>
             </table>
           </div>
         )}
@@ -442,7 +448,6 @@ export function AgentsPage() {
             </FormField>
           </div>
 
-          {/* ---- Model section ---- */}
           <div className="console-form__section">
             <h4>{t('ai.agents.modelTitle', 'Model')}</h4>
             <p>
@@ -499,10 +504,7 @@ export function AgentsPage() {
 
             {advancedOpen ? (
               <div className="console-form__grid">
-                <FormField
-                  label={t('ai.agents.fieldTemperature', 'Temperature')}
-                  htmlFor="agent-temp"
-                >
+                <FormField label="Temperature" htmlFor="agent-temp">
                   <TextField
                     id="agent-temp"
                     type="number"

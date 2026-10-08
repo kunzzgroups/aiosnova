@@ -1,11 +1,11 @@
 import {
   useCallback,
   useEffect,
-  useRef,
+  useId,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
   type DragEvent,
-  type KeyboardEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconPaperclip } from '@/components/icons/Icons'
@@ -22,17 +22,21 @@ type FileDropZoneProps = {
 }
 
 /**
- * Drag-and-drop + click-to-select + paste. Renders the current file list.
+ * Drag-and-drop + click-to-select + paste.
  *
- * Three ways to hand it files:
- *   1. Drag from the DESKTOP or a File Explorer WINDOW onto the zone.
- *   2. Click the zone, pick inside the OS dialog, hit Open.
- *   3. Copy a file elsewhere (Ctrl+C) and paste here (Ctrl+V).
+ * The click path uses a <label htmlFor> linked to the hidden <input>. That is
+ * the most reliable way to open the OS picker: no JS click simulation, and
+ * every browser respects the label -> input association.
  *
- * Dragging OUT of the OS "Open" dialog does not work - that dialog is modal,
+ * The paste path reads the clipboard at the wrapper level and feeds the same
+ * `addFiles` path, so all three entry points stay in lockstep.
+ *
+ * Dragging OUT of the OS "Open" dialog does not work — that dialog is modal,
  * so the browser never sees the drag. Use paste for that workflow.
  *
- * Window blur / focus resets the drag state so the zone never sticks.
+ * Cloud-only files (OneDrive, iCloud): Windows and macOS won't let the browser
+ * read them until they're synced to disk. Dragging works (Explorer fetches
+ * on demand); clicking "Open" does not. The hint text below says so.
  */
 export function FileDropZone({
   value,
@@ -43,10 +47,12 @@ export function FileDropZone({
   multiple = false,
 }: FileDropZoneProps) {
   const { t } = useTranslation()
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const justDroppedRef = useRef(false)
+  const generatedId = useId()
+  const inputId = `file-drop-${generatedId}`
 
+  const [isDragging, setIsDragging] = useState(false)
+
+  /* Reset the drag hint when the window loses focus (e.g. an OS modal opens). */
   useEffect(() => {
     function reset() {
       setIsDragging(false)
@@ -71,7 +77,7 @@ export function FileDropZone({
   )
 
   const handleDragEnter = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
+    (event: DragEvent<HTMLLabelElement>) => {
       event.preventDefault()
       event.stopPropagation()
       if (!disabled) setIsDragging(true)
@@ -80,7 +86,7 @@ export function FileDropZone({
   )
 
   const handleDragOver = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
+    (event: DragEvent<HTMLLabelElement>) => {
       event.preventDefault()
       event.stopPropagation()
       if (!disabled) setIsDragging(true)
@@ -88,57 +94,26 @@ export function FileDropZone({
     [disabled],
   )
 
-  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = useCallback((event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault()
     event.stopPropagation()
     setIsDragging(false)
   }, [])
 
   const handleDrop = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
+    (event: DragEvent<HTMLLabelElement>) => {
       event.preventDefault()
       event.stopPropagation()
       setIsDragging(false)
       if (disabled) return
-
-      justDroppedRef.current = true
-      window.setTimeout(() => {
-        justDroppedRef.current = false
-      }, 300)
-
       const files = Array.from(event.dataTransfer.files ?? [])
       addFiles(files)
     },
     [disabled, addFiles],
   )
 
-  const handlePick = useCallback(() => {
-    if (disabled) return
-    if (justDroppedRef.current) return
-    inputRef.current?.click()
-  }, [disabled])
-
-  const handleKey = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        handlePick()
-      }
-    },
-    [handlePick],
-  )
-
-  const handleInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(event.target.files ?? [])
-      addFiles(files)
-      event.target.value = ''
-    },
-    [addFiles],
-  )
-
   const handlePaste = useCallback(
-    (event: React.ClipboardEvent<HTMLDivElement>) => {
+    (event: ClipboardEvent<HTMLLabelElement>) => {
       if (disabled) return
       const files = Array.from(event.clipboardData?.files ?? [])
       if (files.length > 0) {
@@ -149,12 +124,27 @@ export function FileDropZone({
     [disabled, addFiles],
   )
 
+  const handleInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const input = event.currentTarget
+      const files = Array.from(input.files ?? [])
+      if (files.length > 0) addFiles(files)
+      // Let the browser release the file handles, then clear so the same
+      // file can be picked again. Deferred to avoid racing the change event.
+      window.setTimeout(() => {
+        input.value = ''
+      }, 0)
+    },
+    [addFiles],
+  )
+
   function removeAt(index: number) {
     onChange(value.filter((_, i) => i !== index))
   }
 
   return (
-    <div
+    <label
+      htmlFor={disabled ? undefined : inputId}
       className={[
         'file-drop',
         isDragging ? 'is-dragging' : '',
@@ -167,23 +157,30 @@ export function FileDropZone({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={handlePick}
-      onKeyDown={handleKey}
       onPaste={handlePaste}
-      role="button"
-      tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
     >
       <input
-        ref={inputRef}
+        id={inputId}
         type="file"
         accept={accept}
         multiple={multiple}
         disabled={disabled}
         onChange={handleInputChange}
-        style={{ display: 'none' }}
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0 0 0 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
       />
 
+      {/* Either the empty hint, or the file list — one ternary covers both. */}
       {value.length === 0 ? (
         <div className="file-drop__empty">
           <span className="file-drop__empty-title">
@@ -191,6 +188,12 @@ export function FileDropZone({
           </span>
           <span className="file-drop__empty-hint">
             {hint ?? t('common.fileDropOr', 'Or click to browse · Or paste (Ctrl+V)')}
+          </span>
+          <span className="file-drop__empty-hint file-drop__empty-hint--muted">
+            {t(
+              'common.cloudFileHint',
+              'Cloud-only files (OneDrive, iCloud) must be synced to disk first.',
+            )}
           </span>
         </div>
       ) : (
@@ -207,6 +210,9 @@ export function FileDropZone({
                 className="file-drop__remove"
                 aria-label={t('common.remove', 'Remove')}
                 onClick={(event) => {
+                  // Stop the click from bubbling to the label, which would
+                  // otherwise re-open the picker.
+                  event.preventDefault()
                   event.stopPropagation()
                   removeAt(index)
                 }}
@@ -222,7 +228,7 @@ export function FileDropZone({
           ) : null}
         </ul>
       )}
-    </div>
+    </label>
   )
 }
 
