@@ -31,13 +31,8 @@ export type KnowledgeDocumentType = 'contract' | 'invoice' | 'policy' | 'record'
 
 export type KnowledgeBase = {
   id: string
-<<<<<<< HEAD
-  merchantId: string
-  /** Owning company. Never null - a base belongs to exactly one company. */
-=======
   tenantId: string
   /** Owning company. Write permission is gated by this. */
->>>>>>> origin/main
   companyId: string
   /**
    * Which companies may READ this base (search, list, AI citation).

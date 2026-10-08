@@ -38,11 +38,6 @@ export async function fetchKnowledgeBases(
     }
   }
 
-<<<<<<< HEAD
-/** Bases of one company. `companyId` empty means "every base in the merchant". */
-export async function fetchKnowledgeBases(companyId: string) {
-=======
->>>>>>> origin/main
   const query = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
   return apiRequest<{ items: KnowledgeBaseListItem[] }>(
     `/api/knowledge-bases${query}`,
