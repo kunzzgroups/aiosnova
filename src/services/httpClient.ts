@@ -2,9 +2,9 @@ import { useAuthStore } from '@/stores/authStore'
 import type { AuthUser } from '@/modules/core/auth/types/auth'
 
 export class ApiError extends Error {
-  status: number
+  readonly status: number | undefined
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status?: number) {
     super(message)
     this.name = 'ApiError'
     this.status = status

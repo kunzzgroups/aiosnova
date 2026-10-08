@@ -1,0 +1,52 @@
+.kv-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.kv-editor__empty {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.kv-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kv-editor__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 2fr) auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.kv-editor__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kv-editor__remove:hover {
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+}
+
+.kv-editor__remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
