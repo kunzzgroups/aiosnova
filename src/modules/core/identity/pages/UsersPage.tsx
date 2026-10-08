@@ -519,7 +519,7 @@ export function UsersPage() {
                     </span></td>
                     <td className="directory-design-date">
                       <IconButton className="directory-design-created" variant="ghost"
-                        label={t('users.createdAt')+': '+new Date(user.createdAt).toLocaleString(i18n.language,{ day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short' })}>
+                        label={new Date(user.createdAt).toLocaleTimeString(i18n.language,{ hour:'2-digit',minute:'2-digit',second:'2-digit' })}>
                         <IconClock aria-hidden="true" />
                         <time dateTime={user.createdAt}>{new Date(user.createdAt).toLocaleDateString(i18n.language,{ day:'numeric',month:'short',year:'numeric' })}</time>
                       </IconButton>

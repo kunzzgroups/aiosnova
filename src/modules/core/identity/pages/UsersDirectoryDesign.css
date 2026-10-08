@@ -7,7 +7,8 @@
 .identity-directory-design .identity-directory-toolbar {
   align-items: flex-end;
   gap: var(--space-3);
-  margin-bottom: var(--space-5);
+  margin-bottom: 0;
+  padding-bottom: var(--space-3);
 }
 
 .identity-directory-design .identity-directory-toolbar__filters {
@@ -59,8 +60,10 @@
   min-height: 16rem;
 }
 
-.directory-design-table th {
+.identity-directory-design .directory-design-table th {
   background: var(--color-bg-muted);
+  padding-block: var(--space-4);
+  font-size: var(--text-sm);
 }
 
 .directory-design-sort {
