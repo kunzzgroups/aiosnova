@@ -34,6 +34,7 @@ type RequestOptions = {
   auth?: boolean
   csrf?: boolean
   skipRefresh?: boolean
+  cache?: RequestCache
 }
 
 let refreshPromise: Promise<boolean> | null = null
@@ -78,7 +79,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = false, csrf = false, skipRefresh = false } = options
+  const { method = 'GET', body, auth = false, csrf = false, skipRefresh = false, cache } = options
   const headers = new Headers()
 
   if (body !== undefined) {
@@ -101,6 +102,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const response = await fetch(path, {
     method,
+    cache,
     credentials: 'include',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -123,7 +125,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } catch {
       // ignore JSON parse errors
     }
-    throw new ApiError(message, response.status)
+          throw new ApiError(message, response.status)
   }
 
   if (response.status === 204) {

@@ -1,0 +1,6 @@
+.tools/
+.m2/
+target/
+.env.local
+.env.development
+.env.local.example

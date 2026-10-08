@@ -1,4 +1,5 @@
 import type {
+  InvitationOptions,
   CompanyRecord,
   IdentityUser,
   MembershipRecord,
@@ -8,7 +9,7 @@ import type {
   UserStatus,
 } from '@/modules/core/identity/types/identity'
 
-export const DEMO_TENANT_ID = 'tenant-acme'
+export const DEMO_MERCHANT_ID = 'merchant-acme'
 
 const emptyProfile = {
   fullName: '',
@@ -27,7 +28,7 @@ export type CompanyGroupRecord = {
 export const identityCompanies: CompanyRecord[] = [
   {
     id: 'company-retail',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'RETAIL',
     name: 'Acme Retail',
     status: 'active',
@@ -35,7 +36,7 @@ export const identityCompanies: CompanyRecord[] = [
   },
   {
     id: 'company-wholesale',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'WHOLESALE',
     name: 'Acme Wholesale',
     status: 'active',
@@ -43,7 +44,7 @@ export const identityCompanies: CompanyRecord[] = [
   },
   {
     id: 'company-j1',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'J1',
     name: 'J1 (MIDVALLEY)',
     status: 'active',
@@ -51,7 +52,7 @@ export const identityCompanies: CompanyRecord[] = [
   },
   {
     id: 'company-j2',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'J2',
     name: 'J2 (PARADIGM MALL)',
     status: 'active',
@@ -59,7 +60,7 @@ export const identityCompanies: CompanyRecord[] = [
   },
   {
     id: 'company-tokyo-izakaya',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'TOKYO-I',
     name: 'TOKYO IZAKAYA SDN BHD',
     status: 'active',
@@ -83,7 +84,7 @@ export const identityCompanyGroups: CompanyGroupRecord[] = [
 
 export const identityUsers: IdentityUser[] = [
   {
-    id: 'user-demo',
+    id: '00000000-0000-4000-8000-000000000001',
     email: 'demo@aios.dev',
     displayName: 'Demo User',
     fullName: 'Demo User',
@@ -96,47 +97,6 @@ export const identityUsers: IdentityUser[] = [
     mfaEnabled: false,
     lastActiveAt: '2026-08-18T02:32:00.000Z',
     createdAt: '2026-01-10T08:00:00.000Z',
-  },
-  {
-    id: 'user-mfa',
-    email: 'mfa@aios.dev',
-    displayName: 'MFA User',
-    fullName: 'MFA User',
-    phone: '+60 12-345 0002',
-    avatarUrl: '',
-    language: 'en',
-    timezone: 'Asia/Kuala_Lumpur',
-    status: 'active',
-    signInMethod: 'password',
-    mfaEnabled: true,
-    lastActiveAt: '2026-08-17T08:00:00.000Z',
-    createdAt: '2026-01-12T08:00:00.000Z',
-  },
-  {
-    id: 'user-ops',
-    email: 'ops.lead@aios.dev',
-    displayName: 'Ops Lead',
-    fullName: 'Alex Tan',
-    phone: '+60 12-345 0003',
-    avatarUrl: '',
-    language: 'en',
-    timezone: 'Asia/Kuala_Lumpur',
-    status: 'active',
-    signInMethod: 'password',
-    mfaEnabled: false,
-    lastActiveAt: '2026-08-15T09:10:00.000Z',
-    createdAt: '2026-02-01T08:00:00.000Z',
-  },
-  {
-    id: 'user-invited',
-    email: 'newhire@aios.dev',
-    displayName: 'New Hire',
-    ...emptyProfile,
-    status: 'invited',
-    signInMethod: null,
-    mfaEnabled: false,
-    lastActiveAt: null,
-    createdAt: '2026-08-01T08:00:00.000Z',
   },
 ]
 
@@ -202,7 +162,7 @@ export function setIdentityUserMfaEnabled(userId: string, mfaEnabled: boolean) {
 export const identityOrganizations: OrganizationNode[] = [
   {
     id: 'org-hq',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     parentId: null,
     code: 'HQ',
     name: 'Acme Headquarters',
@@ -212,7 +172,7 @@ export const identityOrganizations: OrganizationNode[] = [
   },
   {
     id: 'org-retail',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     parentId: 'org-hq',
     code: 'RET',
     name: 'Retail Division',
@@ -222,7 +182,7 @@ export const identityOrganizations: OrganizationNode[] = [
   },
   {
     id: 'org-sales',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     parentId: 'org-retail',
     code: 'SAL',
     name: 'Sales Department',
@@ -232,7 +192,7 @@ export const identityOrganizations: OrganizationNode[] = [
   },
   {
     id: 'org-ops',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     parentId: 'org-hq',
     code: 'OPS',
     name: 'Operations',
@@ -242,7 +202,7 @@ export const identityOrganizations: OrganizationNode[] = [
   },
   {
     id: 'org-finance',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     parentId: 'org-hq',
     code: 'FIN',
     name: 'Finance',
@@ -255,7 +215,7 @@ export const identityOrganizations: OrganizationNode[] = [
 export const identityPositions: PositionRecord[] = [
   {
     id: 'pos-ceo',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'CEO',
     name: 'Chief Executive Officer',
     description: 'Executive leadership',
@@ -263,7 +223,7 @@ export const identityPositions: PositionRecord[] = [
   },
   {
     id: 'pos-mgr',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'MGR',
     name: 'Manager',
     description: 'People and delivery management',
@@ -271,7 +231,7 @@ export const identityPositions: PositionRecord[] = [
   },
   {
     id: 'pos-acc',
-    tenantId: DEMO_TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     code: 'ACC',
     name: 'Accountant',
     description: 'Finance operations',
@@ -282,8 +242,8 @@ export const identityPositions: PositionRecord[] = [
 export const identityMemberships: MembershipRecord[] = [
   {
     id: 'mem-1',
-    tenantId: DEMO_TENANT_ID,
-    userId: 'user-demo',
+    merchantId: DEMO_MERCHANT_ID,
+    userId: '00000000-0000-4000-8000-000000000001',
     companyId: 'company-retail',
     organizationId: 'org-sales',
     positionId: 'pos-mgr',
@@ -292,28 +252,30 @@ export const identityMemberships: MembershipRecord[] = [
     validFrom: '2026-01-10',
     validTo: null,
   },
-  {
-    id: 'mem-2',
-    tenantId: DEMO_TENANT_ID,
-    userId: 'user-ops',
-    companyId: 'company-retail',
-    organizationId: 'org-ops',
-    positionId: 'pos-mgr',
-    isPrimary: true,
-    status: 'active',
-    validFrom: '2026-02-01',
-    validTo: null,
-  },
-  {
-    id: 'mem-3',
-    tenantId: DEMO_TENANT_ID,
-    userId: 'user-mfa',
-    companyId: 'company-wholesale',
-    organizationId: 'org-finance',
-    positionId: 'pos-acc',
-    isPrimary: true,
-    status: 'active',
-    validFrom: '2026-01-12',
-    validTo: null,
-  },
 ]
+
+// Preset department and position records used by the invitation mock.
+identityOrganizations.push({ id:'org-hr',merchantId:DEMO_MERCHANT_ID,parentId:'org-hq',code:'HR',name:'HR',type:'department',status:'active',sortOrder:4 })
+identityPositions.push(
+  { id:'pos-hr-lead',merchantId:DEMO_MERCHANT_ID,code:'HR-LEAD',name:'HR Lead',description:'HR leadership',status:'active' },
+  { id:'pos-hr',merchantId:DEMO_MERCHANT_ID,code:'HR',name:'HR',description:'HR staff',status:'active' },
+  { id:'pos-finance-mgr',merchantId:DEMO_MERCHANT_ID,code:'FIN-MGR',name:'Finance Manager',description:'Finance leadership',status:'active' },
+)
+// Mock Permissions-module presets. The users page only reads these definitions.
+export const identityRolePresets: InvitationOptions['roles'] = [
+  { id: 'role-manager', name: 'Manager', permissions: [{ group: 'Work Management', page: 'Projects', action: 'View' }, { group: 'Work Management', page: 'Documents', action: 'View' }] },
+  { id: 'role-staff', name: 'Staff', permissions: [{ group: 'Work Management', page: 'Documents', action: 'View' }] },
+  { id: 'role-hr', name: 'HR', permissions: [{ group: 'Finance & People', page: 'HRM', action: 'View' }] },
+  { id: 'role-finance', name: 'Finance', permissions: [{ group: 'Finance & People', page: 'Finance', action: 'View' }] },
+]
+export function mockInvitationOptions(canInvite: boolean): InvitationOptions {
+  const departments = identityOrganizations.filter(o=>o.type==='department' && o.status==='active').map(o=>({id:o.id,name:o.name,
+      positions:identityPositions.filter(p=>p.status==='active' && (o.id==='org-finance' ? ['pos-finance-mgr','pos-acc'].includes(p.id) : o.id==='org-hr' ? ['pos-hr-lead','pos-hr'].includes(p.id) : p.id==='pos-mgr')).map(p=>({id:p.id,name:p.name}))
+    }))
+  return { canInvite, departments, roles: identityRolePresets, companies: identityCompanies.filter(c=>c.status==='active').map(c=>({
+    id:c.id, name:c.name, groupName:identityCompanyGroups.find(g=>g.companyIds.includes(c.id))?.name || c.name,
+    requireMfa:c.id==='company-retail',
+    departments
+  })) }
+}
+identityUsers[0]!.isOwner = true

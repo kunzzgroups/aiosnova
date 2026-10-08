@@ -2,6 +2,9 @@ import { apiRequest, refreshSession } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
 import type {
   ForgotPasswordRequest,
+  InvitationDetails,
+  InvitationMfaSetup,
+  ActivatedAccount,
   LoginRequest,
   LoginResponse,
   LoginSuccessResponse,
@@ -15,6 +18,22 @@ import type {
   TacVerifyRequest,
 } from '@/modules/core/auth/types/auth'
 import { isMfaRequired } from '@/modules/core/auth/types/auth'
+
+export async function fetchInvitation(token: string) {
+  return apiRequest<InvitationDetails>(`/api/mock/invitations/${encodeURIComponent(token)}`)
+}
+
+export async function startInvitationMfa(token: string) {
+  return apiRequest<InvitationMfaSetup>(`/api/mock/invitations/${encodeURIComponent(token)}/mfa/start`, {
+    method: 'POST',
+  })
+}
+
+export async function activateInvitation(token: string, code: string) {
+  return apiRequest<ActivatedAccount>(`/api/mock/invitations/${encodeURIComponent(token)}/activate`, {
+    method: 'POST', body: { code },
+  })
+}
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   const data = await apiRequest<LoginResponse>('/api/auth/login', {
@@ -32,17 +51,21 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
 }
 
 export async function requestLoginTac(payload: TacSendRequest) {
-  return apiRequest<MessageResponse & { demoHint?: string }>('/api/auth/login/tac/send', {
+  return apiRequest<MessageResponse & { demoHint?: string; resendCooldown?: number }>('/api/auth/login/tac/send', {
     method: 'POST',
     body: payload,
   })
 }
 
-export async function verifyLoginTac(payload: TacVerifyRequest): Promise<LoginSuccessResponse> {
-  const data = await apiRequest<LoginSuccessResponse>('/api/auth/login/tac/verify', {
+export async function verifyLoginTac(payload: TacVerifyRequest): Promise<LoginResponse> {
+  const data = await apiRequest<LoginResponse>('/api/auth/login/tac/verify', {
     method: 'POST',
     body: payload,
   })
+  if (isMfaRequired(data)) {
+    useAuthStore.getState().setMfaTicket(data.mfaTicket)
+    return data
+  }
   useAuthStore.getState().setSession(data.accessToken, data.user)
   return data
 }

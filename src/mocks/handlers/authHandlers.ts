@@ -1,4 +1,4 @@
-import { HttpResponse, http } from 'msw'
+import { HttpResponse, http, passthrough } from 'msw'
 import type {
   AuthUser,
   ForgotPasswordRequest,
@@ -8,10 +8,8 @@ import type {
   MfaSetupConfirmRequest,
   MfaVerifyRequest,
   ResetPasswordRequest,
-  TacSendRequest,
-  TacVerifyRequest,
 } from '@/modules/core/auth/types/auth'
-import { MOCK_MFA_CODE, MOCK_TAC_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
+import { MOCK_MFA_CODE, mockAuthUsers as users, setMockUserMfaEnabled, toPublicUser, type MockUser } from '@/mocks/data/users'
 import { identityUsers, recordIdentitySignIn, upsertIdentityUser } from '@/mocks/data/identity'
 import type { SignInMethod } from '@/modules/core/identity/types/identity'
 import { isValidPassword, NEW_PASSWORD_ERROR_MESSAGE, PASSWORD_ERROR_MESSAGE } from '@/modules/core/auth/utils/passwordPolicy'
@@ -34,12 +32,28 @@ type ResetTokenRecord = {
   userId: string
   expiresAt: number
 }
+//Mock emai; features
+// type MockEmail = {
+//   id:string
+//   to:string
+//   subject:string
+//   body:string
+//   createdAt:string
+// }
 
 const sessions = new Map<string, SessionRecord>()
 const mfaTickets = new Map<string, MfaTicketRecord>()
-const tacChallenges = new Map<string, { userId: string; expiresAt: number }>()
+// const tacChallenges = new Map<string, { userId: string; expiresAt: number }>()
 const resetTokens = new Map<string, ResetTokenRecord>()
 const pendingMfaSecrets = new Map<string, string>()
+//Mock inbox features
+// const mockInbox = new Map<string, MockEmail[]>()
+
+// //Add Mock Email features
+// function addMockEmail(email: MockEmail){
+//   const existing =mockInbox.get(email.to) ?? []
+//   mockInbox.set(email.to, [email, ...existing])
+// }
 
 function createToken(prefix: string) {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, '')}`
@@ -78,29 +92,25 @@ function cookieHeader(name: string, value: string, options?: { maxAge?: number; 
   return parts.join('; ')
 }
 
-function clearCookieHeader(name: string, httpOnly = false) {
-  return cookieHeader(name, '', { maxAge: 0, httpOnly })
-}
-
 function findUserByEmail(email: string) {
   return users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase())
 }
 
-function normalizePhone(value: string) {
-  return value.replace(/[^\d+]/g, '')
-}
+// function normalizePhone(value: string) {
+//   return value.replace(/[^\d+]/g, '')
+// }
 
-function findUserByPhone(phone: string) {
-  const needle = normalizePhone(phone)
-  if (!needle) {
-    return undefined
-  }
-  const identity = identityUsers.find((item) => normalizePhone(item.phone) === needle)
-  if (!identity) {
-    return undefined
-  }
-  return users.find((user) => user.id === identity.id || user.email === identity.email)
-}
+// function findUserByPhone(phone: string) {
+//   const needle = normalizePhone(phone)
+//   if (!needle) {
+//     return undefined
+//   }
+//   const identity = identityUsers.find((item) => normalizePhone(item.phone) === needle)
+//   if (!identity) {
+//     return undefined
+//   }
+//   return users.find((user) => user.id === identity.id || user.email === identity.email)
+// }
 
 function findUserById(id: string) {
   return users.find((user) => user.id === id)
@@ -163,29 +173,29 @@ function requireCsrf(request: Request) {
 }
 
 const GENERIC_LOGIN_ERROR = 'Invalid email or password.'
-const TAC_SENT_MESSAGE = 'If this number is registered, an OTP has been sent.'
-const EMAIL_OTP_SENT_MESSAGE = 'If this email is registered, an OTP has been sent.'
+// const TAC_SENT_MESSAGE = 'If this number is registered, an OTP has been sent.'
+// const EMAIL_OTP_SENT_MESSAGE = 'If this email is registered, an OTP has been sent.'
 const FORGOT_MESSAGE =
   'If an account exists for that email, you will receive password reset instructions.'
 
-function tacChallengeKey(payload: { email?: string; phone?: string }) {
-  const email = payload.email?.trim().toLowerCase()
-  if (email) {
-    return `email:${email}`
-  }
-  const phone = normalizePhone(payload.phone ?? '')
-  if (phone) {
-    return `phone:${phone}`
-  }
-  return ''
-}
+// function tacChallengeKey(payload: { email?: string; phone?: string }) {
+//   const email = payload.email?.trim().toLowerCase()
+//   if (email) {
+//     return `email:${email}`
+//   }
+//   const phone = normalizePhone(payload.phone ?? '')
+//   if (phone) {
+//     return `phone:${phone}`
+//   }
+//   return ''
+// }
 
 export const authHandlers = [
   http.post('/api/auth/login', async ({ request }) => {
     const body = (await request.json()) as LoginRequest
     const user = findUserByEmail(body.email ?? '')
 
-    if (!user || user.password !== body.password) {
+    if (!user || !user.password || user.password !== body.password) {
       return HttpResponse.json({ message: GENERIC_LOGIN_ERROR }, { status: 401 })
     }
 
@@ -212,61 +222,64 @@ export const authHandlers = [
     return issueSession(user)
   }),
 
-  http.post('/api/auth/login/tac/send', async ({ request }) => {
-    const body = (await request.json()) as TacSendRequest
-    const email = body.email?.trim() ?? ''
-    const phone = body.phone?.trim() ?? ''
-    const key = tacChallengeKey(body)
+  // http.post('/api/auth/login/tac/send', async ({ request }) => {
+  //   const body = (await request.json()) as TacSendRequest
+  //   const email = body.email?.trim() ?? ''
+  //   const phone = body.phone?.trim() ?? ''
+  //   const key = tacChallengeKey(body)
 
-    if (email) {
-      if (!email.includes('@')) {
-        return HttpResponse.json({ message: 'Enter a valid email address.' }, { status: 400 })
-      }
-    } else if (!normalizePhone(phone)) {
-      return HttpResponse.json({ message: 'Enter a valid phone number.' }, { status: 400 })
-    }
+  //   if (email) {
+  //     if (!email.includes('@')) {
+  //       return HttpResponse.json({ message: 'Enter a valid email address.' }, { status: 400 })
+  //     }
+  //   } else if (!normalizePhone(phone)) {
+  //     return HttpResponse.json({ message: 'Enter a valid phone number.' }, { status: 400 })
+  //   }
 
-    const user = email ? findUserByEmail(email) : findUserByPhone(phone)
-    if (user) {
-      const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)
-      if (identity?.status === 'disabled') {
-        return HttpResponse.json({ message: 'This account has been disabled.' }, { status: 401 })
-      }
-      tacChallenges.set(key, {
-        userId: user.id,
-        expiresAt: Date.now() + 5 * 60 * 1000,
-      })
-    }
+  //   const user = email ? findUserByEmail(email) : findUserByPhone(phone)
+  //   if (user) {
+  //     const identity = identityUsers.find((item) => item.id === user.id || item.email === user.email)
+  //     if (identity?.status === 'disabled') {
+  //       return HttpResponse.json({ message: 'This account has been disabled.' }, { status: 401 })
+  //     }
+  //     tacChallenges.set(key, {
+  //       userId: user.id,
+  //       expiresAt: Date.now() + 5 * 60 * 1000,
+  //     })
 
-    return HttpResponse.json({
-      message: email ? EMAIL_OTP_SENT_MESSAGE : TAC_SENT_MESSAGE,
-      demoHint: `Demo OTP: ${MOCK_TAC_CODE}`,
-    })
-  }),
+  //     //Mock email features
+  //     addMockEmail({
+  //       id: crypto.randomUUID(),
+  //       to: email,
+  //       subject: 'Your AIOS verification code',
+  //       body: `Your verification code is: ${MOCK_TAC_CODE}\n\nThis code expires in 5 minutes`,
+  //       createdAt: Date.now(),
+  //     })
+  //   }
 
-  http.post('/api/auth/login/tac/verify', async ({ request }) => {
-    const body = (await request.json()) as TacVerifyRequest
-    const key = tacChallengeKey(body)
-    const challenge = key ? tacChallenges.get(key) : undefined
+  //   return HttpResponse.json({
+  //     message: email ? EMAIL_OTP_SENT_MESSAGE : TAC_SENT_MESSAGE,
+  //     demoHint: `Demo OTP: ${MOCK_TAC_CODE}`,
+  //   })
+  // }),
 
-    if (!challenge || challenge.expiresAt < Date.now()) {
-      return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
-    }
-    if (body.code !== MOCK_TAC_CODE) {
-      return HttpResponse.json({ message: 'Invalid OTP.' }, { status: 401 })
-    }
+  // // Mock Inbox features
+  // http.get('/api/mock/inbox', ({request})=>{
+  //   const url = new URL(request.url)
+  //   const email = url.searchParams.get('email')?.trim().toLowerCase() ?? ''
 
-    const user = findUserById(challenge.userId)
-    if (!user) {
-      return HttpResponse.json({ message: 'OTP expired. Request a new code.' }, { status: 401 })
-    }
+  //   const emails = mockInbox.get(email) ?? []
 
-    tacChallenges.delete(key)
-    return issueSession(user, 'otp')
-  }),
+  //   return HttpResponse.json({
+  //     emails,
+  //   })
+  // }),
+
+  http.post('/api/auth/login/tac/verify', () => passthrough()),
 
   http.post('/api/auth/mfa/verify', async ({ request }) => {
     const body = (await request.json()) as MfaVerifyRequest
+    if (body.mfaTicket.startsWith('activation_')) return passthrough()
     const ticket = mfaTickets.get(body.mfaTicket)
 
     if (!ticket || ticket.expiresAt < Date.now()) {
@@ -286,52 +299,8 @@ export const authHandlers = [
     return issueSession(user)
   }),
 
-  http.post('/api/auth/refresh', ({ request }) => {
-    if (!requireCsrf(request)) {
-      return HttpResponse.json({ message: 'CSRF validation failed.' }, { status: 403 })
-    }
-
-    const cookies = parseCookies(request.headers.get('cookie'))
-    const refreshToken = cookies[REFRESH_COOKIE]
-    const session = refreshToken ? sessions.get(refreshToken) : undefined
-
-    if (!session || session.revoked) {
-      return HttpResponse.json({ message: 'Session expired.' }, { status: 401 })
-    }
-
-    const user = findUserById(session.userId)
-    if (!user) {
-      return HttpResponse.json({ message: 'Session expired.' }, { status: 401 })
-    }
-
-    return HttpResponse.json({
-      accessToken: `access_${user.id}`,
-      user: toPublicUser(user),
-    })
-  }),
-
-  http.post('/api/auth/logout', ({ request }) => {
-    if (!requireCsrf(request)) {
-      return HttpResponse.json({ message: 'CSRF validation failed.' }, { status: 403 })
-    }
-
-    const cookies = parseCookies(request.headers.get('cookie'))
-    const refreshToken = cookies[REFRESH_COOKIE]
-    if (refreshToken && sessions.has(refreshToken)) {
-      const session = sessions.get(refreshToken)!
-      sessions.set(refreshToken, { ...session, revoked: true })
-    }
-
-    return HttpResponse.json(
-      { message: 'Signed out.' },
-      {
-        headers: [
-          ['Set-Cookie', clearCookieHeader(REFRESH_COOKIE, true)],
-          ['Set-Cookie', clearCookieHeader(CSRF_COOKIE)],
-        ],
-      },
-    )
-  }),
+  http.post('/api/auth/refresh', () => passthrough()),
+  http.post('/api/auth/logout', () => passthrough()),
 
   http.get('/api/auth/oauth/:provider/start', ({ params }) => {
     const provider = String(params.provider)
@@ -350,7 +319,7 @@ export const authHandlers = [
       return HttpResponse.json({ message: 'Unsupported OAuth provider.' }, { status: 400 })
     }
 
-    const email = `${provider}.user@aios.dev`
+    const email = provider === 'google' ? 'demo@aios.dev' : `${provider}.user@aios.dev`
     let user = findUserByEmail(email)
     if (!user) {
       user = {

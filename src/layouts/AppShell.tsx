@@ -1,23 +1,25 @@
-import { useMemo, type ReactNode } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { createContext, useMemo, useState, type ReactNode } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Sidebar } from '@/components/navigation/Sidebar'
 import { findNavItemByPath } from '@/navigation/sidebarNav'
 import { useNavLabel } from '@/i18n/useNavLabel'
 import { LanguageSwitcher } from '@/components/navigation/LanguageSwitcher'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { useAuthStore } from '@/stores/authStore'
 import { ModuleTabs } from './ModuleTabs'
 import { CompanyTabs } from './CompanyTabs'
 import './AppShell.css'
+
+type PageHeader = { titleKey: string; descriptionKey: string } | null
+export const AppShellHeaderContext = createContext<(header: PageHeader) => void>(() => {})
 
 type AppShellProps = {
   children?: ReactNode
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const user = useAuthStore((state) => state.user)
   const { t } = useTranslation()
+  const [header,setHeader] = useState<PageHeader>(null)
   const location = useLocation()
   const navLabel = useNavLabel()
 
@@ -33,15 +35,18 @@ export function AppShell({ children }: AppShellProps) {
   }, [location.pathname, navLabel, t])
 
   return (
+    <AppShellHeaderContext.Provider value={setHeader}>
     <div className="app-shell">
       <Sidebar />
       <div className="app-shell__workspace">
         <header className="app-shell__header">
-          <div className="app-shell__header-title">{pageTitle}</div>
+          <div className="app-shell__header-copy">
+            <div className="app-shell__header-title">{header ? t(header.titleKey) : pageTitle}</div>
+            {header ? <p className="app-shell__header-description">{t(header.descriptionKey)}</p> : null}
+          </div>
           <div className="app-shell__actions">
             <LanguageSwitcher />
             <ThemeToggle />
-            <Link to={user ? `/mfa/setup?userId=${user.id}` : '/mfa/setup'}>{t('shell.manageMfa')}</Link>
           </div>
         </header>
         <CompanyTabs />
@@ -49,5 +54,6 @@ export function AppShell({ children }: AppShellProps) {
         <main className="app-shell__main">{children ?? <Outlet />}</main>
       </div>
     </div>
+    </AppShellHeaderContext.Provider>
   )
 }

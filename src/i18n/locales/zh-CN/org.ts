@@ -59,4 +59,6 @@ export const org: Record<string, string> = {
   'org.errEndMembership': '无法结束成员关系。',
   'org.errUpdateMembership': '无法更新成员关系。',
   'org.organization.empty': '暂无组织节点。',
+  "org.colMerchant": "商户",
+  "org.memberships.scopeHint": "用户与商户、公司、组织及职位的成员关系（第 1 层 · 06），不代表权限。",
 }
