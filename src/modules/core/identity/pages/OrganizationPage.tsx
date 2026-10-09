@@ -1,10 +1,13 @@
 import { useContext, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
+import { TablePanel } from '@/components/ui/TablePanel'
+import { TablePagination } from '@/components/ui/TablePagination'
+import { TableToolbar } from '@/components/ui/TableToolbar'
 import { Button } from '@/components/ui/Button'
 import { RowMenu } from '@/components/ui/RowMenu'
-import { Popover } from '@/components/ui/Popover'
-import { IconMore } from '@/components/icons/Icons'
+import { IconButton } from '@/components/ui/IconButton'
+import { IconPencil, IconTrash } from '@/components/icons/Icons'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
@@ -27,17 +30,7 @@ type PositionSortKey = 'name' | 'department' | 'level' | 'employees' | 'status'
 type Editor = { kind:'department' | 'position'; organizationId?:string; parentId?:string; item?:OrganizationNode | PositionRecord }
 type Draft = { id:number; name:string; status:OrganizationNode['status']; managedIds:string[]; positionId?:string }
 
-function paginationItems(current: number, total: number): (number | 'backward' | 'forward')[] {
-  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
-  const start = Math.max(2, Math.min(current - 2, total - 5))
-  const end = Math.min(total - 1, Math.max(current + 2, 6))
-  const items: (number | 'backward' | 'forward')[] = [1]
-  if (start > 2) items.push('backward')
-  for (let number = start; number <= end; number++) items.push(number)
-  if (end < total - 1) items.push('forward')
-  items.push(total)
-  return items
-}
+
 
 export function OrganizationPage() {
   const { t, i18n } = useTranslation()
@@ -62,7 +55,10 @@ export function OrganizationPage() {
   const autoFitRowMeasurement=useRef({ width:0,height:0 })
   const [page,setPage]=useState(1)
   const tableRef=useRef<HTMLDivElement>(null)
+  const selectAllPositionsRef=useRef<HTMLInputElement>(null)
   const [pendingDelete,setPendingDelete]=useState<{ kind:Editor['kind']; item:OrganizationNode | PositionRecord }|null>(null)
+  const [selectedPositionIds,setSelectedPositionIds]=useState<string[]>([])
+  const [pendingBulkDeleteIds,setPendingBulkDeleteIds]=useState<string[]>([])
   const [isDeleting,setIsDeleting]=useState(false)
   const [editor,setEditor]=useState<Editor|null>(null)
   const [drafts,setDrafts]=useState<Draft[]>([])
@@ -244,7 +240,7 @@ export function OrganizationPage() {
 
   function actions(kind:Editor['kind'],item:OrganizationNode | PositionRecord,panel=false) {
     if (!canManage) return <span className="organization-menu-spacer" />
-    if (panel) return <Popover placement="left" label={t('org.itemActions',{ name:item.name })} trigger={<IconMore aria-hidden="true" />}><div className="organization-position-actions"><Button variant="ghost" disabled={busy} onClick={()=>openEditor({ kind,item })}>{t('users.actionEdit')}</Button><Button variant="ghost" disabled={busy} className="organization-position-actions__delete" onClick={()=>{setDeleteError(null);setPendingDelete({ kind,item })}}>{t('users.actionDelete')}</Button></div></Popover>
+    if (panel) return <div className="identity-inline-actions identity-directory-actions">{item.status==='active' ? <IconButton label={t('users.actionEdit')} disabled={busy} onClick={()=>openEditor({ kind,item })}><IconPencil /></IconButton> : <IconButton label={t('users.actionDelete')} variant="danger" disabled={busy} onClick={()=>{setDeleteError(null);setPendingDelete({ kind,item })}}><IconTrash /></IconButton>}</div>
     return <RowMenu label={t('org.itemActions',{ name:item.name })} disabled={busy} items={[
       ...(kind==='department' ? [
         { id:'add-subdepartment',label:t('org.addSubdepartment'),onSelect:() => openEditor({ kind:'department',parentId:item.id }) },
@@ -309,10 +305,40 @@ export function OrganizationPage() {
       const order=typeof left==='number'&&typeof right==='number' ? left-right : String(left).localeCompare(String(right),i18n.language)
       return positionSort.descending ? -order : order
     })
+  const selectedPositions=statusFilter==='inactive'&&canManage ? filteredPositions.filter(position=>position.status==='inactive'&&selectedPositionIds.includes(position.id)) : []
+  const bulkPositions=positions.filter(position=>pendingBulkDeleteIds.includes(position.id))
+  const bulkManaged=departments.filter(department=>pendingBulkDeleteIds.includes(department.managerPositionId||'')).length
+  const bulkAssignments=memberships.filter(membership=>membership.status==='active'&&pendingBulkDeleteIds.includes(membership.positionId||'')).length
+  const bulkDeleteBlocked=Boolean(bulkManaged||bulkAssignments)
+  useEffect(()=>{setSelectedPositionIds([]);setPendingBulkDeleteIds([])},[companyId,sessionUser?.id,tab,search,departmentFilter,levelFilter,statusFilter])
+  async function removeSelectedPositions() {
+    if (!canManage||bulkDeleteBlocked||!bulkPositions.length||submittingRef.current||bulkPositions.some(position=>position.status!=='inactive')) return
+    submittingRef.current=true
+    const scope=companyId
+    setDeleteError(null);setIsDeleting(true)
+    try {
+      for (const position of bulkPositions) {
+        if (useCompanyStore.getState().companyId!==scope) return
+        await deletePosition(position.id)
+        if (useCompanyStore.getState().companyId!==scope) return
+        setPositions(current=>current.filter(item=>item.id!==position.id))
+        setSelectedPositionIds(current=>current.filter(id=>id!==position.id))
+        setPendingBulkDeleteIds(current=>current.filter(id=>id!==position.id))
+      }
+      setSuccessMessage(t('org.deletedPositions',{ count:bulkPositions.length }))
+    } catch(err) {
+      if (useCompanyStore.getState().companyId===scope) setDeleteError(err instanceof ApiError ? err.message : t('org.errDeleteOrganization'))
+    } finally {submittingRef.current=false;setIsDeleting(false)}
+  }
   const effectivePageSize=pageSize||autoPageSize
   const pageCount=Math.max(1,Math.ceil(filteredPositions.length/effectivePageSize))
   const currentPage=Math.min(page,pageCount)
   const visiblePositions=filteredPositions.slice((currentPage-1)*effectivePageSize,currentPage*effectivePageSize)
+  const allVisiblePositionsSelected=visiblePositions.length>0&&visiblePositions.every(position=>selectedPositionIds.includes(position.id))
+  const someVisiblePositionsSelected=visiblePositions.some(position=>selectedPositionIds.includes(position.id))
+  useEffect(()=>{
+    if (selectAllPositionsRef.current) selectAllPositionsRef.current.indeterminate=someVisiblePositionsSelected&&!allVisiblePositionsSelected
+  },[someVisiblePositionsSelected,allVisiblePositionsSelected,statusFilter,canManage])
   function employeeCount(positionId:string) {
     return new Set(memberships.filter(m=>m.companyId===companyId&&m.positionId===positionId&&m.status==='active'&&m.validFrom<=today&&(!m.validTo||m.validTo>=today)).map(m=>m.userId)).size
   }
@@ -386,44 +412,25 @@ export function OrganizationPage() {
           {!visibleLeaders.length&&!ungrouped.some(matches) ? <p className="identity-empty">{t(query ? 'org.noSearchResults' : 'org.noDepartments')}</p> : null}
         </div>
         <div id="organization-panel-positions" className="organization-position-panel" role="tabpanel" aria-labelledby="organization-tab-positions" hidden={tab!=='positions'}>
-          <section className="identity-panel identity-directory-panel identity-directory-design organization-position-directory">
-          <div className="organization-position-filters">
-            <div className="organization-search"><IconSearch aria-hidden="true" /><TextField type="search" aria-label={t('org.searchPositions')} placeholder={t('org.searchPositions')} value={search} onChange={event=>setSearch(event.target.value)} /></div>
+          <TablePanel className="organization-position-directory">
+          <TableToolbar
+            search={<><IconSearch aria-hidden="true" /><TextField type="search" aria-label={t('org.searchPositions')} placeholder={t('org.searchPositions')} value={search} onChange={event=>setSearch(event.target.value)} /></>}
+            filters={<>
             <SidebarSelect id="organization-filter-department" label={t('org.department')} value={departmentFilter} onChange={setDepartmentFilter} options={[{value:'all',label:t('org.allDepartments')},...departments.map(d=>({value:d.id,label:d.name}))]} />
             <SidebarSelect id="organization-filter-level" label={t('org.level')} value={levelFilter} onChange={setLevelFilter} options={[{value:'all',label:t('org.allLevels')},...(['executive','manager','staff'] as const).map(value=>({value,label:t(value==='executive' ? 'org.levelExecutive' : value==='manager' ? 'org.levelManager' : 'org.levelStaff')}))]} />
             <SidebarSelect id="organization-filter-status" label={t('org.status')} value={statusFilter} onChange={setStatusFilter} options={[{value:'all',label:t('org.allStatus')},{value:'active',label:t('org.statusActive')},{value:'inactive',label:t('org.statusInactive')}]} />
-            {canManage&&companyId ? <Button disabled={isLoading||busy} onClick={()=>openEditor({ kind:'position' })}>{t('org.addPosition')}</Button> : null}
-          </div>
+            </>}
+            actions={canManage&&companyId ? <>{selectedPositions.length>1 ? <Button variant="danger" disabled={busy} onClick={()=>{setDeleteError(null);setPendingBulkDeleteIds(selectedPositions.map(position=>position.id))}}><IconTrash aria-hidden="true" />{t('users.actionDelete')}</Button> : null}<Button disabled={isLoading||busy} onClick={()=>openEditor({ kind:'position' })}>{t('org.addPosition')}</Button></> : null}
+          />
             <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('org.positionsTab')}>
               <table className={'identity-table identity-table--packed directory-design-table'+(pageSize===0 ? ' directory-design-table--auto-fit' : '')}>
-                <thead><tr>{([['name','org.positionName'],['department','org.department'],['level','org.level'],['employees','org.employees'],['status','org.status']] as const).map(([key,label])=><th key={key} scope="col" aria-sort={positionSort.key===key ? positionSort.descending ? 'descending' : 'ascending' : 'none'}><button type="button" className="directory-design-sort" onClick={()=>setPositionSort({ key,descending:positionSort.key===key&&!positionSort.descending })}>{t(label)}<span aria-hidden="true">{positionSort.key===key&&positionSort.descending ? '↓' : '↑'}</span></button></th>)}<th scope="col">{t('org.actions')}</th></tr></thead>
-                <tbody>{visiblePositions.map(position=><tr key={position.id}><td>{position.name}</td><td>{renderPositionDepartment(position)}</td><td>{displayedLevel(position) ? t(displayedLevel(position)==='executive' ? 'org.levelExecutive' : displayedLevel(position)==='manager' ? 'org.levelManager' : 'org.levelStaff') : t(position.level===null ? 'org.levelNotApplicable' : 'org.levelNotSet')}</td><td><span className="organization-employee-count"><IconUsers aria-hidden="true" /><span>{employeeCount(position.id).toLocaleString(i18n.language)}</span></span></td><td>{status(position.status,position,'position')}</td><td>{actions('position',position,true)}</td></tr>)}</tbody>
+                <thead><tr>{([['name','org.positionName'],['department','org.department'],['level','org.level'],['employees','org.employees'],['status','org.status']] as const).map(([key,label])=><th key={key} scope="col" aria-sort={positionSort.key===key ? positionSort.descending ? 'descending' : 'ascending' : 'none'}><span className="organization-position-name">{key==='name'&&statusFilter==='inactive'&&canManage ? <input ref={selectAllPositionsRef} type="checkbox" className="organization-position-checkbox" aria-label={t('org.selectAllPositions')} disabled={busy||!visiblePositions.length} checked={allVisiblePositionsSelected} onChange={event=>{const checked=event.target.checked;setSelectedPositionIds(current=>checked ? [...new Set([...current,...visiblePositions.map(position=>position.id)])] : current.filter(id=>!visiblePositions.some(position=>position.id===id)))}} /> : null}<button type="button" className="directory-design-sort" onClick={()=>setPositionSort({ key,descending:positionSort.key===key&&!positionSort.descending })}>{t(label)}<span aria-hidden="true">{positionSort.key===key&&positionSort.descending ? '↓' : '↑'}</span></button></span></th>)}{canManage ? <th scope="col">{t('org.actions')}</th> : null}</tr></thead>
+                <tbody>{visiblePositions.map(position=><tr key={position.id}><td><span className="organization-position-name">{statusFilter==='inactive'&&canManage ? <input type="checkbox" className="organization-position-checkbox" aria-label={t('org.selectPosition',{ name:position.name })} disabled={busy} checked={selectedPositionIds.includes(position.id)} onChange={event=>setSelectedPositionIds(current=>event.target.checked ? [...current,position.id] : current.filter(id=>id!==position.id))} /> : null}<span>{position.name}</span></span></td><td>{renderPositionDepartment(position)}</td><td>{displayedLevel(position) ? t(displayedLevel(position)==='executive' ? 'org.levelExecutive' : displayedLevel(position)==='manager' ? 'org.levelManager' : 'org.levelStaff') : t(position.level===null ? 'org.levelNotApplicable' : 'org.levelNotSet')}</td><td><span className="organization-employee-count"><IconUsers aria-hidden="true" /><span>{employeeCount(position.id).toLocaleString(i18n.language)}</span></span></td><td>{status(position.status,position,'position')}</td>{canManage ? <td className="identity-table__actions">{actions('position',position,true)}</td> : null}</tr>)}</tbody>
               </table>
               {!filteredPositions.length ? <div className="organization-position-empty" role="status"><p className="identity-empty">{t(hasPositionFilters ? 'org.noSearchResults' : 'org.noPositions')}</p>{hasPositionFilters ? <Button variant="secondary" onClick={clearPositionFilters}>{t('org.clearFilters')}</Button> : null}</div> : null}
             </div>
-        <footer className="identity-directory-footer">
-          <div className="identity-directory-footer__listing">
-            <label htmlFor="organization-page-size">{t('users.rowsPerPage')}</label>
-            <SidebarSelect id="organization-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} title={pageSize===0? t('users.autoRowsHint', { count: autoPageSize }):undefined} value={String(pageSize)} options={[{ value: '0', label: '–' }, ...[10,25,50,100,200].map(n => ({ value: String(n), label: String(n) }))]} onChange={value => setPageSize(Number(value))} />
-            <span>{t('users.listingRange', { start: filteredPositions.length ? (currentPage-1)*effectivePageSize+1 : 0, end: Math.min(currentPage*effectivePageSize,filteredPositions.length), total: filteredPositions.length })}</span>
-          </div>
-          <nav className="identity-pagination" aria-label={t('org.positionPages')}>
-            <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>
-            {paginationItems(currentPage,pageCount).map(item => {
-              if (typeof item === 'number') return (
-                <Button key={item} variant="secondary" aria-label={t('users.pageNumber', { page: item })} aria-current={item===currentPage? 'page':undefined} onClick={() => setPage(item)}>{item}</Button>
-              )
-              const backward = item === 'backward'
-              const label = t(backward ? 'users.jumpBackPages' : 'users.jumpForwardPages')
-              return <Button key={item} variant="ghost" className="identity-pagination__jump" aria-label={label} title={label} onClick={() => setPage(Math.max(1,Math.min(pageCount,currentPage + (backward ? -5 : 5))))}>
-                <span className="identity-pagination__ellipsis" aria-hidden>•••</span>
-                <span className="identity-pagination__jump-arrow" aria-hidden>{backward ? '«' : '»'}</span>
-              </Button>
-            })}
-            <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => setPage(currentPage+1)} aria-label={t('users.nextPage')}>›</Button>
-          </nav>
-        </footer>
-          </section>
+        <TablePagination id="organization-page-size" total={filteredPositions.length} pageSize={pageSize} autoPageSize={autoPageSize} effectivePageSize={effectivePageSize} currentPage={currentPage} pageCount={pageCount} pagesLabel={t('org.positionPages')} onPageSizeChange={setPageSize} onPageChange={setPage} />
+          </TablePanel>
         </div>
       </>}
     </section>
@@ -447,6 +454,7 @@ export function OrganizationPage() {
       {editorError ? <p className="organization-create-dialog__error" role="alert">{editorError}</p> : null}
       <div className="organization-create-dialog__actions">{editor.kind==='position'&&!editor.item&&totalToAdd ? <span className="organization-placement-summary">{t('org.positionCount',{ count:totalToAdd })} · {placement==='company' ? t('org.companyWide') : departments.find(d=>d.id===placement)?.name||t('org.chooseDepartment')}</span> : null}<Button variant="secondary" onClick={()=>setEditor(null)} disabled={isSubmitting}>{t('users.cancel')}</Button><Button type="submit" disabled={isSubmitting||!totalToAdd||drafts.some(row=>!row.name.trim())||editor.kind==='position'&&!placement}>{t(isSubmitting ? 'users.saving' : editor.item ? 'users.saveChanges' : editor.kind==='position' ? 'org.addPositionBatch' : 'org.addDepartmentBatch',{ count:totalToAdd })}</Button></div>
     </form></dialog> : null}
+    <ConfirmDialog open={Boolean(pendingBulkDeleteIds.length&&canManage)} title={t('org.deletePositionsTitle',{ count:bulkPositions.length })} description={<div className="organization-bulk-delete-copy">{deleteError ? <p className="organization-create-dialog__error" role="alert">{deleteError}</p> : null}<p>{t('org.deletePositionsImpact',{ count:bulkPositions.length })}</p><ul className="organization-bulk-delete-list">{bulkPositions.map(position=><li key={position.id}>{position.name}</li>)}</ul>{bulkManaged ? <p>{t('org.managedDepartmentDependency',{ count:bulkManaged })}</p> : null}{bulkAssignments ? <p>{t('org.deleteAssignmentDependency',{ count:bulkAssignments })}</p> : null}</div>} warning={t(bulkDeleteBlocked ? 'org.deleteBlocked' : 'org.deleteMockWarning')} confirmDisabled={bulkDeleteBlocked} confirmLabel={t('users.actionDelete')} cancelLabel={t('users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={()=>void removeSelectedPositions()} onCancel={()=>setPendingBulkDeleteIds([])} />
     <ConfirmDialog open={Boolean(pendingDelete&&canManage)} title={t(pendingDelete?.kind==='department' ? 'org.deleteDepartmentTitle' : 'org.deletePositionTitle',{ name:pendingDelete?.item.name })} description={<>{deleteError ? <p className="organization-create-dialog__error" role="alert">{deleteError}</p> : null}<p>{t(pendingDelete?.kind==='department' ? 'org.deleteDepartmentImpact' : 'org.deletePositionImpact',{ name:pendingDelete?.item.name })}</p>{dependentPositions ? <p>{t('org.deletePositionDependency',{ count:dependentPositions })}</p> : null}{childDepartments ? <p>{t('org.deleteChildDependency',{ count:childDepartments })}</p> : null}{managedDepartments ? <p>{t('org.managedDepartmentDependency',{ count:managedDepartments })}</p> : null}{activeAssignments ? <p>{t('org.deleteAssignmentDependency',{ count:activeAssignments })}</p> : null}</>} warning={t(deleteBlocked ? 'org.deleteBlocked' : 'org.deleteMockWarning')} confirmDisabled={deleteBlocked} confirmLabel={t('users.actionDelete')} cancelLabel={t('users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={()=>void remove()} onCancel={()=>setPendingDelete(null)} />
   </div>
 }
