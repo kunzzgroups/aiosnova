@@ -176,7 +176,7 @@ export function TemplatesPage() {
 
     function toggleEditCompany(id: string) {
         const ownerId = editing?.ownerCompanyId
-        if (id === ownerId) return    // owner is locked
+        if (id === ownerId) return // owner is locked
         setEditVisibility((current) =>
             current.includes(id)
                 ? current.filter((x) => x !== id)
@@ -240,7 +240,15 @@ export function TemplatesPage() {
                     </p>
                 ) : (
                     <div className="console-table-wrap">
-                        <table className="console-table">
+                        <table className="console-table console-table--fixed">
+                            <colgroup>
+                                <col style={{ width: '18%' }} />
+                                <col style={{ width: '10%' }} />
+                                <col style={{ width: '34%' }} />
+                                <col style={{ width: '24%' }} />
+                                <col style={{ width: '10%' }} />
+                                <col style={{ width: '4%' }} />
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th>{t('ai.knowledge.colName', 'Name')}</th>
@@ -276,20 +284,29 @@ export function TemplatesPage() {
                                             </td>
 
                                             {/* DESCRIPTION */}
-                                            <td className="console-table__muted">{template.description}</td>
+                                            <td className="console-table__muted">
+                                                {template.description}
+                                            </td>
 
                                             {/* VISIBLE TO */}
                                             <td>
-                                                <span className="console-chips">
-                                                    {template.allowedCompanyIds.map((id) => {
-                                                        const label =
-                                                            companies.find((c) => c.value === id)?.label ?? id
+                                                <span
+                                                    className="console-chips"
+                                                    title={template.allowedCompanyIds.map(id => companies.find(c => c.value === id)?.label || id).join(', ')}
+                                                >
+                                                    {template.allowedCompanyIds.slice(0, 2).map((id) => {
+                                                        const label = companies.find((c) => c.value === id)?.label ?? id
                                                         return (
                                                             <span className="console-chip console-chip--muted" key={id}>
                                                                 {label}
                                                             </span>
                                                         )
                                                     })}
+                                                    {template.allowedCompanyIds.length > 2 && (
+                                                        <span className="console-chip console-chip--muted">
+                                                            +{template.allowedCompanyIds.length - 2}
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </td>
 

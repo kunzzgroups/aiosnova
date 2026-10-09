@@ -1,3 +1,4 @@
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 /**
  * Mock seed data.
  *
@@ -19,7 +20,7 @@ export type SeedAgentStatus = 'active' | 'draft' | 'disabled'
 
 export type SeedAgent = {
   id: string
-  tenantId: string
+  merchantId: string
   companyId: string
   name: string
   description: string
@@ -32,7 +33,7 @@ export type SeedAgent = {
 
 export type SeedKnowledgeBase = {
   id: string
-  tenantId: string
+  merchantId: string
   /** Owner. */
   companyId: string
   /** Read visibility. Always includes the owner. */
@@ -63,7 +64,6 @@ export type SeedDocument = {
 
 export const SEED_COMPANY_ID = 'company-j1'
 
-const TENANT_ID = 'tenant-demo'
 const NOW = '2025-01-15T08:00:00.000Z'
 
 /* ------------------------------------------------------------------ */
@@ -81,7 +81,7 @@ function mkBase(
 ): SeedKnowledgeBase {
   return {
     id,
-    tenantId: TENANT_ID,
+    merchantId: DEMO_MERCHANT_ID,
     companyId,
     allowedCompanyIds: allowedCompanyIds ?? [companyId],
     name,
@@ -162,7 +162,7 @@ export const SEED_KNOWLEDGE_BASES: SeedKnowledgeBase[] = [...J1_BASES, ...OTHER_
 /* matter for the current UI, so they all stay in the home company)    */
 /* ------------------------------------------------------------------ */
 
-type RawAgent = Omit<SeedAgent, 'tenantId' | 'companyId'>
+type RawAgent = Omit<SeedAgent, 'merchantId' | 'companyId'>
 
 const RAW_AGENTS: RawAgent[] = [
   {
@@ -288,7 +288,7 @@ const AGENT_OWNER: Record<string, string> = {
 
 export const SEED_AGENTS: SeedAgent[] = RAW_AGENTS.map((agent) => ({
   ...agent,
-  tenantId: TENANT_ID,
+  merchantId: DEMO_MERCHANT_ID,
   companyId: AGENT_OWNER[agent.id] ?? SEED_COMPANY_ID,
   knowledgeBaseIds: [...agent.knowledgeBaseIds],
   model: { ...agent.model },

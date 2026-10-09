@@ -277,7 +277,7 @@
 .identity-directory-toolbar__search {
   flex: 1 1 16rem;
   min-width: 12rem;
-  max-width: 20rem; 
+  max-width: 20rem;
 }
 
 .identity-directory-toolbar__filters {
@@ -374,6 +374,7 @@
 }
 
 @media (max-width: 720px) {
+
   .identity-invite .ui-text-field,
   .identity-invite .password-field,
   .identity-invite__password .password-field,
@@ -483,6 +484,31 @@
   font-weight: 600;
 }
 
+.identity-status--interactive {
+  border: 1px solid transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.identity-status--interactive:hover:not(:disabled) {
+  border-color: currentColor;
+}
+
+.identity-status--interactive:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+.identity-status--interactive:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-status--interactive { transition: none; }
+}
+
 .identity-status--active {
   background: var(--color-success-bg);
   color: var(--color-success);
@@ -589,3 +615,698 @@
   color: var(--color-text);
   font: inherit;
 }
+
+/* Users directory and its full-page invitation form share the existing identity shell. */
+.identity-users-page .identity-directory-toolbar {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.identity-directory-invite-button {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.identity-directory-muted {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin-top: .4rem;
+}
+
+.identity-directory-scroll {
+  max-height: clamp(240px, calc(100dvh - 330px), 680px);
+  overflow: auto;
+}
+
+.identity-directory-scroll th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-bg-elevated);
+}
+
+.identity-directory-footer,
+.identity-directory-footer label,
+.identity-directory-footer nav {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.identity-directory-footer {
+  justify-content: space-between;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+.identity-users-page select,
+.identity-users-page textarea {
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: .6rem;
+  font: inherit;
+}
+
+.identity-users-page [hidden] {
+  display: none !important;
+}
+
+.identity-users-page .identity-invite--page {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.identity-invite-content>header {
+  margin-bottom: 1.5rem;
+}
+
+.identity-invite-sections {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.identity-invite-section--wide {
+  grid-column: 1 / -1;
+}
+
+.identity-invite-fields {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+  align-items: start;
+}
+
+.identity-invite-company {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.identity-invite-check,
+.identity-invite-switch {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.identity-users-page input[type=checkbox] {
+  accent-color: var(--color-brand);
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+.identity-invite-switch input {
+  appearance: none;
+  width: 2.4rem !important;
+  height: 1.4rem !important;
+  border-radius: 1rem;
+  background: var(--color-text-muted);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+
+.identity-invite-switch input::before {
+  content: '';
+  position: absolute;
+  top: .2rem;
+  left: .2rem;
+  height: 1rem;
+  width: 1rem;
+  background: white;
+  border-radius: 50%;
+  transition: transform 200ms ease;
+}
+
+.identity-invite-switch input:checked {
+  background: var(--color-brand);
+}
+
+.identity-invite-switch input:checked::before {
+  transform: translateX(1rem);
+}
+
+.identity-invite-switch input:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+.identity-invite-switch input:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .identity-invite-switch input,
+  .identity-invite-switch input::before {
+    transition: none;
+  }
+}
+
+.identity-role-chips {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin: .75rem 0;
+}
+
+.identity-role-chips button {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-muted);
+  color: var(--color-brand);
+  border-radius: var(--radius-md);
+  padding: .4rem .7rem;
+  cursor: pointer;
+}
+
+.identity-role-options {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: .75rem;
+}
+
+.identity-invite-company summary {
+  cursor: pointer;
+  padding: .75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.identity-permission-preview {
+  padding: 1rem;
+  margin-top: 1rem;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.identity-permission-preview p {
+  margin: .4rem 0 0;
+  color: var(--color-text-muted);
+}
+
+.identity-invite--page textarea {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.identity-invite-page-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: .75rem;
+  padding: 1rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 960px) {
+  .identity-invite-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container invitation (max-width: 1100px) {
+  .identity-invite-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container invitation (max-width: 560px) {
+  .identity-invite-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.identity-delivery-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.identity-delivery-heading p {
+  margin: .4rem 0 0;
+}
+
+.identity-delivery-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .identity-delivery-heading {
+    flex-wrap: wrap;
+  }
+}
+
+.identity-company-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-top: 1rem;
+}
+
+.identity-company-buttons .ui-button {
+  text-align: left;
+  min-height: 2.75rem;
+  justify-content: flex-start;
+}
+
+.identity-company-buttons [aria-pressed=true] {
+  box-shadow: 0 0 0 2px var(--color-brand);
+}
+
+.identity-language-toggle {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
+  flex-shrink: 0;
+  gap: .125rem;
+  padding: .125rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+}
+
+.identity-language-toggle::before {
+  content: '';
+  position: absolute;
+  top: .125rem;
+  bottom: .125rem;
+  left: .125rem;
+  width: calc((100% - .375rem) / 2);
+  border-radius: calc(var(--radius-md) - 2px);
+  background: var(--color-brand);
+  pointer-events: none;
+  transition: transform 200ms ease;
+}
+
+.identity-language-toggle[data-language='zh-CN']::before {
+  transform: translateX(calc(100% + .125rem));
+}
+
+.identity-language-toggle button {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: .35rem .65rem;
+  border-radius: calc(var(--radius-md) - 2px);
+  font: inherit;
+  font-size: .8125rem;
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+
+.identity-language-toggle button[aria-pressed=true] {
+  color: var(--color-on-brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .identity-language-toggle::before,
+  .identity-language-toggle button {
+    transition: none;
+  }
+}
+
+.identity-language-toggle button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.identity-language-toggle button:disabled {
+  opacity: .6;
+  cursor: default;
+}
+
+
+
+.identity-invite .sidebar-select__trigger[aria-invalid="true"],
+.identity-invite .identity-company-buttons button[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+/* Invitation owns the scrollport; the action bar stays at the shell bottom. */
+.app-shell:has(.identity-users-page--inviting) .app-shell__workspace {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell:has(.identity-users-page--inviting) .app-shell__header {
+  flex-shrink: 0;
+}
+
+.app-shell__main:has(.identity-users-page--inviting) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.identity-users-page--inviting {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  container: invitation / inline-size;
+}
+
+.identity-users-page--inviting .identity-invite--page {
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.identity-invite-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6);
+  scrollbar-gutter: stable;
+}
+
+.identity-invite-fields .ui-text-field,
+.identity-invite-fields .sidebar-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.identity-users-page--inviting .identity-invite-page-footer {
+  position: relative;
+  flex-shrink: 0;
+  min-height: var(--invitation-footer-height, 4rem);
+  box-sizing: border-box;
+  margin: 0;
+  padding: .65rem var(--space-6);
+  align-items: center;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.identity-users-page--inviting .identity-invite-page-footer>button {
+  transform: translateY(var(--invitation-footer-offset, 0px));
+}
+
+/* Directory fills the same workspace as its invitation form. */
+.app-shell:has(.identity-users-page) .app-shell__workspace {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.identity-directory-name {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.identity-directory-name .identity-status--inline {
+  margin: 0;
+}
+
+.app-shell:has(.identity-users-page) .app-shell__header {
+  flex-shrink: 0;
+}
+
+.app-shell__main:has(.identity-users-page) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.identity-users-page {
+  flex: 1;
+  min-height: 0;
+}
+
+.identity-directory-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.identity-users-page:not(.identity-users-page--inviting) {
+  --directory-bottom-inset: 1rem;
+  padding: var(--space-6) var(--space-6) var(--directory-bottom-inset);
+}
+
+.identity-users-page .identity-directory-toolbar {
+  flex-shrink: 0;
+  align-items: flex-end;
+  margin: 0;
+  padding: var(--space-5);
+}
+
+.identity-directory-toolbar__filters {
+  align-items: flex-end;
+}
+
+.identity-directory-toolbar .sidebar-select__trigger,
+.identity-directory-toolbar__search,
+.identity-directory-invite-button {
+  min-height: 2.75rem;
+}
+
+.identity-directory-panel .identity-directory-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  margin: 0 var(--space-5);
+}
+
+.identity-directory-panel>.identity-empty {
+  flex: 1;
+  margin: 0;
+  padding: var(--space-5);
+}
+
+.identity-directory-panel .identity-directory-footer {
+  flex-shrink: 0;
+  min-height: 4.5rem;
+  box-sizing: border-box;
+  margin: 0;
+  padding: .75rem var(--space-5);
+  align-items: center;
+  row-gap: .75rem;
+}
+
+.identity-directory-footer__listing {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.identity-directory-footer>div,
+.identity-directory-footer>nav {
+  transform: none;
+}
+
+.identity-directory-footer>nav {
+  flex-wrap: nowrap;
+  margin-left: auto;
+  gap: .5rem;
+}
+
+.identity-pagination-select {
+  width: 4.25rem;
+  flex-shrink: 0;
+}
+
+.identity-pagination-select--page {
+  width: 5.5rem;
+}
+
+.identity-pagination-select .sidebar-select__trigger {
+  min-height: 2.25rem;
+  height: 2.25rem;
+  box-sizing: border-box;
+  padding: .35rem .6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+  font-size: var(--text-xs);
+}
+
+.identity-pagination-select .sidebar-select__menu {
+  top: auto;
+  bottom: calc(100% + .5rem);
+  min-width: 100%;
+  max-height: min(16rem, 45dvh);
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: .25rem;
+}
+
+.identity-pagination-select .sidebar-select__option {
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  min-height: 2rem;
+  padding: .4rem .5rem;
+  border-radius: calc(var(--radius-md) - 3px);
+  box-sizing: border-box;
+}
+
+.identity-pagination-select .sidebar-select__option:hover {
+  background: var(--color-bg-muted);
+}
+
+.identity-pagination-select .sidebar-select__option.is-selected {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.identity-directory-footer nav .ui-button {
+  min-height: 2.25rem;
+  height: 2.25rem;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  padding: .35rem .65rem;
+}
+
+@media (max-width: 700px) {
+  .identity-users-page:not(.identity-users-page--inviting) {
+    padding: var(--space-3);
+  }
+
+  .identity-directory-footer>div,
+  .identity-directory-footer>nav {
+    transform: none;
+  }
+
+  .identity-directory-toolbar__filters {
+    flex-wrap: wrap;
+  }
+
+  .identity-directory-toolbar .sidebar-select {
+    width: auto;
+    flex: 1 1 7rem;
+  }
+}
+
+/* Compact pagination using the existing buttons and theme tokens. */
+.identity-directory-footer .identity-pagination .ui-button {
+  min-width: 2.25rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+}
+
+.identity-directory-footer .identity-pagination [aria-current="page"] {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  font-weight: 650;
+}
+
+.identity-directory-footer .identity-pagination .ui-button:hover:not(:disabled) {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+.identity-pagination__jump {
+  position: relative;
+}
+
+.identity-pagination__ellipsis {
+  font-size: .6rem;
+  letter-spacing: .1rem;
+}
+
+.identity-pagination__jump-arrow {
+  display: none;
+  font-size: 1.15rem;
+}
+
+.identity-pagination__jump:hover .identity-pagination__ellipsis,
+.identity-pagination__jump:focus-visible .identity-pagination__ellipsis {
+  display: none;
+}
+
+.identity-pagination__jump:hover .identity-pagination__jump-arrow,
+.identity-pagination__jump:focus-visible .identity-pagination__jump-arrow {
+  display: inline;
+}
+
+@media (max-width: 560px) {
+  .identity-directory-footer>.identity-pagination {
+    flex-wrap: wrap;
+    gap: .25rem;
+  }
+
+  .identity-directory-footer .identity-pagination .ui-button {
+    min-width: 1.875rem;
+    height: 2rem;
+    min-height: 2rem;
+    padding: .25rem .4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-directory-footer .identity-pagination .ui-button {
+    transition: none;
+  }
+}
+
+.identity-directory-actions {
+  justify-content: center;
+}
+
+.identity-directory-assignment {
+  width: 26.5rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Compact invitation spacing keeps the stacked sections within desktop height. */
+.identity-invite-content { padding: 1rem var(--space-5); }
+.identity-invite-sections { gap: .75rem; }
+.identity-invite-sections > .identity-panel { padding: 1rem; }
+.identity-invite-fields { margin: .75rem 0; }
+.identity-invite-sections .identity-invite-switch { margin-top: .75rem; }
+.identity-invite-sections .identity-directory-muted { font-size: var(--text-xs); }
+.identity-invite-sections .identity-company-buttons { margin-top: .75rem; gap: .5rem; }
+.identity-invite-sections .identity-company-buttons .ui-button { min-height: 2.5rem; }
+.identity-invite-sections .identity-delivery-heading { margin-bottom: .75rem; }
+.identity-invite--page textarea { min-height: 4rem; }
+.identity-invite-sections .identity-delivery-actions { margin-top: .75rem; }

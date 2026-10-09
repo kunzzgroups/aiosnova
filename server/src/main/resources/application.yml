@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: aiosnova-server
+  profiles:
+    default: local
+
+server:
+  port: 8080
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+auth:
+  tac:
+    resend-cooldown-seconds: 60

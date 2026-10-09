@@ -86,3 +86,10 @@
   /* Last-resort scrollport: the composer's sticky bottom resolves against it. */
   overflow-y: auto;
 }
+
+.app-shell__header-copy { min-width: 0; }
+.app-shell__header-description {
+  margin: .25rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

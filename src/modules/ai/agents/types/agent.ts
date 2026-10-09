@@ -33,7 +33,7 @@ export const DEFAULT_AGENT_MODEL: AgentModelConfig = {
 
 export type AiAgent = {
   id: string
-  tenantId: string
+  merchantId: string
   companyId: string
   name: string
   description: string

@@ -59,4 +59,6 @@ export const org: Record<string, string> = {
   'org.errEndMembership': 'Unable to end membership.',
   'org.errUpdateMembership': 'Unable to update membership.',
   'org.organization.empty': 'No organizations.',
+  "org.colMerchant": "Merchant",
+  "org.memberships.scopeHint": "User relationships to Merchant / Company / Organization / Position (Layer 1 · 06). Not permissions.",
 }

@@ -10,6 +10,9 @@ type AuthLayoutProps = {
   subtitle?: string
   children: ReactNode
   footer?: ReactNode
+  headerContent?: ReactNode
+  headerDetails?: ReactNode
+  inlineControls?: boolean
   wide?: boolean
   compact?: boolean
   hideIcon?: boolean
@@ -21,6 +24,9 @@ export function AuthLayout({
   subtitle,
   children,
   footer,
+  headerContent,
+  headerDetails,
+  inlineControls = false,
   wide = false,
   compact = false,
   hideIcon = false,
@@ -34,6 +40,12 @@ export function AuthLayout({
   ]
     .filter(Boolean)
     .join(' ')
+
+  const controls = <div className="auth-layout__locale">
+    {headerContent}
+    <ThemeToggle />
+    <LanguageSwitcher />
+  </div>
 
   return (
     <div className="auth-layout">
@@ -50,10 +62,7 @@ export function AuthLayout({
       </Link>
 
       <div className={panelClass}>
-        <div className="auth-layout__locale">
-          <ThemeToggle />
-          <LanguageSwitcher />
-        </div>
+        {inlineControls ? null : controls}
 
         {login || compact || hideIcon ? null : (
           <div className="auth-layout__feature-icon" aria-hidden>
@@ -66,9 +75,13 @@ export function AuthLayout({
         )}
 
         {title ? (
-          <header className="auth-layout__header">
-            <h1 className="auth-layout__title">{title}</h1>
-            {subtitle ? <p className="auth-layout__subtitle">{subtitle}</p> : null}
+          <header className={'auth-layout__header'+(inlineControls ? ' auth-layout__header--inline' : '')}>
+            <div className="auth-layout__heading">
+              <h1 className="auth-layout__title">{title}</h1>
+              {subtitle ? <p className="auth-layout__subtitle">{subtitle}</p> : null}
+              {headerDetails}
+            </div>
+            {inlineControls ? controls : null}
           </header>
         ) : null}
 

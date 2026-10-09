@@ -1,0 +1,16 @@
+spring:
+  config:
+    import: optional:file:./.env.local[.properties]
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:aiosnova}?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+    username: ${DB_USERNAME:aiosnova_user}
+    password: ${DB_PASSWORD}
+  sql:
+    init:
+      mode: never
+
+auth:
+  storage-key: ${AUTH_STORAGE_KEY}
+
+app:
+  local-merchant-id: ${LOCAL_MERCHANT_ID:00000000-0000-4000-8000-000000000002}

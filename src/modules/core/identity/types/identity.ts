@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next'
 
-export type UserStatus = 'active' | 'disabled' | 'invited'
+export type UserStatus = 'active' | 'disabled' | 'invited' | 'draft'
 
 export type SignInMethod = 'password' | 'otp' | 'google' | 'facebook' | 'apple'
 
@@ -10,6 +10,14 @@ export type IdentityUser = {
   displayName: string
   fullName: string
   phone: string
+  isOwner?: boolean
+  requireMfa?: boolean
+  canInvite?: boolean
+  canManageUsers?: boolean
+  departmentId?: string
+  positionId?: string
+  invitationSettings?: InvitationPayload['settings']
+  invitationDraft?: InvitationPayload
   avatarUrl: string
   language: string
   timezone: string
@@ -17,18 +25,21 @@ export type IdentityUser = {
   signInMethod: SignInMethod | null
   mfaEnabled: boolean
   lastActiveAt: string | null
+  createdBy?: string | null
   createdAt: string
+  
 }
 
 export type IdentityProfilePayload = Partial<
-  Pick<IdentityUser, 'email' | 'displayName' | 'fullName' | 'phone' | 'avatarUrl' | 'language' | 'timezone' | 'status'>
->
+  Pick<IdentityUser, 'email' | 'displayName' | 'fullName' | 'phone' | 'avatarUrl' | 'language' | 'timezone' | 'status' | 'departmentId' | 'positionId' | 'requireMfa' | 'canInvite' | 'canManageUsers'>
+> & { assignments?: InvitationAssignment[] }
 
 export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 'phone'>): boolean {
   return user.fullName.trim().length > 0 && user.phone.trim().length > 0
 }
 
 export function formatStatusLabel(status: string, t: TFunction) {
+  if (status === 'draft') return t('users.statusDraft')
   if (!status) {
     return status
   }
@@ -110,7 +121,7 @@ export type OrganizationType = 'division' | 'department' | 'team' | 'other'
 
 export type OrganizationNode = {
   id: string
-  tenantId: string
+  merchantId: string
   parentId: string | null
   code: string
   name: string
@@ -121,18 +132,18 @@ export type OrganizationNode = {
 
 export type PositionRecord = {
   id: string
-  tenantId: string
+  merchantId: string
   code: string
   name: string
   description: string
   status: 'active' | 'inactive'
 }
 
-export type MembershipStatus = 'active' | 'ended'
+export type MembershipStatus = 'active' | 'ended' | 'invited'
 
 export type MembershipRecord = {
   id: string
-  tenantId: string
+  merchantId: string
   userId: string
   companyId: string | null
   organizationId: string | null
@@ -140,6 +151,7 @@ export type MembershipRecord = {
   isPrimary: boolean
   status: MembershipStatus
   validFrom: string
+  roleIds?: string[]
   validTo: string | null
 }
 
@@ -147,7 +159,7 @@ export type CompanyStatus = 'active' | 'inactive'
 
 export type CompanyRecord = {
   id: string
-  tenantId: string
+  merchantId: string
   code: string
   name: string
   status: CompanyStatus
@@ -155,3 +167,17 @@ export type CompanyRecord = {
 }
 
 export type CompanyOption = CompanyRecord
+
+export type InvitationAssignment = { companyId: string; organizationId: string; positionId: string; roleIds: string[] }
+export type InvitationPayload = {
+  email: string; fullName: string; phone: string; assignments: InvitationAssignment[]; departmentId: string; positionId: string
+
+  requireMfa: boolean; canInvite: boolean
+  settings: { expiryDays: 7; language: string; personalMessage: string; sendNow: boolean }
+}
+export type InvitationOptions = {
+  departments: InvitationOptions['companies'][number]['departments']
+  canInvite: boolean
+  companies: { id: string; name: string; groupName: string; requireMfa: boolean; departments: { id: string; name: string; positions: { id: string; name: string }[] }[] }[]
+  roles: { id: string; name: string; permissions: { group: string; page: string; action: string }[] }[]
+}

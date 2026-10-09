@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { type AriaAttributes, useEffect, useId, useRef, useState } from 'react'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import './SidebarSelect.css'
 
@@ -17,7 +17,7 @@ export type SidebarSelectOption =
       hint?: string
     }
 
-type SidebarSelectProps = {
+type SidebarSelectProps = Pick<AriaAttributes, 'aria-invalid' | 'aria-describedby'> & {
   label: string
   value: string
   options: SidebarSelectOption[]

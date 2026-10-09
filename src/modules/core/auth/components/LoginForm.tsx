@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
 import { FormField } from '@/components/ui/FormField'
@@ -27,17 +27,47 @@ export function LoginForm() {
 
   const canSendOtp = Boolean(email.trim())
 
-  async function sendTac() {
-    if (!canSendOtp || sendingTac || isSubmitting) {
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resendAvailableAt, setResendAvailableAt] = useState(0)
+
+  useEffect(() => {
+    if (!resendAvailableAt) {
       return
     }
-    setSendingTac(true)
-    const sent = await handleRequestTac({ email })
-    setSendingTac(false)
-    if (sent) {
+
+    function updateCountdown() {
+      setResendCooldown(
+        Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000)),
+      )
+    }
+
+    updateCountdown()
+    const timer = setInterval(updateCountdown, 1000)
+    return () => clearInterval(timer)
+  }, [resendAvailableAt])
+
+  const cooldownLabel =
+    `${Math.floor(resendCooldown / 60)}m ${resendCooldown % 60}s`
+
+  async function sendTac() {
+  if (!canSendOtp || sendingTac || isSubmitting || resendCooldown > 0) {
+    return
+  }
+
+  setSendingTac(true)
+  const result = await handleRequestTac({ email })
+  setSendingTac(false)
+
+  if (result) {
+    const seconds = result.resendCooldown ?? 60
+    setResendCooldown(seconds)
+    setResendAvailableAt(Date.now() + seconds * 1000)
+
+    if (result.sent) {
       setTacSent(true)
     }
   }
+}
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -78,9 +108,9 @@ export function LoginForm() {
               type="button"
               className="login-form__tac-send"
               onClick={() => void sendTac()}
-              disabled={sendingTac || isSubmitting || !canSendOtp}
+              disabled={sendingTac || isSubmitting || !canSendOtp || resendCooldown > 0}
             >
-              {sendingTac ? t('auth.sendingTac') : tacSent ? t('auth.resendTac') : t('auth.sendTac')}
+              {sendingTac ? t('auth.sendingTac') : resendCooldown > 0 ? `Resend OTP in ${cooldownLabel}` : tacSent ? t('auth.resendTac') : t('auth.sendTac')}
             </button>
           </div>
         </FormField>

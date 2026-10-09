@@ -70,10 +70,10 @@ export type AssistantThread = {
   id: string
   title: string
   group: ThreadGroup
-  updated: string
+  /** ISO 8601 timestamp of the last activity. */
+  updatedAt: string
   pinned?: boolean
   companyId: string
-  /** Which agent this thread last used. Falls back to Auto when absent. */
   agentId?: string
   turns: AssistantTurn[]
 }

@@ -25,6 +25,8 @@ dist-ssr
 
 # TypeScript
 *.tsbuildinfo
+.env.development
+AGENTS.md
 
 # API KEY ENV
 .env

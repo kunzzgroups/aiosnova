@@ -1,6 +1,6 @@
 import type { AiAgent } from '@/modules/ai/agents/types/agent'
 import type { AgentDocumentLink, AgentKnowledgeLink } from '@/modules/ai/shared/assignment'
-import { DEMO_TENANT_ID } from '@/mocks/data/identity'
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 
 /**
  * Agents plus the two relation tables that bind them to knowledge.
@@ -18,7 +18,7 @@ function agent(
   status: AiAgent['status'],
   createdAt: string,
 ): AiAgent {
-  return { id, tenantId: DEMO_TENANT_ID, companyId, name, description, status, createdAt }
+  return { id, merchantId: DEMO_MERCHANT_ID, companyId, name, description, status, createdAt }
 }
 
 export const agents: AiAgent[] = [

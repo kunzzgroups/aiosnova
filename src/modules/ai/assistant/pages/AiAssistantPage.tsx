@@ -51,8 +51,8 @@ import { AssistantSettingsDrawer } from '../components/AssistantSettingsDrawer'
 
 /** Which side rails the reader has folded away. Session-scoped, like the sidebar. */
 const PANELS_STORAGE_KEY = 'aios.ai.panels'
-/** v2: threads carry a companyId. v1 data is discarded on read. */
-const THREADS_STORAGE_KEY = 'aios.ai.threads.v2'
+/** v3: threads carry an ISO `updatedAt` instead of a translated label. */
+const THREADS_STORAGE_KEY = 'aios.ai.threads.v3'
 /** Versioned so the old full-catalogue cache is discarded automatically. */
 const MODELS_STORAGE_KEY = 'aios.ai.models.v2'
 /** Full provider catalogue, kept separately so search has something to reach into. */
@@ -162,6 +162,32 @@ function rich(text: string): ReactNode[] {
 
 function toggleId(ids: string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]
+}
+
+function formatThreadTimestamp(iso: string, locale: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60_000)
+
+  if (diffMin < 1) return locale.startsWith('zh') ? '刚刚' : 'just now'
+  if (diffMin < 60) return locale.startsWith('zh') ? `${diffMin} 分钟前` : `${diffMin}m ago`
+
+  const sameDay = date.toDateString() === now.toDateString()
+  if (sameDay) {
+    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const yesterday = new Date(now.getTime() - 86_400_000)
+  if (date.toDateString() === yesterday.toDateString()) {
+    return locale.startsWith('zh') ? '昨天' : 'Yesterday'
+  }
+
+  return date.toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'short',
+  })
 }
 
 function formatBytes(bytes: number): string {
@@ -334,7 +360,8 @@ function AiModelPicker(props: {
 }
 
 export function AiAssistantPage() {
-  const { t } = useTranslation()
+  // ✅ 修复点 1：在最顶层解构出 i18n
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const companyId = useCompanyStore((state) => state.companyId)
   const companies = useCompanyStore((state) => state.companies)
@@ -387,6 +414,13 @@ export function AiAssistantPage() {
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  /** Only ACTIVE agents can handle a turn. Draft and disabled ones are hidden
+ *  from the composer's picker. */
+  const activeAgents = useMemo(
+    () => agents.filter((agent) => agent.status === 'active'),
+    [agents],
+  )
 
   const activeThread = threads.find((thread) => thread.id === activeThreadId) ?? null
   const turns = activeThread?.turns ?? []
@@ -640,6 +674,13 @@ export function AiAssistantPage() {
     )
   }, [agentId, activeThreadId])
 
+  useEffect(() => {
+    if (agentId === AUTO_AGENT_ID) return
+    if (!activeAgents.some((a) => a.id === agentId)) {
+      setAgentId(AUTO_AGENT_ID)
+    }
+  }, [agentId, activeAgents])
+
   function cancelPendingReply() {
     abortRef.current?.abort()
     abortRef.current = null
@@ -700,9 +741,8 @@ export function AiAssistantPage() {
 
   function openSource(source: AssistantSource) {
     if (!source.baseId) return
-    const target = `/ai/ai/knowledge/${source.baseId}/documents${
-      source.documentId ? `?highlight=${encodeURIComponent(source.documentId)}` : ''
-    }`
+    const target = `/ai/ai/knowledge/${source.baseId}/documents${source.documentId ? `?highlight=${encodeURIComponent(source.documentId)}` : ''
+      }`
     if (prefs.evidenceAction === 'newTab') {
       window.open(target, '_blank', 'noopener,noreferrer')
     } else {
@@ -738,7 +778,7 @@ export function AiAssistantPage() {
           turns: nextTurns,
           title: thread.turns.length === 0 ? turn.question : thread.title,
           group: 'today',
-          updated: t('ai.assistant.justNow'),
+          updatedAt: new Date().toISOString(),
         }
       }),
     )
@@ -768,7 +808,8 @@ export function AiAssistantPage() {
 
     const selectedAgent =
       agentId !== AUTO_AGENT_ID ? agents.find((a) => a.id === agentId) : null
-    const effectiveAgentId = selectedAgent?.id ?? pickDefaultAgentId(agents)
+    const effectiveAgentId =
+      selectedAgent?.id ?? pickDefaultAgentId(activeAgents)
 
     const agentModelId = resolveAgentModelId(selectedAgent?.model)
     const selectedModel = agentModelId ?? modelRef.current
@@ -801,13 +842,15 @@ export function AiAssistantPage() {
         }
       }
 
-      const evidence = effectiveAgentId
-        ? await retrieveEvidence({
-          agentId: effectiveAgentId,
-          question,
-          activeCompanyId: companyId,
-        })
-        : { sources: [], scanned: 0, matched: 0, scope: '' }
+      const rawEvidence = effectiveAgentId
+        ? await retrieveEvidence({ agentId: effectiveAgentId, question, activeCompanyId: companyId })
+        : { sources: [], scanned: 0, matched: 0, scope: '' };
+
+      // ✅ 修复点 2：防御性兜底，防止 sources 不是数组导致崩溃
+      const evidence = {
+        ...rawEvidence,
+        sources: Array.isArray(rawEvidence?.sources) ? rawEvidence.sources : []
+      };
 
       const systemWithContext =
         evidence.sources.length === 0
@@ -867,11 +910,13 @@ export function AiAssistantPage() {
             continue
           }
           try {
-            const parsed = JSON.parse(payload) as {
-              choices?: Array<{ delta?: { content?: string } }>
+            // ✅ 修复点 3：更加安全的流式解析
+            const parsed = JSON.parse(payload) as any;
+            const content = parsed?.choices?.[0]?.delta?.content;
+            if (typeof content === 'string') {
+              full += content;
+              setStreamingText(full);
             }
-            full += parsed.choices?.[0]?.delta?.content ?? ''
-            setStreamingText(full)
           } catch {
             /* half a packet */
           }
@@ -930,7 +975,7 @@ export function AiAssistantPage() {
         id: threadId,
         title: question,
         group: 'today',
-        updated: t('ai.assistant.justNow'),
+        updatedAt: new Date().toISOString(),
         companyId,
         agentId,
         turns: [],
@@ -993,6 +1038,7 @@ export function AiAssistantPage() {
   }
 
   function renderThreadButton(thread: AssistantThread) {
+    // ✅ 修复点 4：删除了这里的 useTranslation()，直接使用组件顶层的 t 和 i18n
     const active = thread.id === activeThreadId
     const threadSources =
       thread.turns.length > 0 ? thread.turns[thread.turns.length - 1].sources : []
@@ -1017,7 +1063,7 @@ export function AiAssistantPage() {
             <span>{thread.title}</span>
           </span>
           <span className="ai-thread__meta">
-            {thread.updated}
+            {formatThreadTimestamp(thread.updatedAt, i18n.language)}
             {threadSources.length > 0
               ? ` · ${t('ai.assistant.evidenceCount', { count: threadSources.length })}`
               : ''}
@@ -1645,7 +1691,11 @@ export function AiAssistantPage() {
                     value={agentId}
                     options={[
                       { value: AUTO_AGENT_ID, label: t('ai.assistant.agentAuto', 'Auto') },
-                      ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
+                      ...activeAgents.map((agent) => ({
+                        value: agent.id,
+                        label: agent.name,
+                        hint: agent.description,
+                      })),
                     ]}
                     onChange={setAgentId}
                     open={openPopover === 'agent'}

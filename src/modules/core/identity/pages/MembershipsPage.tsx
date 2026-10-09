@@ -156,8 +156,7 @@ export function MembershipsPage() {
         <header className="identity-page__header">
           <h1>{t('org.memberships.title')}</h1>
           <p>
-            User relationships to Tenant / Company / Organization / Position (Layer 1 · 06). Not
-            permissions.
+            {t('org.memberships.scopeHint')}
           </p>
         </header>
 

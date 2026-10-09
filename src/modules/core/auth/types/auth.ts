@@ -4,6 +4,8 @@ export type AuthUser = {
   name: string
   mfaEnabled: boolean
   profileComplete: boolean
+  isOwner?: boolean
+  canManageUsers?: boolean
 }
 
 export type LoginSuccessResponse = {
@@ -72,6 +74,28 @@ export type MfaDisableResponse = {
 
 export type MessageResponse = {
   message: string
+}
+
+export type InvitationDetails = {
+  userId: string
+  email: string
+  fullName: string
+  companies: string[]
+  requireMfa: boolean
+  expiresAt: string
+}
+
+export type ActivatedAccount = {
+  userId: string
+  email: string
+  fullName: string
+  requireMfa: boolean
+  mfaEnabled: boolean
+}
+
+export type InvitationMfaSetup = {
+  secret: string
+  qrCodeSvg: string
 }
 
 export function isMfaRequired(response: LoginResponse): response is MfaRequiredResponse {

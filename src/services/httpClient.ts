@@ -3,11 +3,13 @@ import type { AuthUser } from '@/modules/core/auth/types/auth'
 
 export class ApiError extends Error {
   readonly status: number | undefined
+  readonly retryAfter: number | null
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, retryAfter: number | null = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.retryAfter = retryAfter
   }
 }
 
@@ -34,6 +36,7 @@ type RequestOptions = {
   auth?: boolean
   csrf?: boolean
   skipRefresh?: boolean
+  cache?: RequestCache
 }
 
 let refreshPromise: Promise<boolean> | null = null
@@ -78,7 +81,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = false, csrf = false, skipRefresh = false } = options
+  const { method = 'GET', body, auth = false, csrf = false, skipRefresh = false, cache } = options
   const headers = new Headers()
 
   if (body !== undefined) {
@@ -101,6 +104,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const response = await fetch(path, {
     method,
+    cache,
     credentials: 'include',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -115,6 +119,25 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     let message = 'Request failed.'
+    let retryAfter: number | null = null
+
+    const retryAfterHeader = response.headers.get('Retry-After')?.trim()
+
+    if (retryAfterHeader) {
+      if (/^\d+$/.test(retryAfterHeader)) {
+        retryAfter = Number(retryAfterHeader)
+      } else {
+        const retryDate = Date.parse(retryAfterHeader)
+        if (Number.isFinite(retryDate)) {
+          retryAfter = Math.max(0, Math.ceil((retryDate - Date.now()) / 1000))
+        }
+      }
+
+      if (retryAfter !== null && !Number.isFinite(retryAfter)) {
+        retryAfter = null
+      }
+    }
+
     try {
       const errorBody = (await response.json()) as { message?: string }
       if (errorBody.message) {
@@ -123,7 +146,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } catch {
       // ignore JSON parse errors
     }
-    throw new ApiError(message, response.status)
+
+    throw new ApiError(message, response.status, retryAfter)
   }
 
   if (response.status === 204) {

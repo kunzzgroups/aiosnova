@@ -1,5 +1,7 @@
 import { apiRequest } from '@/services/httpClient'
 import type {
+  InvitationPayload,
+  InvitationOptions,
   CompanyOption,
   CompanyRecord,
   IdentityProfilePayload,
@@ -10,7 +12,7 @@ import type {
 } from '@/modules/core/identity/types/identity'
 
 export async function fetchIdentityMeta() {
-  return apiRequest<{ tenantId: string; companies: CompanyOption[] }>('/api/identity/meta', {
+  return apiRequest<{ merchantId: string; companies: CompanyOption[] }>('/api/identity/meta', {
     auth: true,
   })
 }
@@ -76,17 +78,12 @@ export async function fetchUser(id: string) {
   )
 }
 
-export async function createUser(payload: {
-  email: string
-  password: string
-  companyId: string
-  status?: IdentityUser['status']
-}) {
-  return apiRequest<IdentityUser>('/api/identity/users', {
-    method: 'POST',
-    auth: true,
-    body: payload,
-  })
+export async function fetchInvitationOptions() {
+  return apiRequest<InvitationOptions>('/api/identity/invitation-options', { auth: true })
+}
+
+export async function createUser(payload: InvitationPayload) {
+  return apiRequest<IdentityUser>('/api/identity/users', { method: 'POST', auth: true, body: payload })
 }
 
 export async function updateUser(id: string, payload: IdentityProfilePayload) {
@@ -221,5 +218,11 @@ export async function updateMembership(
     method: 'PATCH',
     auth: true,
     body: payload,
+  })
+}
+
+export async function updateInvitation(id: string, payload: InvitationPayload) {
+  return apiRequest<IdentityUser>(`/api/identity/users/${id}/invitation`, {
+    method: 'PATCH', auth: true, body: payload,
   })
 }
