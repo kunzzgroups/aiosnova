@@ -1,4 +1,12 @@
 export const org: Record<string, string> = {
+  'org.selectPosition': '选择{{name}}',
+  'org.selectAllPositions': '选择本页所有职位',
+  'org.deletePositionsTitle_one': '删除 {{count}} 个职位？',
+  'org.deletePositionsTitle_other': '删除 {{count}} 个职位？',
+  'org.deletePositionsImpact_one': '删除此已停用的职位。此操作无法撤销。',
+  'org.deletePositionsImpact_other': '删除这 {{count}} 个已停用的职位。此操作无法撤销。',
+  'org.deletedPositions_one': '已删除 {{count}} 个职位。',
+  'org.deletedPositions_other': '已删除 {{count}} 个职位。',
   'org.department': '部门',
   'org.level': '职级',
   'org.levelManager': '管理人员',

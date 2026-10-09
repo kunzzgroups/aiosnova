@@ -1,4 +1,12 @@
 export const org: Record<string, string> = {
+  'org.selectPosition': 'Select {{name}}',
+  'org.selectAllPositions': 'Select all positions on this page',
+  'org.deletePositionsTitle_one': 'Delete {{count}} position?',
+  'org.deletePositionsTitle_other': 'Delete {{count}} positions?',
+  'org.deletePositionsImpact_one': 'Delete this inactive position. This cannot be undone.',
+  'org.deletePositionsImpact_other': 'Delete these {{count}} inactive positions. This cannot be undone.',
+  'org.deletedPositions_one': '{{count}} position deleted.',
+  'org.deletedPositions_other': '{{count}} positions deleted.',
   'org.department': 'Department',
   'org.level': 'Level',
   'org.levelManager': 'Manager',

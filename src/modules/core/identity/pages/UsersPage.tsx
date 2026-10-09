@@ -2,11 +2,14 @@ import { useCallback,useContext,useEffect,useMemo,useRef,useState,type FormEvent
 import { Link,useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
+import { TablePanel } from '@/components/ui/TablePanel'
+import { TablePagination } from '@/components/ui/TablePagination'
+import { TableToolbar } from '@/components/ui/TableToolbar'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { IconButton } from '@/components/ui/IconButton'
 import { Popover } from '@/components/ui/Popover'
-import { IconBuilding } from '@/components/navigation/SidebarIcons'
+import { IconBuilding, IconSearch } from '@/components/navigation/SidebarIcons'
 import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
@@ -49,17 +52,7 @@ const STATUS_FILTERS=['all','active','invited','draft','disabled'] as const
 const MFA_FILTERS=['all','enabled','disabled'] as const
 
 
-function paginationItems(current: number, total: number): (number | 'backward' | 'forward')[] {
-  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
-  const start = Math.max(2, Math.min(current - 2, total - 5))
-  const end = Math.min(total - 1, Math.max(current + 2, 6))
-  const items: (number | 'backward' | 'forward')[] = [1]
-  if (start > 2) items.push('backward')
-  for (let number = start; number <= end; number++) items.push(number)
-  if (end < total - 1) items.push('forward')
-  items.push(total)
-  return items
-}
+
 
 function matchesSearch(user: IdentityUser,query: string) {
   if(!query) {
@@ -132,6 +125,11 @@ export function UsersPage() {
   const [statusUpdatingId,setStatusUpdatingId]=useState<string|null>(null)
   const [deletingId,setDeletingId]=useState<string|null>(null)
   const [pendingDelete,setPendingDelete]=useState<IdentityUser|null>(null)
+  const [selectedUserIds,setSelectedUserIds]=useState<string[]>([])
+  const [pendingBulkDeleteIds,setPendingBulkDeleteIds]=useState<string[]>([])
+  const [isBulkDeleting,setIsBulkDeleting]=useState(false)
+  const selectAllUsersRef=useRef<HTMLInputElement>(null)
+  const deleteInProgress=useRef(false)
 
   const loadUsers=useCallback(async () => {
     setIsLoading(true)
@@ -254,6 +252,13 @@ export function UsersPage() {
   const pageCount=Math.max(1,Math.ceil(filteredUsers.length/effectivePageSize))
   const currentPage=Math.min(page,pageCount)
   const visibleUsers=filteredUsers.slice((currentPage-1)*effectivePageSize,currentPage*effectivePageSize)
+  const selectedUsers=statusFilter==='disabled'&&isOwner ? filteredUsers.filter(user=>user.status==='disabled'&&user.id!==sessionUser?.id&&selectedUserIds.includes(user.id)) : []
+  const selectableVisibleUsers=visibleUsers.filter(user=>user.status==='disabled'&&user.id!==sessionUser?.id)
+  const allVisibleUsersSelected=selectableVisibleUsers.length>0&&selectableVisibleUsers.every(user=>selectedUserIds.includes(user.id))
+  const someVisibleUsersSelected=selectableVisibleUsers.some(user=>selectedUserIds.includes(user.id))
+  const pendingBulkUsers=users.filter(user=>pendingBulkDeleteIds.includes(user.id))
+  useEffect(()=>{setSelectedUserIds([]);setPendingBulkDeleteIds([])},[query,statusFilter,companyFilter,mfaFilter,sessionUser?.id,showInvite])
+  useEffect(()=>{if(selectAllUsersRef.current) selectAllUsersRef.current.indeterminate=someVisibleUsersSelected&&!allVisibleUsersSelected},[someVisibleUsersSelected,allVisibleUsersSelected,statusFilter,isOwner])
   useEffect(() => { setPage(1) },[query,statusFilter,companyFilter,mfaFilter,effectivePageSize,sort])
   useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,effectivePageSize])
   useEffect(() => {
@@ -375,7 +380,7 @@ export function UsersPage() {
   }
 
   async function handleToggleStatus(user: IdentityUser) {
-    if (!canManageUserStatus || user.isOwner || statusUpdatingId || !['active','disabled'].includes(user.status)) return
+    if (!canManageUserStatus || user.isOwner || statusUpdatingId || deletingId || isBulkDeleting || !['active','disabled'].includes(user.status)) return
     const nextStatus: UserStatus=user.status==='disabled'? 'active':'disabled'
     setError(null)
     setMessage(null)
@@ -391,6 +396,7 @@ export function UsersPage() {
   }
 
   function requestDelete(user: IdentityUser) {
+    if(!isOwner||user.status!=='disabled'||deleteInProgress.current) return
     if(sessionUser?.id===user.id) {
       setError(t('users.deleteSelf'))
       return
@@ -400,9 +406,8 @@ export function UsersPage() {
   }
 
   async function handleConfirmDelete() {
-    if(!pendingDelete) {
-      return
-    }
+    if(!isOwner||!pendingDelete||pendingDelete.status!=='disabled'||pendingDelete.id===sessionUser?.id||deleteInProgress.current) return
+    deleteInProgress.current=true
     setError(null)
     setMessage(null)
     setDeletingId(pendingDelete.id)
@@ -414,8 +419,29 @@ export function UsersPage() {
     } catch(err) {
       setError(err instanceof ApiError? err.message:t('users.errDelete'))
     } finally {
+      deleteInProgress.current=false
       setDeletingId(null)
     }
+  }
+
+  async function handleBulkDelete() {
+    if(!isOwner||deleteInProgress.current||!pendingBulkUsers.length||pendingBulkUsers.some(user=>user.status!=='disabled'||user.id===sessionUser?.id)) return
+    deleteInProgress.current=true
+    const actorId=sessionUser?.id
+    setError(null);setMessage(null);setIsBulkDeleting(true)
+    try {
+      for(const user of pendingBulkUsers) {
+        if(useAuthStore.getState().user?.id!==actorId) return
+        await deleteUser(user.id)
+        if(useAuthStore.getState().user?.id!==actorId) return
+        setUsers(current=>current.filter(item=>item.id!==user.id))
+        setSelectedUserIds(current=>current.filter(id=>id!==user.id))
+        setPendingBulkDeleteIds(current=>current.filter(id=>id!==user.id))
+      }
+      setMessage(t('users.bulkDeleted',{ count:pendingBulkUsers.length }))
+    } catch(err) {
+      if(useAuthStore.getState().user?.id===actorId) setError(err instanceof ApiError ? err.message : t('users.errDelete'))
+    } finally {deleteInProgress.current=false;setIsBulkDeleting(false)}
   }
 
   return (
@@ -427,26 +453,27 @@ export function UsersPage() {
         onClearMessage={() => setMessage(null)}
       />
 
-      <section className="identity-panel identity-directory-panel identity-directory-design" hidden={showInvite}>
-        <div className="identity-directory-toolbar">
+      <TablePanel hidden={showInvite}>
+        <TableToolbar
+          search={<><IconSearch aria-hidden="true" />
           <TextField
-            className="identity-directory-toolbar__search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('users.directorySearch')}
             aria-label={t('users.directorySearchAria')}
           />
-          <div className="identity-directory-toolbar__filters">
-            <SidebarSelect id="directory-company" className="directory-design-company-filter" label={t('users.filterCompany')} value={companyFilter}
+          </>}
+          filters={<>
+            <SidebarSelect id="directory-company" label={t('users.filterCompany')} value={companyFilter}
               options={[{ value:'all',label:t('users.filterAll') },...companies.map(company => ({ value:company.id,label:company.name }))]} onChange={setCompanyFilter} />
             <SidebarSelect id="directory-status" label={t('users.filterStatus')} value={statusFilter}
               options={STATUS_FILTERS.map((value) => ({ value,label:statusLabel(value) }))} onChange={setStatusFilter} />
             <SidebarSelect id="directory-mfa" label={t('users.filterMfa')} value={mfaFilter}
               options={MFA_FILTERS.map((value) => ({ value,label:mfaLabel(value) }))} onChange={setMfaFilter} />
-          </div>
-          {inviteOptions?.canInvite? <Button className="identity-directory-invite-button" onClick={handleToggleInvite}>{t('users.inviteUser')}</Button>:null}
-        </div>
+          </>}
+          actions={<>{selectedUsers.length>1 ? <Button variant="danger" disabled={Boolean(deletingId)||isBulkDeleting||Boolean(statusUpdatingId)} onClick={()=>{setError(null);setPendingBulkDeleteIds(selectedUsers.map(user=>user.id))}}><IconTrash aria-hidden="true" />{t('users.actionDelete')}</Button> : null}{inviteOptions?.canInvite? <Button disabled={Boolean(deletingId)||isBulkDeleting} onClick={handleToggleInvite}>{t('users.inviteUser')}</Button>:null}</>}
+        />
 
 
 
@@ -460,7 +487,7 @@ export function UsersPage() {
             <table className={`identity-table identity-table--packed directory-design-table${pageSize===0 ? ' directory-design-table--auto-fit' : ''}`}>
               <thead>
                 <tr>
-                  <th aria-sort={sort.key==='employee' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('employee',t('users.designEmployee'))}</th>
+                  <th aria-sort={sort.key==='employee' ? sort.descending ? 'descending' : 'ascending' : 'none'}><span className="directory-design-employee">{statusFilter==='disabled'&&isOwner ? <input ref={selectAllUsersRef} type="checkbox" className="directory-design-checkbox" aria-label={t('users.selectAllUsers')} disabled={!selectableVisibleUsers.length||Boolean(deletingId)||isBulkDeleting||Boolean(statusUpdatingId)} checked={allVisibleUsersSelected} onChange={event=>{const checked=event.target.checked;setSelectedUserIds(current=>checked ? [...new Set([...current,...selectableVisibleUsers.map(user=>user.id)])] : current.filter(id=>!selectableVisibleUsers.some(user=>user.id===id)))}} /> : null}{sortHeading('employee',t('users.designEmployee'))}</span></th>
                   <th aria-sort={sort.key==='companies' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('companies',t('users.designCompanies'))}</th>
                   <th className="identity-table__status" aria-sort={sort.key==='status' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('status',t('users.colStatus'))}</th>
                   <th aria-sort={sort.key==='mfa' ? sort.descending ? 'descending' : 'ascending' : 'none'}>{sortHeading('mfa',t('users.colMfa'))}</th>
@@ -479,6 +506,7 @@ export function UsersPage() {
                   <tr key={user.id}>
                     <td>
                       <div className="directory-design-employee">
+                        {statusFilter==='disabled'&&isOwner ? <input type="checkbox" className="directory-design-checkbox" aria-label={t('users.selectUser',{ name:user.displayName })} disabled={user.id===sessionUser?.id||Boolean(deletingId)||isBulkDeleting||Boolean(statusUpdatingId)} checked={selectedUserIds.includes(user.id)} onChange={event=>{const checked=event.target.checked;setSelectedUserIds(current=>checked ? [...current,user.id] : current.filter(id=>id!==user.id))}} /> : null}
                         <span className="directory-design-avatar" aria-hidden="true">{user.displayName.trim().split(/\s+/).slice(0,2).map(name => name[0]).join('').toUpperCase()}</span>
                         <div className="directory-design-identity">
                           <Link className="identity-text-link" to={'/system/core/employees/'+user.id}>{user.displayName}</Link>
@@ -504,11 +532,11 @@ export function UsersPage() {
                     <td className="identity-table__status">
                       {canManageUserStatus && !user.isOwner && ['active','disabled'].includes(user.status) ? (
                         <button type="button" className={`identity-status identity-status--${user.status} identity-status--interactive`}
-                          disabled={statusUpdatingId!==null} aria-busy={statusUpdatingId===user.id}
+                          disabled={statusUpdatingId!==null||Boolean(deletingId)||isBulkDeleting} aria-busy={statusUpdatingId===user.id}
                           aria-label={t(user.status==='active'? 'users.deactivateUser':'users.activateUser', { name: user.displayName })}
                           title={t(user.status==='active'? 'users.deactivateUser':'users.activateUser', { name: user.displayName })}
                           onClick={() => void handleToggleStatus(user)}>
-                          {formatStatusLabel(user.status,t)}
+                          {statusUpdatingId===user.id ? t('users.updating') : formatStatusLabel(user.status,t)}
                         </button>
                       ) : <span className={`identity-status identity-status--${user.status}`}>{formatStatusLabel(user.status,t)}</span>}
                     </td>
@@ -531,19 +559,10 @@ export function UsersPage() {
                     </td>
                     <td className="identity-table__actions">
                       <div className="identity-inline-actions identity-directory-actions">
-                        <span style={{ visibility: canEdit ? 'visible' : 'hidden' }}>
-                          <IconButton label={t(user.status==='draft' ? 'users.continueDraft' : 'users.actionEdit')}
-                            onClick={() => user.status==='draft' ? openDraft(user) : navigate('/system/core/employees/'+user.id+'?edit=1')}>
-                            <IconPencil />
-                          </IconButton>
-                        </span>
-                        <IconButton label={t('users.actionView')} onClick={() => navigate('/system/core/employees/'+user.id)}>
-                          <IconEye />
-                        </IconButton>
-                        {isOwner ? <IconButton label={t(sessionUser?.id===user.id ? 'users.deleteSelf' : 'users.actionDelete')}
-                          variant="danger" disabled={deletingId===user.id||sessionUser?.id===user.id} onClick={() => requestDelete(user)}>
-                          <IconTrash />
-                        </IconButton> : null}
+                        {user.status==='disabled' ? isOwner ? <IconButton label={t(sessionUser?.id===user.id ? 'users.deleteSelf' : 'users.actionDelete')} variant="danger" disabled={Boolean(deletingId)||isBulkDeleting||Boolean(statusUpdatingId)||sessionUser?.id===user.id} onClick={()=>requestDelete(user)}><IconTrash /></IconButton> : null : <>
+                          <span style={{ visibility:canEdit ? 'visible' : 'hidden' }}><IconButton label={t(user.status==='draft' ? 'users.continueDraft' : 'users.actionEdit')} onClick={()=>user.status==='draft' ? openDraft(user) : navigate('/system/core/employees/'+user.id+'?edit=1')}><IconPencil /></IconButton></span>
+                          <IconButton label={t('users.actionView')} onClick={()=>navigate('/system/core/employees/'+user.id)}><IconEye /></IconButton>
+                        </>}
                       </div>
                     </td>
                   </tr>
@@ -552,29 +571,8 @@ export function UsersPage() {
             </table>
           </div>
         ):null}
-        <footer className="identity-directory-footer">
-          <div className="identity-directory-footer__listing">
-            <label htmlFor="directory-page-size">{t('users.rowsPerPage')}</label>
-            <SidebarSelect id="directory-page-size" hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} title={pageSize===0? t('users.autoRowsHint', { count: autoPageSize }):undefined} value={String(pageSize)} options={[{ value: '0', label: '–' }, ...[10,25,50,100,200].map(n => ({ value: String(n), label: String(n) }))]} onChange={value => setPageSize(Number(value))} />
-            <span>{t('users.listingRange', { start: filteredUsers.length ? (currentPage-1)*effectivePageSize+1 : 0, end: Math.min(currentPage*effectivePageSize,filteredUsers.length), total: filteredUsers.length })}</span>
-          </div>
-          <nav className="identity-pagination" aria-label={t('users.directoryPages')}>
-            <Button variant="secondary" disabled={currentPage===1} onClick={() => setPage(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>
-            {paginationItems(currentPage,pageCount).map(item => {
-              if (typeof item === 'number') return (
-                <Button key={item} variant="secondary" aria-label={t('users.pageNumber', { page: item })} aria-current={item===currentPage? 'page':undefined} onClick={() => setPage(item)}>{item}</Button>
-              )
-              const backward = item === 'backward'
-              const label = t(backward ? 'users.jumpBackPages' : 'users.jumpForwardPages')
-              return <Button key={item} variant="ghost" className="identity-pagination__jump" aria-label={label} title={label} onClick={() => setPage(Math.max(1,Math.min(pageCount,currentPage + (backward ? -5 : 5))))}>
-                <span className="identity-pagination__ellipsis" aria-hidden>•••</span>
-                <span className="identity-pagination__jump-arrow" aria-hidden>{backward ? '«' : '»'}</span>
-              </Button>
-            })}
-            <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => setPage(currentPage+1)} aria-label={t('users.nextPage')}>›</Button>
-          </nav>
-        </footer>
-      </section>
+        <TablePagination id="directory-page-size" total={filteredUsers.length} pageSize={pageSize} autoPageSize={autoPageSize} effectivePageSize={effectivePageSize} currentPage={currentPage} pageCount={pageCount} pagesLabel={t('users.directoryPages')} onPageSizeChange={setPageSize} onPageChange={setPage} />
+      </TablePanel>
 
 
       {showInvite? <form noValidate className="identity-invite identity-invite--page" onSubmit={e => void handleCreate(e)}>
@@ -645,8 +643,9 @@ export function UsersPage() {
         </footer>
       </form>:null}
 
+      <ConfirmDialog open={Boolean(pendingBulkDeleteIds.length&&isOwner)} title={t('users.bulkDeleteTitle',{ count:pendingBulkUsers.length })} description={<div className="directory-design-delete-copy"><p>{t('users.bulkDeleteDescription',{ count:pendingBulkUsers.length })}</p><ul className="directory-design-delete-list">{pendingBulkUsers.map(user=><li key={user.id}>{user.displayName}<small>{user.email}</small></li>)}</ul></div>} warning={t('users.bulkDeleteMockWarning')} confirmLabel={t('users.deleteConfirm')} cancelLabel={t('users.cancel')} busyLabel={t('users.bulkDeleting')} busy={isBulkDeleting} onConfirm={()=>void handleBulkDelete()} onCancel={()=>{if(!isBulkDeleting) setPendingBulkDeleteIds([])}} />
       <ConfirmDialog
-        open={Boolean(pendingDelete)}
+        open={Boolean(pendingDelete&&isOwner)}
         title={t('users.deleteTitle')}
         description={
           pendingDelete? (
