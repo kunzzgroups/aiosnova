@@ -1,5 +1,5 @@
-import type { KnowledgeBase, KnowledgeDocument } from '@/modules/ai/knowledge/types/knowledge'
 import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
+import type { KnowledgeBase, KnowledgeDocument } from '@/modules/ai/knowledge/types/knowledge'
 
 /**
  * Knowledge bases are seeded per company so the sidebar company switcher visibly

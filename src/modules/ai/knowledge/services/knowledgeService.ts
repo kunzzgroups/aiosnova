@@ -1,3 +1,4 @@
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import { apiRequest } from '@/services/httpClient'
 import { ApiError } from '@/services/httpClient'
 import type {
@@ -125,7 +126,7 @@ export async function createKnowledgeBase(payload: {
     const now = new Date().toISOString()
     const base = {
       id: nextId('kb'),
-      tenantId: 'tenant-demo',
+      merchantId: DEMO_MERCHANT_ID,
       companyId: payload.companyId,
       allowedCompanyIds: [payload.companyId],
       name: payload.name,
