@@ -1,3 +1,4 @@
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import { apiRequest } from '@/services/httpClient'
 import type {
   AgentDetail,
@@ -64,7 +65,7 @@ export async function createAgent(payload: {
     const now = new Date().toISOString()
     const agent = {
       id: nextId('ag'),
-      tenantId: 'tenant-demo',
+      merchantId: DEMO_MERCHANT_ID,
       companyId: payload.companyId || 'company-demo',
       name: payload.name,
       description: payload.description,

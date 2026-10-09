@@ -5,6 +5,8 @@
  * the first argument. Nothing bypasses `permissions.ts` by accident.
  */
 
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
+import type { AgentListItem } from '@/modules/ai/agents/types/agent'
 import {
   SEED_AGENTS,
   SEED_KNOWLEDGE_BASES,
@@ -128,10 +130,10 @@ export function setDocumentOverride(documentId: string, agentIds: string[] | nul
 /* Row projections                                                     */
 /* ------------------------------------------------------------------ */
 
-export function toAgentListItem(agent: SeedAgent) {
+export function toAgentListItem(agent: SeedAgent): AgentListItem {
   return {
     id: agent.id,
-    tenantId: agent.tenantId,
+    merchantId: agent.merchantId,
     companyId: agent.companyId,
     name: agent.name,
     description: agent.description,
@@ -164,7 +166,7 @@ export function toBaseListItem(base: SeedKnowledgeBase) {
 
   return {
     id: base.id,
-    tenantId: base.tenantId,
+    merchantId: base.merchantId,
     companyId: base.companyId,
     allowedCompanyIds: [...base.allowedCompanyIds],
     name: base.name,
@@ -284,7 +286,7 @@ export function adoptTemplate(
 
   const base: SeedKnowledgeBase = {
     id: baseId,
-    tenantId: 'tenant-demo',
+    merchantId: DEMO_MERCHANT_ID,
     companyId: payload.companyId,
     // Adopted bases start owner-only; visibility can be widened later.
     allowedCompanyIds: [payload.companyId],

@@ -31,7 +31,7 @@ export type KnowledgeDocumentType = 'contract' | 'invoice' | 'policy' | 'record'
 
 export type KnowledgeBase = {
   id: string
-  tenantId: string
+  merchantId: string
   /** Owning company. Write permission is gated by this. */
   companyId: string
   /**
