@@ -57,7 +57,6 @@ const MODELS_BY_PROVIDER: Record<AgentModelProvider, string[]> = {
 export function AgentsPage() {
   const { t } = useTranslation()
   const companyId = useCompanyStore((state) => state.companyId)
-  const companies = useCompanyStore((state) => state.companies)
 
   const [searchParams, setSearchParams] = useSearchParams()
   const highlightAgentId = searchParams.get('agentId')
