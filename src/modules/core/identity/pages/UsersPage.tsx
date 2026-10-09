@@ -453,7 +453,7 @@ export function UsersPage() {
         {isLoading? <p className="identity-empty">{t('users.loading')}</p>:null}
         {!isLoading&&users.length===0? <p className="identity-empty">{t('users.empty')}</p>:null}
         {!isLoading&&users.length>0&&filteredUsers.length===0? (
-          <p className="identity-empty">{t('users.emptyFiltered')}</p>
+          <div className="identity-empty directory-design-empty"><p role="status">{t('users.emptyFiltered')}</p>{query||companyFilter!=='all'||statusFilter!=='all'||mfaFilter!=='all' ? <Button variant="secondary" onClick={()=>{setQuery('');setCompanyFilter('all');setStatusFilter('all');setMfaFilter('all')}}>{t('users.clearFilters')}</Button> : null}</div>
         ):null}
         {filteredUsers.length>0? (
           <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('users.staffDirectory')}>

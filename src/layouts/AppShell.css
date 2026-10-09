@@ -88,6 +88,12 @@
 }
 
 .app-shell__header-copy { min-width: 0; }
+.app-shell__header-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
 .app-shell__header-description {
   margin: .25rem 0 0;
   font-size: var(--text-sm);

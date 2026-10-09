@@ -1,4 +1,5 @@
 export const users: Record<string, string> = {
+  'users.clearFilters': 'Clear filters',
   'users.assignedCompanies': 'Assigned companies',
   'users.designEmployee': 'Employee',
   'users.designCompanies': 'Companies',
