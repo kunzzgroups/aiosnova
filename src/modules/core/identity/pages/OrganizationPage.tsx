@@ -56,7 +56,7 @@ export function OrganizationPage() {
   const [levelFilter,setLevelFilter]=useState('all')
   const [statusFilter,setStatusFilter]=useState('active')
   const [positionSort,setPositionSort]=useState<{ key:PositionSortKey; descending:boolean }>({ key:'name',descending:false })
-  const [positionLevel,setPositionLevel]=useState<NonNullable<PositionRecord['level']> | ''>('staff')
+  const [positionLevel,setPositionLevel]=useState<NonNullable<PositionRecord['level']>>('staff')
   const [pageSize,setPageSize]=useState(0)
   const [autoPageSize,setAutoPageSize]=useState(10)
   const autoFitRowMeasurement=useRef({ width:0,height:0 })
@@ -78,8 +78,7 @@ export function OrganizationPage() {
   const [deleteError,setDeleteError]=useState<string|null>(null)
   const [updatingStatusId,setUpdatingStatusId]=useState<string|null>(null)
   const [editorError,setEditorError]=useState<string|null>(null)
-  const [notice,setNotice]=useState('')
-  const [positionMessage,setPositionMessage]=useState('')
+  const [successMessage,setSuccessMessage]=useState('')
   const [recentIds,setRecentIds]=useState<string[]>([])
   const [isLoading,setIsLoading]=useState(true)
   const [isSubmitting,setIsSubmitting]=useState(false)
@@ -113,7 +112,7 @@ export function OrganizationPage() {
 
   useEffect(() => {
     let current=true
-    setEditor(null); setPendingDelete(null); setItems([]); setPositions([]); setUsers([]); setMemberships([]); setError(null); setLoadError(null); setDeleteError(null); setNotice(''); setPositionMessage(''); setRecentIds([])
+    setEditor(null); setPendingDelete(null); setItems([]); setPositions([]); setUsers([]); setMemberships([]); setError(null); setLoadError(null); setDeleteError(null); setSuccessMessage(''); setRecentIds([])
     if (!companyId||!companies.some(company=>company.value===companyId)) { setIsLoading(false); return }
     setIsLoading(true)
     Promise.all([fetchOrganizations(companyId),fetchPositions(companyId),fetchUsers(),fetchMemberships()]).then(([organizations,positionResult,userResult,membershipResult]) => {
@@ -136,7 +135,7 @@ export function OrganizationPage() {
     setInputName(''); setNameError(null); setPendingManagedIds([])
     setPlacement(next.kind==='department' ? organization?.parentId&&departmentIds.has(organization.parentId) ? organization.parentId : next.parentId||'' : position ? departmentIds.has(position.organizationId||'') ? position.organizationId! : 'company' : next.organizationId||'')
     setManagerId(organization?.managerPositionId||'')
-    setPositionLevel(position ? position.level||'' : 'staff')
+    setPositionLevel(position&&(!position.organizationId||!departmentIds.has(position.organizationId)) ? 'executive' : position?.level==='manager' ? 'manager' : 'staff')
     setDrafts(!next.item ? [] : [{ id:++draftId.current,name:next.item?.name||'',status:next.item?.status||'active',managedIds:position ? roots.filter(d=>d.managerPositionId===position.id).map(d=>d.id) : [] }])
     setEditor(next)
   }
@@ -177,7 +176,7 @@ export function OrganizationPage() {
           setItems(current => editor.item ? current.map(item => item.id===result.id ? result : item) : [...current,result])
           created.push(result.id)
         } else {
-          const payload={ name:row.name,organizationId:placement==='company' ? null : placement,level:positionLevel||undefined }
+          const payload={ name:row.name,organizationId:placement==='company' ? null : placement,level:placement==='company' ? 'executive' as const : positionLevel }
           const result=editor.item ? await updatePosition(editor.item.id,payload) : row.positionId ? positions.find(p=>p.id===row.positionId)! : await createPosition({ ...payload,companyId:scope })
           if (useCompanyStore.getState().companyId!==scope) return
           setPositions(current => current.some(item=>item.id===result.id) ? current.map(item=>item.id===result.id ? result : item) : [...current,result])
@@ -194,8 +193,7 @@ export function OrganizationPage() {
         if (!editor.item) setDrafts(current => current.filter(d=>d.id!==row.id))
       }
       if (useCompanyStore.getState().companyId!==scope) return
-      if (editor.kind==='position') setNotice('')
-      setRecentIds(created); setSearch(''); setTab('departments'); setCollapsed({}); (editor.kind==='position' ? setPositionMessage : setNotice)(t(editor.item ? 'org.saved' : 'org.addedItems',{ count:created.length })); setEditor(null)
+      setRecentIds(created); setSearch(''); setTab('departments'); setCollapsed({}); setSuccessMessage(t(editor.item ? 'org.saved' : 'org.addedItems',{ count:created.length })); setEditor(null)
     } catch(err) {
       if (useCompanyStore.getState().companyId===scope) setEditorError(err instanceof ApiError ? err.message : t('org.errUpdateOrganization'))
     } finally { submittingRef.current=false; setIsSubmitting(false) }
@@ -284,16 +282,25 @@ export function OrganizationPage() {
   }
   const visibleLeaders=leaders.filter(p=>!query||p.name.toLocaleLowerCase().includes(query)||roots.some(d=>d.managerPositionId===p.id&&matches(d)))
   const ungrouped=roots.filter(d=>!leaders.some(p=>p.id===d.managerPositionId))
+  function renderPositionDepartment(position:PositionRecord) {
+    const department=departments.find(d=>d.id===position.organizationId)
+    if (department) return department.name
+    const managed=departments.filter(d=>d.managerPositionId===position.id).map(d=>d.name)
+    return <span className="organization-position-placement"><span className="organization-position-placement__badge">{t('org.companyWidePlacement')}</span>{managed.length ? <span className="organization-position-placement__managed">{t('org.managedDepartmentNames',{ names:new Intl.ListFormat(i18n.language,{ style:'short',type:'conjunction' }).formatToParts(managed).map(part=>part.type==='literal' ? part.value.replace(/,\s*&/g,' &') : part.value).join('') })}</span> : null}</span>
+  }
+  function displayedLevel(position:PositionRecord) {
+    return !departmentIds.has(position.organizationId||'') ? 'executive' : position.level
+  }
   const today=new Date().toLocaleDateString('en-CA')
   const filteredPositions=positions.filter(position=>(!query||position.name.toLocaleLowerCase().includes(query))
-    &&(departmentFilter==='all'||(departmentFilter==='executive' ? !departmentIds.has(position.organizationId||'') : position.organizationId===departmentFilter))
-    &&(levelFilter==='all'||position.level===levelFilter)
+    &&(departmentFilter==='all'||position.organizationId===departmentFilter)
+    &&(levelFilter==='all'||displayedLevel(position)===levelFilter)
     &&(statusFilter==='all'||position.status===statusFilter)).sort((a,b)=>{
       const value=(position:PositionRecord)=>{
         switch(positionSort.key) {
           case 'name': return position.name
-          case 'department': return departments.find(d=>d.id===position.organizationId)?.name||t('org.companyWide')
-          case 'level': return position.level ? t(position.level==='manager' ? 'org.levelManager' : 'org.levelStaff') : t(position.level===null ? 'org.levelNotApplicable' : 'org.levelNotSet')
+          case 'department': return departments.find(d=>d.id===position.organizationId)?.name||t('org.companyWidePlacement')
+          case 'level': return displayedLevel(position) ? t(displayedLevel(position)==='executive' ? 'org.levelExecutive' : displayedLevel(position)==='manager' ? 'org.levelManager' : 'org.levelStaff') : t(position.level===null ? 'org.levelNotApplicable' : 'org.levelNotSet')
           case 'employees': return employeeCount(position.id)
           case 'status': return t(position.status==='active' ? 'org.statusActive' : 'org.statusInactive')
         }
@@ -367,12 +374,11 @@ export function OrganizationPage() {
   }
 
   return <div className="identity-page organization-page">
-    <FlashToasts error={error} message={positionMessage} onClearError={()=>setError(null)} onClearMessage={()=>setPositionMessage('')} />
+    <FlashToasts error={error} message={successMessage} onClearError={()=>setError(null)} onClearMessage={()=>setSuccessMessage('')} />
     <section className="organization-panel" aria-busy={isLoading}>
       <div className="organization-toolbar"><div className="organization-tabs" role="tablist" aria-label={t('org.views')}>
         {(['departments','positions'] as const).map((value,index)=><button key={value} id={'organization-tab-'+value} type="button" role="tab" aria-selected={tab===value} aria-controls={'organization-panel-'+value} tabIndex={tab===value ? 0 : -1} onClick={()=>setTab(value)} onKeyDown={event=>{if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {event.preventDefault();const next=event.key==='Home' ? 'departments' : event.key==='End' ? 'positions' : index ? 'departments' : 'positions';setTab(next);document.getElementById('organization-tab-'+next)?.focus()}}}>{t(value==='departments' ? 'org.departmentsTitle' : 'org.positionsTab')}</button>)}
       </div>{tab==='departments' ? <div className="organization-search"><IconSearch aria-hidden="true" /><TextField type="search" disabled={isLoading||Boolean(loadError)||!company} aria-label={t('org.search')} placeholder={t('org.search')} value={search} onChange={event=>setSearch(event.target.value)} /></div> : null}{tab==='departments'&&canManage&&companyId ? <Button disabled={isLoading||busy} onClick={()=>openEditor({ kind:'department' })}>{t('org.addDepartment')}</Button> : null}</div>
-      {notice&&tab==='departments' ? <p className="organization-notice" role="status">{notice}</p> : null}
       {isLoading ? <div className="organization-load-state" role="status"><p>{t('org.loadingStructure')}</p><div className="organization-skeleton" aria-hidden="true">{[0,1,2].map(index=><div key={index}><span /><span /></div>)}</div></div> : loadError ? <div className="organization-load-state organization-load-state--error" role="alert"><h2>{t('org.loadFailed')}</h2><p>{loadError.message}</p>{loadError.retryable ? <Button variant="secondary" onClick={()=>{setIsLoading(true);setReloadKey(current=>current+1)}}>{t('org.retry')}</Button> : null}</div> : !company ? <p className="identity-empty">{t('org.selectActiveCompany')}</p> : <>
         <div id="organization-panel-departments" role="tabpanel" aria-labelledby="organization-tab-departments" hidden={tab!=='departments'}>
           {visibleLeaders.map(leader=>{const managed=roots.filter(d=>d.managerPositionId===leader.id),key='leader-'+leader.id,open=Boolean(query)||!(collapsed[key]??true);return <section className="organization-leadership" key={leader.id}><div className="organization-department__header"><button className="organization-expand" type="button" aria-expanded={open} aria-controls={key} onClick={()=>setCollapsed(current=>({ ...current,[key]:!(current[key]??true) }))}><IconChevron aria-hidden="true" /><span className="organization-department__label"><span className="organization-department__name">{leader.name}</span><span className="organization-count">{t('org.companyWide')}</span></span></button><div className="organization-header-meta"><span className="organization-count">{t('org.departmentCount',{ count:managed.length })}</span>{status(leader.status,leader,'position')}</div>{actions('position',leader)}</div><div id={key} hidden={!open}>{managed.length ? <ul className="organization-branches organization-managed">{managed.map(d=>renderDepartment(d,Boolean(query&&leader.name.toLocaleLowerCase().includes(query))))}</ul> : <p className="organization-muted organization-leadership-empty">{t('org.noManagedDepartments')}</p>}</div></section>})}
@@ -383,15 +389,15 @@ export function OrganizationPage() {
           <section className="identity-panel identity-directory-panel identity-directory-design organization-position-directory">
           <div className="organization-position-filters">
             <div className="organization-search"><IconSearch aria-hidden="true" /><TextField type="search" aria-label={t('org.searchPositions')} placeholder={t('org.searchPositions')} value={search} onChange={event=>setSearch(event.target.value)} /></div>
-            <SidebarSelect id="organization-filter-department" label={t('org.department')} value={departmentFilter} onChange={setDepartmentFilter} options={[{value:'all',label:t('org.allDepartments')},{value:'executive',label:t('org.companyWide')},...departments.map(d=>({value:d.id,label:d.name}))]} />
-            <SidebarSelect id="organization-filter-level" label={t('org.level')} value={levelFilter} onChange={setLevelFilter} options={[{value:'all',label:t('org.allLevels')},...(['manager','staff'] as const).map(value=>({value,label:t(value==='manager' ? 'org.levelManager' : 'org.levelStaff')}))]} />
+            <SidebarSelect id="organization-filter-department" label={t('org.department')} value={departmentFilter} onChange={setDepartmentFilter} options={[{value:'all',label:t('org.allDepartments')},...departments.map(d=>({value:d.id,label:d.name}))]} />
+            <SidebarSelect id="organization-filter-level" label={t('org.level')} value={levelFilter} onChange={setLevelFilter} options={[{value:'all',label:t('org.allLevels')},...(['executive','manager','staff'] as const).map(value=>({value,label:t(value==='executive' ? 'org.levelExecutive' : value==='manager' ? 'org.levelManager' : 'org.levelStaff')}))]} />
             <SidebarSelect id="organization-filter-status" label={t('org.status')} value={statusFilter} onChange={setStatusFilter} options={[{value:'all',label:t('org.allStatus')},{value:'active',label:t('org.statusActive')},{value:'inactive',label:t('org.statusInactive')}]} />
             {canManage&&companyId ? <Button disabled={isLoading||busy} onClick={()=>openEditor({ kind:'position' })}>{t('org.addPosition')}</Button> : null}
           </div>
             <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('org.positionsTab')}>
               <table className={'identity-table identity-table--packed directory-design-table'+(pageSize===0 ? ' directory-design-table--auto-fit' : '')}>
                 <thead><tr>{([['name','org.positionName'],['department','org.department'],['level','org.level'],['employees','org.employees'],['status','org.status']] as const).map(([key,label])=><th key={key} scope="col" aria-sort={positionSort.key===key ? positionSort.descending ? 'descending' : 'ascending' : 'none'}><button type="button" className="directory-design-sort" onClick={()=>setPositionSort({ key,descending:positionSort.key===key&&!positionSort.descending })}>{t(label)}<span aria-hidden="true">{positionSort.key===key&&positionSort.descending ? '↓' : '↑'}</span></button></th>)}<th scope="col">{t('org.actions')}</th></tr></thead>
-                <tbody>{visiblePositions.map(position=><tr key={position.id}><td>{position.name}</td><td>{departments.find(d=>d.id===position.organizationId)?.name||t('org.companyWide')}</td><td>{position.level ? t(position.level==='manager' ? 'org.levelManager' : 'org.levelStaff') : t(position.level===null ? 'org.levelNotApplicable' : 'org.levelNotSet')}</td><td><span className="organization-employee-count"><IconUsers aria-hidden="true" /><span>{employeeCount(position.id).toLocaleString(i18n.language)}</span></span></td><td>{status(position.status,position,'position')}</td><td>{actions('position',position,true)}</td></tr>)}</tbody>
+                <tbody>{visiblePositions.map(position=><tr key={position.id}><td>{position.name}</td><td>{renderPositionDepartment(position)}</td><td>{displayedLevel(position) ? t(displayedLevel(position)==='executive' ? 'org.levelExecutive' : displayedLevel(position)==='manager' ? 'org.levelManager' : 'org.levelStaff') : t(position.level===null ? 'org.levelNotApplicable' : 'org.levelNotSet')}</td><td><span className="organization-employee-count"><IconUsers aria-hidden="true" /><span>{employeeCount(position.id).toLocaleString(i18n.language)}</span></span></td><td>{status(position.status,position,'position')}</td><td>{actions('position',position,true)}</td></tr>)}</tbody>
               </table>
               {!filteredPositions.length ? <div className="organization-position-empty" role="status"><p className="identity-empty">{t(hasPositionFilters ? 'org.noSearchResults' : 'org.noPositions')}</p>{hasPositionFilters ? <Button variant="secondary" onClick={clearPositionFilters}>{t('org.clearFilters')}</Button> : null}</div> : null}
             </div>
@@ -425,9 +431,9 @@ export function OrganizationPage() {
       <h2 id="create-department-title">{t(editor.item ? editor.kind==='position' ? 'org.editPosition' : 'org.editDepartment' : editor.kind==='position' ? 'org.addPositions' : 'org.addDepartments')}</h2><p id="create-department-description">{t(editor.kind==='position' ? editor.item ? 'org.positionBatchHint' : 'org.positionCreationHint' : 'org.departmentBatchHint')}</p>
       <fieldset disabled={isSubmitting} className="organization-editor-fields">
         {editor.kind==='position'&&!editor.item ? <h3 className="organization-flow-heading">{t('org.positionPlacementStep')}</h3> : null}
-        {editor.kind==='position' ? <fieldset className="organization-scope"><legend>{t(editor.item ? 'org.positionBelongsTo' : 'org.positionType')}</legend><label><input type="radio" name="position-scope" checked={placement!=='company'} onChange={()=>setPlacement('')} />{t(editor.item ? 'org.departmentScope' : 'org.departmentPosition')}</label><label><input type="radio" name="position-scope" checked={placement==='company'} onChange={()=>setPlacement('company')} />{t(editor.item ? 'org.companyWide' : 'org.executivePosition')}</label></fieldset> : null}
+        {editor.kind==='position' ? <fieldset className="organization-scope"><legend>{t(editor.item ? 'org.positionBelongsTo' : 'org.positionType')}</legend><label><input type="radio" name="position-scope" checked={placement!=='company'} onChange={()=>{setPlacement('');setPositionLevel('staff')}} />{t(editor.item ? 'org.departmentScope' : 'org.departmentPosition')}</label><label><input type="radio" name="position-scope" checked={placement==='company'} onChange={()=>{setPlacement('company');setPositionLevel('executive')}} />{t(editor.item ? 'org.companyWide' : 'org.executivePosition')}</label></fieldset> : null}
         <div className="organization-editor-fields">
-        {editor.kind==='position' ? <FormField label={t('org.level')} htmlFor="organization-position-level" hint={!editor.item ? t('org.levelForAll') : undefined}><SelectField id="organization-position-level" label={t('org.level')} value={positionLevel} onChange={value=>setPositionLevel(value as NonNullable<PositionRecord['level']> | '')} options={[...(editor.item&&!(editor.item as PositionRecord).level ? [{value:'',label:t('org.levelUnassigned')}] : []),{value:'manager',label:t('org.levelManager')},{value:'staff',label:t('org.levelStaff')}]} /></FormField> : null}
+        {editor.kind==='position'&&placement!=='company' ? <FormField label={t('org.level')} htmlFor="organization-position-level" hint={!editor.item ? t('org.levelForAll') : undefined}><SelectField id="organization-position-level" label={t('org.level')} value={positionLevel} onChange={value=>setPositionLevel(value as NonNullable<PositionRecord['level']>)} options={[{value:'manager',label:t('org.levelManager')},{value:'staff',label:t('org.levelStaff')}]} /></FormField> : null}
         {placement!=='company' ? <FormField label={t(editor.kind==='department' ? 'org.parentDepartment' : editor.item ? 'org.departmentForAll' : 'org.assignPositionsTo')} htmlFor="organization-placement" hint={editor.kind==='position'&&!editor.item ? t('org.positionPlacementHint') : undefined}><SelectField id="organization-placement" label={t(editor.kind==='department' ? 'org.parentDepartment' : editor.item ? 'org.departmentForAll' : 'org.assignPositionsTo')} value={placement} disabled={isSubmitting} onChange={setPlacement} options={[{ value:'',label:t(editor.kind==='department' ? 'org.companyLevel' : 'org.chooseDepartment') },...departments.filter(d=>!editor.item||d.id!==editor.item.id&&!isDescendant(d,editor.item.id)).map(d=>({ value:d.id,label:d.name+(d.status==='inactive' ? ' ('+t('org.statusInactive')+')' : ''),disabled:editor.kind==='position'&&d.status==='inactive' }))]} /></FormField> : null}
         {editor.kind==='department' ? <FormField label={t('org.managedByPosition')} htmlFor="organization-manager" hint={placement ? t('org.inheritsManagement') : undefined}><SelectField id="organization-manager" label={t('org.managedByPosition')} value={managerId} disabled={Boolean(placement)||isSubmitting} onChange={setManagerId} options={[{ value:'',label:t('org.companyLevel') },...leaders.map(p=>({ value:p.id,label:p.name }))]} /></FormField> : null}
         </div>
