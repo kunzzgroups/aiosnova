@@ -7,7 +7,6 @@ import {
   type FormEvent,
 } from 'react'
 import {
-  Link,
   Navigate,
   useNavigate,
   useParams,
@@ -567,11 +566,11 @@ export function KnowledgeBaseDetailPage() {
               <div className="console-table-wrap">
                 <table className="console-table console-table--fixed">
                   <colgroup>
-                    <col style={{ width: '34%' }} />
+                    <col style={{ width: '40%' }} />
+                    <col style={{ width: '10%' }} />
                     <col style={{ width: '12%' }} />
-                    <col style={{ width: '14%' }} />
-                    <col style={{ width: '26%' }} />
-                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '23%' }} />
+                    <col style={{ width: '15%' }} />
                   </colgroup>
                   <thead>
                     <tr>
@@ -630,34 +629,23 @@ export function KnowledgeBaseDetailPage() {
                           </td>
                           <td>
                             {agentIds.length === 0 ? (
-                              <span className="console-chip console-chip--muted">
-                                {t('ai.knowledge.noAgentsReach')}
-                              </span>
+                              <span className="console-chip console-chip--muted">{t('ai.knowledge.noAgentsReach')}</span>
                             ) : (
-                              <span className="console-chips">
-                                {agentIds.slice(0, MAX_CHIPS).map((agentId) => {
-                                  const name = agentName(agentId)
-                                  if (!name) return null
-                                  return (
-                                    <Link
-                                      key={agentId}
-                                      className="console-chip console-chip--link"
-                                      to={`/ai/ai/ai-agents?agentId=${encodeURIComponent(agentId)}`}
-                                    >
-                                      {name}
-                                    </Link>
-                                  )
-                                })}
-                                {agentIds.length > MAX_CHIPS ? (
+                              <span
+                                className="console-chips"
+                                title={agentIds.map(id => agentName(id)).filter(Boolean).join(', ')}
+                              >
+                                {agentIds.slice(0, MAX_CHIPS).map((id) => (
+                                  <span className="console-chip console-chip--link" key={id}>
+                                    {agentName(id) || t('ai.knowledge.unknownAgent', 'Unknown Agent')}
+                                  </span>
+                                ))}
+
+                                {agentIds.length > MAX_CHIPS && (
                                   <span className="console-chip console-chip--muted">
                                     +{agentIds.length - MAX_CHIPS}
                                   </span>
-                                ) : null}
-                                {effective?.source === 'document' ? (
-                                  <span className="console-chip console-chip--muted">
-                                    {t('ai.knowledge.sourceOverride')}
-                                  </span>
-                                ) : null}
+                                )}
                               </span>
                             )}
                           </td>
@@ -839,9 +827,9 @@ export function KnowledgeBaseDetailPage() {
                     <table className="console-table console-table--fixed">
                       <colgroup>
                         <col style={{ width: '30%' }} />
-                        <col style={{ width: '40%' }} />
-                        <col style={{ width: '15%' }} />
-                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '20%' }} />
                       </colgroup>
                       <thead>
                         <tr>
@@ -874,20 +862,21 @@ export function KnowledgeBaseDetailPage() {
                                       {t('ai.knowledge.noAgentsReach')}
                                     </span>
                                   ) : (
-                                    <span className="console-chips">
-                                      {agentIds.map((agentId) => {
-                                        const name = agentName(agentId)
-                                        if (!name) return null
-                                        return (
-                                          <Link
-                                            key={agentId}
-                                            className="console-chip console-chip--link"
-                                            to={`/ai/ai/ai-agents?agentId=${encodeURIComponent(agentId)}`}
-                                          >
-                                            {name}
-                                          </Link>
-                                        )
-                                      })}
+                                    <span
+                                      className="console-chips"
+                                      title={agentIds.map((id) => agentName(id)).filter(Boolean).join(', ')}
+                                    >
+                                      {agentIds.slice(0, MAX_CHIPS).map((id) => (
+                                        <span className="console-chip console-chip--link" key={id}>
+                                          {agentName(id) || t('ai.knowledge.unknownAgent', 'Unknown Agent')}
+                                        </span>
+                                      ))}
+
+                                      {agentIds.length > MAX_CHIPS && (
+                                        <span className="console-chip console-chip--muted">
+                                          +{agentIds.length - MAX_CHIPS}
+                                        </span>
+                                      )}
                                     </span>
                                   )}
                                 </td>
