@@ -132,6 +132,9 @@
 }
 
 .identity-directory-panel.identity-directory-design .identity-directory-scroll {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
   min-height: 16rem;
   min-width: 0;
   width: calc(100% - 2 * var(--directory-content-inset));
