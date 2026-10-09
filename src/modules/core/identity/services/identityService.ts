@@ -35,6 +35,10 @@ export async function fetchCompanies() {
   return apiRequest<{ items: CompanyListItem[] }>('/api/identity/companies', { auth: true })
 }
 
+export async function fetchAccessibleCompanies() {
+  return apiRequest<{ items: CompanyListItem[] }>('/api/identity/accessible-companies', { auth: true, cache: 'no-store' })
+}
+
 export async function fetchCompany(id: string) {
   return apiRequest<{ company: CompanyListItem; members: CompanyMember[] }>(
     `/api/identity/companies/${id}`,
@@ -129,13 +133,16 @@ export async function changeOwnPassword(payload: {
   })
 }
 
-export async function fetchOrganizations() {
-  return apiRequest<{ items: OrganizationNode[] }>('/api/identity/organizations', { auth: true })
+export async function fetchOrganizations(companyId?: string) {
+  return apiRequest<{ items: OrganizationNode[] }>('/api/identity/organizations'+(companyId ? '?companyId='+encodeURIComponent(companyId) : ''), { auth: true })
 }
 
 export async function createOrganization(payload: {
+  managerPositionId?: string | null
+  status?: OrganizationNode['status']
+  companyId?: string
   parentId?: string | null
-  code: string
+  code?: string
   name: string
   type?: OrganizationNode['type']
 }) {
@@ -148,7 +155,7 @@ export async function createOrganization(payload: {
 
 export async function updateOrganization(
   id: string,
-  payload: Partial<Pick<OrganizationNode, 'name' | 'status' | 'parentId' | 'type'>>,
+  payload: Partial<Pick<OrganizationNode, 'name' | 'status' | 'parentId' | 'type' | 'managerPositionId'>>,
 ) {
   return apiRequest<OrganizationNode>(`/api/identity/organizations/${id}`, {
     method: 'PATCH',
@@ -164,12 +171,15 @@ export async function deleteOrganization(id: string) {
   })
 }
 
-export async function fetchPositions() {
-  return apiRequest<{ items: PositionRecord[] }>('/api/identity/positions', { auth: true })
+export async function fetchPositions(companyId?: string) {
+  return apiRequest<{ items: PositionRecord[] }>('/api/identity/positions'+(companyId ? '?companyId='+encodeURIComponent(companyId) : ''), { auth: true })
 }
 
 export async function createPosition(payload: {
-  code: string
+  level?: PositionRecord['level']
+  companyId?: string
+  organizationId?: string | null
+  code?: string
   name: string
   description?: string
 }) {
@@ -182,13 +192,17 @@ export async function createPosition(payload: {
 
 export async function updatePosition(
   id: string,
-  payload: Partial<Pick<PositionRecord, 'name' | 'description' | 'status'>>,
+  payload: Partial<Pick<PositionRecord, 'name' | 'description' | 'status' | 'organizationId' | 'level'>>,
 ) {
   return apiRequest<PositionRecord>(`/api/identity/positions/${id}`, {
     method: 'PATCH',
     auth: true,
     body: payload,
   })
+}
+
+export async function deletePosition(id: string) {
+  return apiRequest<void>(`/api/identity/positions/${id}`, { method:'DELETE',auth:true })
 }
 
 export async function fetchMemberships() {

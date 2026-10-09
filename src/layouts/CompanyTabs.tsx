@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { findCompanyGroup, useCompanyStore } from '@/stores/companyStore'
+import { IconBuilding } from '@/components/navigation/SidebarIcons'
 import './TopTabs.css'
 
 /**
@@ -91,7 +92,7 @@ export function CompanyTabs() {
               aria-current={active ? 'true' : undefined}
               onClick={() => handleSelect(company.value)}
             >
-              {company.label}
+              <IconBuilding aria-hidden="true" />{company.label}
             </button>
           )
         })}

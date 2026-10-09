@@ -121,6 +121,8 @@ export type OrganizationType = 'division' | 'department' | 'team' | 'other'
 
 export type OrganizationNode = {
   id: string
+  managerPositionId?: string | null
+  companyId?: string
   merchantId: string
   parentId: string | null
   code: string
@@ -131,7 +133,10 @@ export type OrganizationNode = {
 }
 
 export type PositionRecord = {
+  level?: 'executive' | 'manager' | 'staff'
   id: string
+  companyId?: string
+  organizationId?: string | null
   merchantId: string
   code: string
   name: string

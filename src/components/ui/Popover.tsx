@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom'
 import './Popover.css'
 
 type PopoverProps = {
+  placement?: 'bottom' | 'left'
   label: string
   trigger: ReactNode
   children: ReactNode
 }
 
-export function Popover({ label, trigger, children }: PopoverProps) {
+export function Popover({ label, trigger, children, placement = 'bottom' }: PopoverProps) {
   const id = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -35,6 +36,11 @@ export function Popover({ label, trigger, children }: PopoverProps) {
       panel.style.width = `${Math.min(280, rightEdge - leftEdge)}px`
       panel.style.maxHeight = `${Math.min(384, bottomEdge - topEdge)}px`
       const height = panel.offsetHeight
+      if (placement === 'left') {
+        panel.style.left = `${Math.max(leftEdge, anchor.left - panel.offsetWidth - gap)}px`
+        panel.style.top = `${Math.max(topEdge, Math.min(anchor.top, bottomEdge - height))}px`
+        return
+      }
       const below = bottomEdge - anchor.bottom - gap
       const above = anchor.top - topEdge - gap
       const placeAbove = below < height && above > below
@@ -81,7 +87,7 @@ export function Popover({ label, trigger, children }: PopoverProps) {
       document.removeEventListener('focusin', dismiss)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open])
+  }, [open, placement])
 
   return <>
     <button ref={triggerRef} type="button" className="ui-popover-trigger" aria-label={label}

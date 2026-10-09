@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useAuthStore } from '@/stores/authStore'
 import type { CompanyGroupRecord } from '@/mocks/data/identity'
 
 export type CompanyOption = { value: string; label: string }
@@ -75,7 +76,7 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
   pinnedGroupId: null,
   stripHovered: false,
   setData: (companies, groups) => {
-    const current = get().companyId
+    const current = get().companyId || readStoredCompanyId()
     const next =
       current && companies.some((item) => item.value === current)
         ? current
@@ -87,9 +88,11 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
         /* storage unavailable - keep the in-memory value */
       }
     }
-    set({ companies, groups, companyId: next })
+    const allowedIds = new Set(companies.map(item => item.value))
+    set({ companies, groups: groups.map(group => ({ ...group, companyIds: group.companyIds.filter(id => allowedIds.has(id)) })).filter(group => group.companyIds.length > 0), companyId: next, previewCompanyId: null, pinnedGroupId: null })
   },
   setCompany: (companyId) => {
+    if (!get().companies.some(item => item.value === companyId)) return
     try {
       window.localStorage.setItem(COMPANY_STORAGE_KEY, companyId)
     } catch {
@@ -98,6 +101,7 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
     set({ companyId })
   },
   setPreviewCompany: (previewCompanyId) => {
+    if (previewCompanyId && !get().companies.some(item => item.value === previewCompanyId)) return
     if (get().previewCompanyId !== previewCompanyId) {
       set({ previewCompanyId })
     }
@@ -121,3 +125,9 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
     }
   },
 }))
+
+useAuthStore.subscribe((state, previous) => {
+  if (state.user?.id !== previous.user?.id || state.accessToken !== previous.accessToken) {
+    useCompanyStore.getState().setData([], [])
+  }
+})

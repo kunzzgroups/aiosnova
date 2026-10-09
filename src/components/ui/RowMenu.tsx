@@ -27,12 +27,15 @@ type RowMenuProps = {
 export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
 
   useEffect(() => {
     if (!open) {
       return
     }
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
     function handlePointerDown(event: MouseEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
         setOpen(false)
@@ -40,7 +43,9 @@ export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        event.preventDefault()
         setOpen(false)
+        triggerRef.current?.focus()
       }
     }
     document.addEventListener('mousedown', handlePointerDown)
@@ -58,6 +63,7 @@ export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
   return (
     <div className="row-menu" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="row-menu__trigger"
         aria-label={label}
@@ -66,12 +72,27 @@ export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
         aria-controls={open ? menuId : undefined}
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
+        onKeyDown={event => {
+          if (event.key==='ArrowDown'||event.key==='ArrowUp') {
+            event.preventDefault()
+            setOpen(true)
+          }
+        }}
       >
         <IconMore />
       </button>
 
       {open ? (
-        <div className="row-menu__list" role="menu" id={menuId}>
+        <div ref={menuRef} className="row-menu__list" role="menu" id={menuId} aria-label={label}
+          onKeyDown={event => {
+            const buttons=Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')||[])
+            const index=buttons.indexOf(document.activeElement as HTMLButtonElement)
+            if (event.key==='ArrowDown'||event.key==='ArrowUp'||event.key==='Home'||event.key==='End') {
+              event.preventDefault()
+              const next=event.key==='Home' ? 0 : event.key==='End' ? buttons.length-1 : (index+(event.key==='ArrowDown' ? 1 : -1)+buttons.length)%buttons.length
+              buttons[next]?.focus()
+            } else if (event.key==='Tab') setOpen(false)
+          }}>
           {items.map((item) => (
             <button
               key={item.id}
@@ -82,6 +103,7 @@ export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
                 .join(' ')}
               onClick={() => {
                 setOpen(false)
+                triggerRef.current?.focus()
                 item.onSelect()
               }}
             >

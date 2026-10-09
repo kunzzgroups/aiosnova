@@ -1,0 +1,13 @@
+.ui-select-field { position:relative; min-width:0; }
+.ui-select-field__trigger { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); width:100%; min-height:2.75rem; padding:.65rem .85rem; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-bg-elevated); color:var(--color-text); font:inherit; text-align:left; cursor:pointer; }
+.ui-select-field__trigger > span { min-width:0; overflow-wrap:anywhere; }
+.ui-select-field__trigger svg { width:1rem; height:1rem; flex-shrink:0; transform:rotate(90deg); color:var(--color-text-muted); }
+.ui-select-field__trigger:focus-visible { outline:none; border-color:var(--color-border-focus); box-shadow:0 0 0 3px var(--color-focus-ring); }
+.ui-select-field__trigger:disabled { background:var(--color-bg-muted); color:var(--color-text-muted); cursor:default; }
+.ui-select-field__list { position:absolute; top:calc(100% + var(--space-2)); left:0; right:0; z-index:20; display:flex; flex-direction:column; gap:var(--space-1); max-height:12rem; overflow-y:auto; padding:var(--space-2); border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-bg-elevated); box-shadow:var(--shadow-md); }
+.ui-select-field__option { flex-shrink:0; padding:var(--space-3); border:0; border-radius:var(--radius-sm); background:transparent; color:var(--color-text); font:inherit; font-size:var(--text-sm); text-align:left; overflow-wrap:anywhere; cursor:pointer; }
+.ui-select-field__option:focus-visible { outline:2px solid var(--color-border-focus); outline-offset:-2px; }
+.ui-select-field__list:not(:has(.ui-select-field__option:hover:not(:disabled), .ui-select-field__option:focus-visible)) .ui-select-field__option[aria-selected='true'],
+.ui-select-field__list:not(:has(.ui-select-field__option:hover:not(:disabled))) .ui-select-field__option:focus-visible,
+.ui-select-field__option:hover:not(:disabled) { background:color-mix(in srgb,#7c73ff 16%,var(--color-bg-elevated)); color:#7c73ff; }
+.ui-select-field__option:disabled { color:var(--color-text-muted); opacity:.5; cursor:default; }

@@ -268,14 +268,21 @@ export const identityRolePresets: InvitationOptions['roles'] = [
   { id: 'role-hr', name: 'HR', permissions: [{ group: 'Finance & People', page: 'HRM', action: 'View' }] },
   { id: 'role-finance', name: 'Finance', permissions: [{ group: 'Finance & People', page: 'Finance', action: 'View' }] },
 ]
+// Existing demo catalog belongs to Retail; other companies start with their own empty structure.
+identityOrganizations.forEach(node => { node.companyId = 'company-retail' })
+identityPositions.forEach(position => {
+  position.companyId = 'company-retail'
+  position.organizationId = position.id === 'pos-acc' ? 'org-finance' : position.id === 'pos-mgr' ? 'org-ops' : 'org-hq'
+})
+
 export function mockInvitationOptions(canInvite: boolean): InvitationOptions {
-  const departments = identityOrganizations.filter(o=>o.type==='department' && o.status==='active').map(o=>({id:o.id,name:o.name,
-      positions:identityPositions.filter(p=>p.status==='active' && (o.id==='org-finance' ? ['pos-finance-mgr','pos-acc'].includes(p.id) : o.id==='org-hr' ? ['pos-hr-lead','pos-hr'].includes(p.id) : p.id==='pos-mgr')).map(p=>({id:p.id,name:p.name}))
-    }))
-  return { canInvite, departments, roles: identityRolePresets, companies: identityCompanies.filter(c=>c.status==='active').map(c=>({
-    id:c.id, name:c.name, groupName:identityCompanyGroups.find(g=>g.companyIds.includes(c.id))?.name || c.name,
-    requireMfa:c.id==='company-retail',
-    departments
+  const departments = identityOrganizations.filter(o => o.type==='department' && o.status==='active').map(o => ({
+    id:o.id,name:o.name,positions:identityPositions.filter(p => p.status==='active' && p.organizationId===o.id && p.companyId===o.companyId).map(p => ({ id:p.id,name:p.name }))
+  }))
+  return { canInvite,departments,roles:identityRolePresets,companies:identityCompanies.filter(c => c.status==='active').map(c => ({
+    id:c.id,name:c.name,groupName:identityCompanyGroups.find(g => g.companyIds.includes(c.id))?.name || c.name,
+    requireMfa:c.id==='company-retail',departments:departments.filter(d => identityOrganizations.find(o => o.id===d.id)?.companyId===c.id)
   })) }
 }
+
 identityUsers[0]!.isOwner = true

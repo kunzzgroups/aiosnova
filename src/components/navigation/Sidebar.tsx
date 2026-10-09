@@ -21,7 +21,7 @@ import { useNavLabel } from '@/i18n/useNavLabel'
 import { useAuthStore } from '@/stores/authStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { logout } from '@/modules/core/auth/services/authService'
-import { fetchCompanies } from '@/modules/core/identity/services/identityService'
+import { fetchAccessibleCompanies } from '@/modules/core/identity/services/identityService'
 import type { CompanyRecord } from '@/modules/core/identity/types/identity'
 import type { CompanyGroupRecord } from '@/mocks/data/identity'
 import './Sidebar.css'
@@ -107,20 +107,13 @@ async function loadGroupCompaniesData(): Promise<{
   const { identityCompanyGroups } = await import('@/mocks/data/identity')
 
   try {
-    const result = await fetchCompanies()
+    const result = await fetchAccessibleCompanies()
     const items = Array.isArray(result.items) ? result.items : []
     return {
       companies: toCompanyOptions(items),
       groups: identityCompanyGroups,
     }
   } catch {
-    if (import.meta.env.DEV) {
-      const { identityCompanies } = await import('@/mocks/data/identity')
-      return {
-        companies: toCompanyOptions(identityCompanies),
-        groups: identityCompanyGroups,
-      }
-    }
     return { companies: [], groups: [] }
   }
 }
@@ -492,6 +485,8 @@ export function Sidebar() {
   const companyId = useCompanyStore((state) => state.companyId)
   const companyOptions = useCompanyStore((state) => state.companies)
   const companyGroups = useCompanyStore((state) => state.groups)
+  const sessionUserId = useAuthStore(state => state.user?.id)
+  const sessionToken = useAuthStore(state => state.accessToken)
   const setCompanyData = useCompanyStore((state) => state.setData)
   const setActiveCompany = useCompanyStore((state) => state.setCompany)
   const setPreviewCompany = useCompanyStore((state) => state.setPreviewCompany)
@@ -610,6 +605,8 @@ export function Sidebar() {
     }
 
     let cancelled = false
+    setCompanyData([], [])
+    if (!sessionUserId || !sessionToken) return
     void loadGroupCompaniesData().then(({ companies, groups }) => {
       if (cancelled) {
         return
@@ -619,7 +616,7 @@ export function Sidebar() {
     return () => {
       cancelled = true
     }
-  }, [isHydrated, setCompanyData])
+  }, [isHydrated, sessionUserId, sessionToken, setCompanyData])
 
   async function handleLogout() {
     await logout()
