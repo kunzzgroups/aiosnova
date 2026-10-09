@@ -9,6 +9,7 @@ import { FormField } from '@/components/ui/FormField'
 import { TextField } from '@/components/ui/TextField'
 import { useCompanyStore } from '@/stores/companyStore'
 import { ApiError } from '@/services/httpClient'
+import { IconPencil, IconTrash } from '@/components/icons/Icons'
 import {
     deleteKnowledgeTemplate,
     fetchTemplatesForCompany,
@@ -300,24 +301,30 @@ export function TemplatesPage() {
                                             {/* ACTIONS */}
                                             <td className="console-table__actions">
                                                 {canEdit || canDelete ? (
-                                                    <span className="template-actions">
+                                                    <>
                                                         {canEdit ? (
-                                                            <Button
-                                                                variant="secondary"
+                                                            <button
+                                                                type="button"
+                                                                className="console-icon-button"
+                                                                aria-label={t('ai.knowledge.edit', 'Edit')}
+                                                                title={t('ai.knowledge.edit', 'Edit')}
                                                                 onClick={() => openEdit(template)}
                                                             >
-                                                                {t('ai.knowledge.edit', 'Edit')}
-                                                            </Button>
+                                                                <IconPencil />
+                                                            </button>
                                                         ) : null}
                                                         {canDelete ? (
-                                                            <Button
-                                                                variant="ghost"
+                                                            <button
+                                                                type="button"
+                                                                className="console-icon-button console-icon-button--danger"
+                                                                aria-label={t('ai.knowledge.delete', 'Delete')}
+                                                                title={t('ai.knowledge.delete', 'Delete')}
                                                                 onClick={() => setPendingDelete(template)}
                                                             >
-                                                                {t('ai.knowledge.delete', 'Delete')}
-                                                            </Button>
+                                                                <IconTrash />
+                                                            </button>
                                                         ) : null}
-                                                    </span>
+                                                    </>
                                                 ) : (
                                                     <span className="console-readonly">
                                                         {t('ai.knowledge.readOnly', 'Read only')}

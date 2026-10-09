@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { TextField } from './TextField'
 import { Button } from './Button'
 import { IconX } from '@/components/icons/Icons'
@@ -7,6 +6,10 @@ import './TagInput.css'
 type TagInputProps = {
   id: string
   items: { id: number; name: string }[]
+  value: string
+  onValueChange: (value: string) => void
+  error: string | null
+  onErrorChange: (error: string | null) => void
   onAdd: (name: string) => void
   onRemove: (id: number) => void
   removeLabel: (name: string) => string
@@ -19,24 +22,22 @@ type TagInputProps = {
   autoFocus?: boolean
 }
 
-export function TagInput({ id, items, onAdd, onRemove, removeLabel, placeholder, hint, addLabel, queueLabel, validate, disabled, autoFocus }: TagInputProps) {
-  const [value, setValue] = useState('')
-  const [error, setError] = useState<string | null>(null)
+export function TagInput({ id, items, value, onValueChange, error, onErrorChange, onAdd, onRemove, removeLabel, placeholder, hint, addLabel, queueLabel, validate, disabled, autoFocus }: TagInputProps) {
 
   function add() {
     const name = value.trim()
     const message = validate(name)
-    setError(message)
+    onErrorChange(message)
     if (message) return
     onAdd(name)
-    setValue('')
+    onValueChange('')
   }
 
   return (
     <div className="ui-tag-input">
       <div className="ui-tag-input__entry">
       <TextField id={id} value={value} placeholder={placeholder} disabled={disabled} autoFocus={autoFocus} hasError={Boolean(error)} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-        onChange={event => { setValue(event.target.value); setError(null) }}
+        onChange={event => { onValueChange(event.target.value); onErrorChange(null) }}
         onKeyDown={event => {
           if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
           event.preventDefault()

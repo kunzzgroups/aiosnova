@@ -1,7 +1,7 @@
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import { HttpResponse, http } from 'msw'
 import { knowledgeBases, knowledgeDocuments } from '@/mocks/data/knowledge'
 import { agentDocumentLinks, agentKnowledgeLinks } from '@/mocks/data/agents'
-import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import {
   deriveBaseStatus,
   type KnowledgeBase,

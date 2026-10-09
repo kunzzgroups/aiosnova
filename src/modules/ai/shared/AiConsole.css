@@ -1,14 +1,20 @@
-/**
- * Shared chrome for the AI console screens (Agents, Knowledge).
- *
- * These were duplicated per submodule until a second one needed them; the AI
- * module is the right home for now. `knowledge-` keeps only what is specific to
- * knowledge bases (the list cards). Everything reuses the shared design tokens,
- * so these screens still match the identity ones.
- *
- * If a module OUTSIDE `ai/` ever needs the same panel/table/pill trio, that is the
- * moment to promote them into `src/design-system/` instead of importing this file.
- */
+/* ---------------------------------------------------------------------------
+   Shared chrome for the AI console screens (Agents, Knowledge, Templates).
+
+   Cross-module: the same panel / table / pill / toolbar shapes are reused by
+   System pages (Employees, Organization). If a module OUTSIDE `ai/` ever needs
+   a new shape, promote it into `src/design-system/` instead of copying here.
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* One control height for every input, select, and button inside a console
+     toolbar or panel header. Matches the System module's Employees toolbar. */
+  --console-control-height: 2.25rem;
+  --console-input-padding: 0.25rem 0.85rem;
+  --console-button-padding: 0.25rem 1rem;
+}
+
+/* ── page + panel ─────────────────────────────────────────────── */
 
 .console-page {
   display: flex;
@@ -29,22 +35,89 @@
   font-size: var(--text-lg);
 }
 
+/* ------------------------------------------------------------------ */
+/* Panel header: search (fixed 320×36) + action buttons               */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Fixed height (92px) so Agents and Knowledge pages look identical.
+ * Search sits at the left, buttons flush right.
+ */
 .console-panel__title-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  min-height: 92px;
   margin-bottom: var(--space-4);
 }
 
-.console-panel__title-row h2 {
-  margin-bottom: 0;
+.console-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* All panel-header search fields: 320 × 36, matching both pages. */
+.console-panel__search,
+.console-panel__search--lead {
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0.25rem 0.85rem;
+  box-sizing: border-box;
+}
+
+/* TextField may render as <input> or be wrapped in a label. Force height. */
+.console-panel__search.ui-text-field,
+.console-panel__search .ui-text-field,
+.console-panel__search--lead.ui-text-field,
+.console-panel__search--lead .ui-text-field {
+  height: 36px;
+  padding: 0.25rem 0.85rem;
+  box-sizing: border-box;
+}
+
+/* Every action button in a panel header / toolbar: 36px tall, 1rem padding. */
+.console-panel__actions .ui-button,
+.console-toolbar .ui-button,
+.console-toolbar__action.ui-button {
+  min-height: 2.25rem;
+  height: 2.25rem;
+  padding: 0.25rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Icon inside an action button: consistent size, muted so the label wins. */
+.console-panel__actions .ui-button svg,
+.console-toolbar .ui-button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+/* TextField may render as <input> or be wrapped in a label. */
+.console-panel__search--lead.ui-text-field,
+.console-panel__search--lead .ui-text-field {
+  height: var(--console-control-height);
+  padding: var(--console-input-padding);
+}
+
+/* All buttons inside a console panel header / toolbar share one size. */
+.console-panel__actions .ui-button,
+.console-toolbar .ui-button,
+.console-toolbar__action.ui-button {
+  min-height: var(--console-control-height);
+  padding: var(--console-button-padding);
 }
 
 .console-hint {
-  /* The title row already opened a gap above; pull back into it so the hint sits
-     directly under the heading it qualifies. */
   margin: -0.5rem 0 var(--space-4);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -52,16 +125,26 @@
 
 /* ── status pill ──────────────────────────────────────────────── */
 
+/*
+ * Status pill. Matches the identity-status pill on System pages:
+ *   84 × 22.78px · 12px DM Sans · padding 2.4px 7.2px.
+ * Height is fixed so every state renders the same size regardless of the
+ * label length or font metrics.
+ */
 .console-status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 5.25rem;
   box-sizing: border-box;
-  padding: 0.15rem 0.45rem;
+  width: 5.25rem;             /* 84px */
+  height: 1.424rem;           /* ≈ 22.78px */
+  padding: 0.15rem 0.45rem;   /* 2.4px 7.2px */
   border-radius: 999px;
-  font-size: var(--text-xs);
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .console-status--ready,
@@ -87,6 +170,21 @@
   color: var(--color-text-muted);
 }
 
+.console-status--connected {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.console-status--disconnected {
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+}
+
+.console-status--error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
 [data-theme='dark'] .console-status--ready,
 [data-theme='dark'] .console-status--active {
   color: #34d399;
@@ -97,29 +195,60 @@
   color: #fbbf24;
 }
 
-/* ── toolbar + table ──────────────────────────────────────────── */
+/* Clickable status pill - cycles state on click (dev / demo affordance). */
+.console-status--clickable {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  transition: filter 0.15s ease;
+}
+
+.console-status--clickable:hover {
+  filter: brightness(1.15);
+}
+
+.console-status--clickable:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Toolbar: 320×36 search + status filter + action button             */
+/* ------------------------------------------------------------------ */
 
 .console-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  gap: var(--space-3);
+  align-items: center;
+  gap: 0.75rem;
   margin-bottom: var(--space-4);
 }
 
+/* Search: same fixed 320×36 as the panel header. */
 .console-toolbar__search {
-  flex: 1 1 16rem;
-  min-width: 12rem;
-  max-width: 20rem;
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0.25rem 0.85rem;
+  box-sizing: border-box;
 }
 
-/* Pushes a button (e.g. "Add source") to the far end of the toolbar. */
+.console-toolbar__search.ui-text-field,
+.console-toolbar__search .ui-text-field {
+  height: 36px;
+  padding: 0.25rem 0.85rem;
+  box-sizing: border-box;
+}
+
 .console-toolbar__action {
   margin-left: auto;
 }
 
 .console-toolbar .sidebar-select {
   width: 11.5rem;
+  flex: none;
 }
 
 .console-toolbar .sidebar-select__label {
@@ -127,9 +256,22 @@
 }
 
 .console-toolbar .sidebar-select__trigger {
-  min-height: 2.75rem;
+  min-height: 36px;
+  height: 36px;
+  padding: 0.25rem 0.85rem;
   border-color: var(--color-border);
   border-radius: var(--radius-md);
+}
+
+/* All buttons next to the toolbar share the same height. */
+.console-toolbar .ui-button,
+.console-toolbar__action.ui-button,
+.console-panel__actions .ui-button {
+  min-height: var(--console-control-height, 2.25rem);
+  height: var(--console-control-height, 2.25rem);
+  padding: 0.25rem 1rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 .console-table-wrap {
@@ -193,6 +335,28 @@
   text-align: right;
 }
 
+/* Fixed-layout table: column widths are declared by <col>, so adding or
+   removing a chip inside a cell never pushes the other columns around. */
+.console-table--fixed {
+  table-layout: fixed;
+}
+
+.console-table--fixed td {
+  overflow: hidden;
+}
+
+.console-table--fixed .console-chips {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Row targeted by ?agentId= on AgentsPage. */
+.console-table__row--highlight {
+  background: var(--color-brand-soft);
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
 /* ── agent / knowledge chips ──────────────────────────────────── */
 
 .console-chips {
@@ -220,7 +384,26 @@
   color: var(--color-text-muted);
 }
 
-/* ── form internals (rendered inside `Modal`) + empty / error states ── */
+.console-chip--link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.console-chip--link:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.console-chip--link:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* ── form internals (rendered inside `Drawer`) + empty / error states ── */
 
 .console-form__grid {
   display: grid;
@@ -244,7 +427,6 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* Ticked-while-filtered count, next to the section heading. */
 .console-form__count {
   display: inline-block;
   margin-left: 0.5rem;
@@ -269,7 +451,7 @@
   font-size: var(--text-sm);
 }
 
-/* ── single checkbox row (opt in/out of a section) ────────────── */
+/* ── single checkbox row ──────────────────────────────────────── */
 
 .console-toggle {
   display: flex;
@@ -305,7 +487,6 @@
   font-weight: 400;
 }
 
-/* Section revealed when the toggle above it is unticked. */
 .console-toggle__reveal {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
@@ -348,7 +529,6 @@
   margin-top: var(--space-5);
 }
 
-/* A hint that sits under a table row rather than under a title row. */
 .console-hint--flat {
   margin: 0 0 var(--space-3);
 }
@@ -358,36 +538,14 @@
   font-size: var(--text-sm);
 }
 
-/* ------------------------------------------------------------------ */
-/* Deep-link affordances                                              */
-/* ------------------------------------------------------------------ */
-
-.console-chip--link {
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+.console-error {
+  margin-top: var(--space-3);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
 }
 
-.console-chip--link:hover {
-  border-color: var(--color-brand);
-  background: var(--color-brand-soft);
-}
+/* ── deep-link filter chip ────────────────────────────────────── */
 
-.console-chip--link:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
-}
-
-/* Row targeted by ?agentId= on AgentsPage. */
-.console-table__row--highlight {
-  background: var(--color-brand-soft);
-  box-shadow: inset 3px 0 0 var(--color-brand);
-}
-
-/* Banner showing which filter a deep link applied, with a clear button. */
 .console-filter-chip {
   display: inline-flex;
   align-items: center;
@@ -421,133 +579,7 @@
   background: var(--color-border);
 }
 
-/* ------------------------------------------------------------------ */
-/* Table category groups (AgentsPage)                                 */
-/* ------------------------------------------------------------------ */
-
-.console-table__group-row td {
-  padding: 0.5rem 0.75rem;
-  background: var(--color-bg-muted);
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.console-table__group:first-of-type .console-table__group-row td {
-  border-top: none;
-}
-
-.console-table__group-label {
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.console-table__group-count {
-  margin-left: 0.5rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  opacity: 0.75;
-}
-
-/* ------------------------------------------------------------------ */
-/* Fixed-size selection cards (no layout shift on toggle)             */
-/* ------------------------------------------------------------------ */
-
-/*
- * The card never changes size when toggled:
- *  - `grid-auto-rows` gives every row a fixed height, so a growing card in one
- *    column can't stretch its neighbours.
- *  - `overflow: hidden` + `white-space: nowrap` on the text stops content from
- *    pushing the box open.
- *  - Selection is drawn with `box-shadow: inset`, never with a border-width
- *    change, so the outer box is identical in both states.
- */
-.console-check-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  grid-auto-rows: 4.75rem;
-  gap: var(--space-3);
-}
-
-.console-check-card {
-  box-sizing: border-box;
-  height: 100%;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-muted);
-  color: inherit;
-  text-align: left;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-  cursor: pointer;
-  font: inherit;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.console-check-card:hover {
-  border-color: var(--color-brand);
-  background: var(--color-brand-soft);
-}
-
-.console-check-card--selected {
-  border-color: var(--color-brand);
-  background: var(--color-brand-soft);
-  /* Inner ring instead of a bigger border: the outer box never grows. */
-  box-shadow: inset 0 0 0 1px var(--color-brand);
-}
-
-.console-check-card:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
-}
-
-.console-check-card input[type='checkbox'] {
-  flex-shrink: 0;
-  width: 1rem;
-  height: 1rem;
-  margin: 0.15rem 0 0;
-  accent-color: var(--color-brand);
-}
-
-.console-check-card__body {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.console-check-card__title {
-  display: block;
-  font-size: var(--text-sm);
-  font-weight: 650;
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.console-check-card__hint {
-  display: block;
-  margin-top: 0.15rem;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ------------------------------------------------------------------ */
-/* Drawer helpers: Advanced toggle, kind picker                       */
-/* ------------------------------------------------------------------ */
+/* ── drawer helpers: Advanced toggle, kind picker ─────────────── */
 
 .console-form__toggle {
   display: inline-flex;
@@ -577,7 +609,7 @@
   text-align: center;
 }
 
-/* Kind picker inside the Knowledge create drawer. */
+/* Kind picker inside the Knowledge / AttachMenu drawers. */
 .console-kind-picker {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -643,57 +675,11 @@
   line-height: 1.35;
 }
 
-/* Small inline code snippet, used for skill input schemas. */
+/* Small inline code snippet (skill input schemas). */
 .console-code {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--text-xs);
   color: var(--color-text-muted);
-}
-
-/* Fixed-layout table: column widths are declared by <col>, so adding or
-   removing a chip inside a cell never pushes the other columns around. */
-.console-table--fixed {
-  table-layout: fixed;
-}
-
-.console-table--fixed td {
-  overflow: hidden;
-}
-
-.console-table--fixed .console-chips {
-  flex-wrap: wrap;
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* File input inside the Add source drawer. */
-.console-file-input {
-  display: block;
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-muted);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.console-file-input:hover {
-  border-color: var(--color-brand);
-  color: var(--color-text);
-}
-
-.console-file-input::file-selector-button {
-  margin-right: 0.6rem;
-  padding: 0.3rem 0.7rem;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-brand-soft);
-  color: var(--color-brand);
-  font-weight: 600;
-  font-size: var(--text-xs);
-  cursor: pointer;
 }
 
 /* Small inline link next to a document's name. */
@@ -709,54 +695,7 @@
   text-decoration: underline;
 }
 
-/* Skill statuses */
-.console-status--draft {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-}
-
-/* Data source statuses */
-.console-status--connected {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.console-status--disconnected {
-  background: var(--color-bg-muted);
-  color: var(--color-text-muted);
-}
-
-.console-status--error {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-/* Clickable status pill - cycles state on click (dev / demo affordance). */
-.console-status--clickable {
-  border: none;
-  cursor: pointer;
-  font: inherit;
-  transition: filter 0.15s ease;
-}
-
-.console-status--clickable:hover {
-  filter: brightness(1.15);
-}
-
-.console-status--clickable:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
-}
-
-.console-error {
-  margin-top: var(--space-3);
-  color: var(--color-danger);
-  font-size: var(--text-sm);
-}
-
-/* ------------------------------------------------------------------ */
-/* Promote / visibility picker                                          */
-/* ------------------------------------------------------------------ */
+/* ── promote / visibility picker ──────────────────────────────── */
 
 .promote-toolbar {
   display: flex;
@@ -842,4 +781,70 @@
   color: var(--color-brand);
   font-size: var(--text-xs);
   font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ */
+/* Icon button (square, matches System pages)                         */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A 40×36 square button that holds only an icon. Matches the System
+ * module's `ui-button--icon ui-icon-button` shape (40 × 38.39px).
+ */
+.console-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;              /* 40px */
+  min-width: 2.5rem;
+  height: 2.25rem;            /* 36px — same as console-control-height */
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.console-icon-button:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.console-icon-button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.console-icon-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.console-icon-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Destructive variant (delete). */
+.console-icon-button--danger {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.console-icon-button--danger:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-on-brand);
+}
+
+/* Actions cell: icons sit in a row, small gap. */
+.console-table__actions .console-icon-button + .console-icon-button {
+  margin-left: 0.35rem;
 }

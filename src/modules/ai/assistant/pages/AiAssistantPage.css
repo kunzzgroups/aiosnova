@@ -496,8 +496,6 @@
   position: relative;
   max-width: 46rem;
   margin: 0 auto;
-  /* Keep this in sync with the composer's own padding so the chips row
-     aligns with the textarea above and the buttons below. */
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--color-border);
   border-radius: 14px;
@@ -582,8 +580,8 @@
 
 .ai-composer__attachments {
   list-style: none;
-  margin: 0 0 0.7rem;   /* gap between chips and textarea */
-  padding: 0;           /* left edge follows the composer padding */
+  margin: 0 0 0.7rem;
+  padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -1314,23 +1312,39 @@
 
 /* --- model list: exactly six rows tall ------------------------------------ */
 
-/* Each row is 2rem. The list is 6 * 2rem + 0.4rem of padding = 12.4rem.
-   This is a hard `height`, not `max-height`, so the panel keeps the same
-   silhouette even when a search returns fewer (or one) result. */
+/*
+ * Each row is 2rem. The list is 6 × 2rem + 2 × 0.2rem padding = 12.4rem.
+ * A hard `height` (not `max-height`) so the panel keeps the same silhouette
+ * even when a search returns fewer (or one) result.
+ */
 .ai-model-picker__list {
   margin: 0;
   padding: 0.2rem;
   list-style: none;
   height: 12.4rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   box-sizing: border-box;
 }
 
-/* Shorter windows: four rows so the panel fits without scrolling. */
 @media (max-height: 640px) {
   .ai-model-picker__list {
     height: 8.4rem;
   }
+}
+
+.ai-model-picker__list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ai-model-picker__list::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.ai-model-picker__list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .ai-model-picker__item {
@@ -1339,9 +1353,11 @@
 
 .ai-model-picker__option {
   display: flex;
+  align-items: center;
   width: 100%;
-  min-height: 2rem;
-  padding: 0.5rem 0.7rem;
+  /* Fixed height so exactly 6 rows fit. */
+  height: 2rem;
+  padding: 0 0.7rem;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1357,10 +1373,13 @@
   background: var(--color-bg-muted);
 }
 
+/* Selected: same restrained style as SidebarSelect — muted background,
+   brand text, thin left rail. */
 .ai-model-picker__option.is-active {
-  background: var(--color-brand-soft);
+  background: var(--color-bg-muted);
   color: var(--color-brand);
   font-weight: 650;
+  box-shadow: inset 2px 0 0 var(--color-brand);
 }
 
 .ai-model-picker__empty {

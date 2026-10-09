@@ -1,3 +1,4 @@
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import { apiRequest } from '@/services/httpClient'
 import { ApiError } from '@/services/httpClient'
 import type {
@@ -34,7 +35,9 @@ export async function fetchKnowledgeBases(
 ): Promise<{ items: KnowledgeBaseListItem[] }> {
   if (USE_MOCK) {
     return {
-      items: listBasesVisibleFrom(MOCK_USER, companyId).map(toBaseListItem),
+      items: listBasesVisibleFrom(MOCK_USER, companyId).map((base) =>
+        toBaseListItem(base, companyId),
+      ),
     }
   }
 
@@ -123,7 +126,7 @@ export async function createKnowledgeBase(payload: {
     const now = new Date().toISOString()
     const base = {
       id: nextId('kb'),
-      tenantId: 'tenant-demo',
+      merchantId: DEMO_MERCHANT_ID,
       companyId: payload.companyId,
       allowedCompanyIds: [payload.companyId],
       name: payload.name,
@@ -217,14 +220,14 @@ export async function addKnowledgeDocument(
 ): Promise<KnowledgeDocument> {
   if (USE_MOCK) {
     const state = getMockState()
-    const base = state.bases.find((b) => b.id === baseId)
-    if (!base) throw new ApiError(`Base ${baseId} not found`, 404)
-    if (!canWriteToCompany(MOCK_USER, base.companyId)) {
-      throw new ApiError('You do not have permission to modify this base.', 403)
-    }
-
     const now = new Date().toISOString()
-    const fileUrl = payload.file ? URL.createObjectURL(payload.file) : undefined
+
+    // Synchronous and can't fail in the browser. Note: the URL is only valid
+    // for the current JS session — a reload invalidates it. A real backend
+    // returns a signed storage URL instead.
+    const fileUrl = payload.file
+      ? URL.createObjectURL(payload.file)
+      : undefined
 
     const document: KnowledgeDocument = {
       id: nextId(`${baseId}-doc`),
@@ -243,11 +246,16 @@ export async function addKnowledgeDocument(
 
     state.documents.push({ ...document })
 
-    if (payload.agentIds !== null) setDocumentOverride(document.id, payload.agentIds)
+    if (payload.agentIds !== null) {
+      setDocumentOverride(document.id, payload.agentIds)
+    }
 
-    base.updatedAt = now
+    const base = state.bases.find((b) => b.id === baseId)
+    if (base) {
+      base.updatedAt = now
+    }
 
-    // Auto ingestion: mostly ready, occasionally failed.
+    // Mock ingestion: flip to ready (or failed) after a moment.
     window.setTimeout(() => {
       const live = state.documents.find((d) => d.id === document.id)
       if (!live) return

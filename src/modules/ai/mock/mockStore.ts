@@ -5,6 +5,8 @@
  * the first argument. Nothing bypasses `permissions.ts` by accident.
  */
 
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
+import type { AgentListItem } from '@/modules/ai/agents/types/agent'
 import {
   SEED_AGENTS,
   SEED_KNOWLEDGE_BASES,
@@ -86,10 +88,16 @@ export function nextId(prefix: string): string {
 /* Relation reads                                                      */
 /* ------------------------------------------------------------------ */
 
-export function agentIdsForBase(baseId: string): string[] {
+export function agentIdsForBase(
+  baseId: string,
+  restrictToCompanyId?: string,
+): string[] {
   return state.agents
-    .filter((a) => a.knowledgeBaseIds.includes(baseId))
-    .map((a) => a.id)
+    .filter((agent) => agent.knowledgeBaseIds.includes(baseId))
+    .filter(
+      (agent) => !restrictToCompanyId || agent.companyId === restrictToCompanyId,
+    )
+    .map((agent) => agent.id)
 }
 
 export function effectiveAgentIdsForDocument(documentId: string): {
@@ -128,10 +136,10 @@ export function setDocumentOverride(documentId: string, agentIds: string[] | nul
 /* Row projections                                                     */
 /* ------------------------------------------------------------------ */
 
-export function toAgentListItem(agent: SeedAgent) {
+export function toAgentListItem(agent: SeedAgent): AgentListItem {
   return {
     id: agent.id,
-    tenantId: agent.tenantId,
+    merchantId: agent.merchantId,
     companyId: agent.companyId,
     name: agent.name,
     description: agent.description,
@@ -144,8 +152,8 @@ export function toAgentListItem(agent: SeedAgent) {
   }
 }
 
-export function toBaseListItem(base: SeedKnowledgeBase) {
-  const agentIds = agentIdsForBase(base.id)
+export function toBaseListItem(base: SeedKnowledgeBase, restrictToCompanyId?: string,) {
+  const agentIds = agentIdsForBase(base.id, restrictToCompanyId)
   const documents = state.documents.filter((d) => d.baseId === base.id)
   const skillCount = state.skills.filter((s) => s.baseId === base.id).length
   const dataSourceCount = state.dataSources.filter((d) => d.baseId === base.id).length
@@ -164,7 +172,7 @@ export function toBaseListItem(base: SeedKnowledgeBase) {
 
   return {
     id: base.id,
-    tenantId: base.tenantId,
+    merchantId: base.merchantId,
     companyId: base.companyId,
     allowedCompanyIds: [...base.allowedCompanyIds],
     name: base.name,
@@ -284,7 +292,7 @@ export function adoptTemplate(
 
   const base: SeedKnowledgeBase = {
     id: baseId,
-    tenantId: 'tenant-demo',
+    merchantId: DEMO_MERCHANT_ID,
     companyId: payload.companyId,
     // Adopted bases start owner-only; visibility can be widened later.
     allowedCompanyIds: [payload.companyId],

@@ -133,6 +133,7 @@ export type OrganizationNode = {
 }
 
 export type PositionRecord = {
+  level?: 'manager' | 'staff'
   id: string
   companyId?: string
   organizationId?: string | null

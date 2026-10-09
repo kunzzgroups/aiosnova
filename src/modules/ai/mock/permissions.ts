@@ -1,3 +1,4 @@
+import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 /**
  * Role + Visibility permission model.
  *
@@ -26,7 +27,7 @@ export type Membership = {
 
 export type User = {
   userId: string
-  tenantId: string
+  merchantId: string
   memberships: Membership[]
 }
 
@@ -42,7 +43,7 @@ export type User = {
  */
 export const MOCK_USER: User = {
   userId: 'user-demo',
-  tenantId: 'tenant-demo',
+  merchantId: DEMO_MERCHANT_ID,
   memberships: [
     { companyId: 'company-j1', role: 'admin' },
     { companyId: 'company-j2', role: 'editor' },

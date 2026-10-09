@@ -20,6 +20,7 @@ import { useCompanyStore } from '@/stores/companyStore'
 import { fetchAgents } from '@/modules/ai/agents/services/agentService'
 import type { AgentListItem } from '@/modules/ai/agents/types/agent'
 import { ApiError } from '@/services/httpClient'
+import { IconPlus, IconSettings, IconSpark } from '@/components/icons/Icons'
 import {
   createKnowledgeBase,
   deleteKnowledgeBase,
@@ -61,18 +62,6 @@ const KIND_LABEL_KEY: Record<KnowledgeBaseKind, string> = {
 const KIND_ORDER: KnowledgeBaseKind[] = ['document', 'skill', 'data']
 const OTHER_CATEGORY = 'Other'
 
-/**
- * L1: the knowledge bases visible while acting as the ACTIVE company.
- *
- * Two creation flows:
- *   - Create:       an empty base named by the user.
- *   - Use template: adopt a snapshot from the tenant-level template library.
- *
- * Per row:
- *   - Rename / Delete (write access).
- *   - Promote to template (admin of the base's owner company): snapshots the
- *     base into the library and lets the admin choose who can see it.
- */
 export function KnowledgeBasesPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -88,7 +77,6 @@ export function KnowledgeBasesPage() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-  // ---- Create / rename drawer
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -97,11 +85,9 @@ export function KnowledgeBasesPage() {
   const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
 
-  // ---- Delete dialog
   const [pendingDelete, setPendingDelete] = useState<KnowledgeBaseListItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // ---- Adopt template drawer
   const [templateOpen, setTemplateOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateListItem[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
@@ -111,12 +97,12 @@ export function KnowledgeBasesPage() {
   const [isAdopting, setIsAdopting] = useState(false)
   const [templateError, setTemplateError] = useState<string | null>(null)
 
-  // ---- Promote dialog
   const [pendingPromote, setPendingPromote] = useState<KnowledgeBaseListItem | null>(null)
   const [promoteName, setPromoteName] = useState('')
   const [promoteVisibility, setPromoteVisibility] = useState<string[]>([])
   const [promoteSearch, setPromoteSearch] = useState('')
   const [isPromoting, setIsPromoting] = useState(false)
+  const [query, setQuery] = useState('')
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -142,12 +128,7 @@ export function KnowledgeBasesPage() {
   }, [load])
 
   const companyName = companies.find((item) => item.value === companyId)?.label ?? ''
-
-  /* ---- Permission-aware flags (recomputed when the active company changes) ---- */
-  const canUseTemplates = useMemo(
-    () => userCanSeeTemplates(companyId),
-    [companyId],
-  )
+  const canUseTemplates = useMemo(() => userCanSeeTemplates(companyId), [companyId])
 
   const agentItems = useMemo(
     () =>
@@ -168,10 +149,25 @@ export function KnowledgeBasesPage() {
   )
 
   const visibleBases = useMemo(() => {
-    if (!agentIdFilter) return bases
-    return bases.filter((base) => base.agentIds?.includes(agentIdFilter))
-  }, [bases, agentIdFilter])
+    let list = bases
+    if (agentIdFilter) {
+      list = list.filter((base) => base.agentIds?.includes(agentIdFilter))
+    }
+    const needle = query.trim().toLowerCase()
+    if (needle) {
+      list = list.filter(
+        (base) =>
+          base.name.toLowerCase().includes(needle) ||
+          base.description.toLowerCase().includes(needle),
+      )
+    }
+    return list
+  }, [bases, agentIdFilter, query])
 
+  /**
+   * Group by kind, then by category. Inside each category, bases are sorted
+   * A → Z by name. No counts shown anywhere.
+   */
   const groupedByKind = useMemo(() => {
     const byKind = new Map<KnowledgeBaseKind, Map<string, KnowledgeBaseListItem[]>>()
 
@@ -189,12 +185,20 @@ export function KnowledgeBasesPage() {
     return KIND_ORDER.flatMap((kindId) => {
       const categories = byKind.get(kindId)
       if (!categories || categories.size === 0) return []
+
+      // Categories: A–Z, but "Other" pinned to the end.
       const entries = [...categories.entries()]
-      const otherIndex = entries.findIndex(([key]) => key === OTHER_CATEGORY)
-      if (otherIndex > -1 && otherIndex < entries.length - 1) {
-        const [other] = entries.splice(otherIndex, 1)
-        entries.push(other)
-      }
+        .map(([category, items]) => [
+          category,
+          // Bases inside: A → Z by name.
+          items.slice().sort((a, b) => a.name.localeCompare(b.name)),
+        ] as [string, KnowledgeBaseListItem[]])
+        .sort(([a], [b]) => {
+          if (a === OTHER_CATEGORY) return 1
+          if (b === OTHER_CATEGORY) return -1
+          return a.localeCompare(b)
+        })
+
       return [{ kind: kindId, categories: entries }]
     })
   }, [visibleBases])
@@ -206,7 +210,6 @@ export function KnowledgeBasesPage() {
 
   /* ---------------- Promote visibility helpers ---------------- */
 
-  /** Companies with the owner first, then alphabetical. */
   const orderedPromoteCompanies = useMemo(() => {
     if (!pendingPromote) return companies
     const ownerId = pendingPromote.companyId
@@ -218,7 +221,6 @@ export function KnowledgeBasesPage() {
     return owner ? [owner, ...rest] : companies
   }, [companies, pendingPromote])
 
-  /** Filtered by the search box. Owner is preserved even if filtered out. */
   const visiblePromoteCompanies = useMemo(() => {
     const needle = promoteSearch.trim().toLowerCase()
     if (!needle) return orderedPromoteCompanies
@@ -249,8 +251,6 @@ export function KnowledgeBasesPage() {
     setPromoteVisibility([...next])
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Create / rename                                                     */
   /* ------------------------------------------------------------------ */
 
   function clearAgentFilter() {
@@ -331,10 +331,6 @@ export function KnowledgeBasesPage() {
     }
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Delete                                                              */
-  /* ------------------------------------------------------------------ */
-
   async function handleDelete() {
     if (!pendingDelete || isDeleting) return
     setIsDeleting(true)
@@ -352,10 +348,6 @@ export function KnowledgeBasesPage() {
       setIsDeleting(false)
     }
   }
-
-  /* ------------------------------------------------------------------ */
-  /* Adopt template                                                      */
-  /* ------------------------------------------------------------------ */
 
   function openTemplates() {
     setTemplateOpen(true)
@@ -415,14 +407,9 @@ export function KnowledgeBasesPage() {
     }
   }
 
-  /* ------------------------------------------------------------------ */
-  /* Promote to template                                                 */
-  /* ------------------------------------------------------------------ */
-
   function openPromote(base: KnowledgeBaseListItem) {
     setPendingPromote(base)
     setPromoteName(base.name)
-    // Owner company is always selected and cannot be unchecked.
     setPromoteVisibility([base.companyId])
     setPromoteSearch('')
     setError(null)
@@ -470,7 +457,14 @@ export function KnowledgeBasesPage() {
 
       <section className="console-panel">
         <div className="console-panel__title-row">
-          <h2>{t('ai.knowledge.listTitle')}</h2>
+          <TextField
+            className="console-panel__search console-panel__search--lead"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('ai.knowledge.searchBasesPlaceholder', 'Search knowledge bases…')}
+            aria-label={t('ai.knowledge.searchBasesAria', 'Search knowledge bases')}
+          />
           <div className="console-panel__actions">
             {canUseTemplates ? (
               <>
@@ -478,21 +472,21 @@ export function KnowledgeBasesPage() {
                   variant="secondary"
                   onClick={() => void navigate('/ai/ai/knowledge/templates')}
                 >
+                  <IconSettings />
                   {t('ai.knowledge.manageTemplates', 'Manage templates')}
                 </Button>
                 <Button variant="secondary" onClick={openTemplates}>
+                  <IconSpark />
                   {t('ai.knowledge.useTemplate')}
                 </Button>
               </>
             ) : null}
-            <Button onClick={openCreate}>{t('ai.knowledge.create')}</Button>
+            <Button onClick={openCreate}>
+              <IconPlus />
+              {t('ai.knowledge.create')}
+            </Button>
           </div>
         </div>
-        <p className="console-hint">
-          {companyName
-            ? t('ai.knowledge.companyScope', { company: companyName })
-            : t('ai.knowledge.companyScopeUnknown')}
-        </p>
 
         {activeAgent ? (
           <div className="console-filter-chip">
@@ -524,9 +518,7 @@ export function KnowledgeBasesPage() {
                   <h3 className="knowledge-kind__title">
                     {t(KIND_LABEL_KEY[kindId])}
                   </h3>
-                  <span className="knowledge-kind__count">
-                    {categories.reduce((sum, [, items]) => sum + items.length, 0)}
-                  </span>
+                  {/* count removed */}
                 </header>
 
                 <div className="knowledge-groups">
@@ -534,77 +526,74 @@ export function KnowledgeBasesPage() {
                     <section className="knowledge-group" key={category}>
                       <header className="knowledge-group__header">
                         <h4 className="knowledge-group__title">{category}</h4>
-                        <span className="knowledge-group__count">{items.length}</span>
+                        {/* count removed */}
                       </header>
                       <ul className="knowledge-bases">
-                        {items.map((base) => {
-                          const canPromoteThis = userCanPromoteBase(base.id)
-                          return (
-                            <li className="knowledge-base-row" key={base.id}>
-                              <Link
-                                className="knowledge-base"
-                                to={`/ai/ai/knowledge/${base.id}/${tabForKind(
-                                  base.kind ?? 'document',
-                                )}`}
-                              >
-                                <div className="knowledge-base__body">
-                                  <strong className="knowledge-base__name">
-                                    {base.name}
-                                  </strong>
-                                  <span className="knowledge-base__description">
-                                    {base.description}
-                                  </span>
-                                  <div className="knowledge-base__meta">
-                                    {base.kind === 'document' ? (
-                                      <span>
-                                        {t('ai.knowledge.documentCount', {
-                                          count: base.documentCount,
-                                        })}
-                                      </span>
-                                    ) : null}
-                                    <span>
-                                      {base.agentCount > 0
-                                        ? t('ai.knowledge.agentCount', {
-                                            count: base.agentCount,
-                                          })
-                                        : t('ai.knowledge.agentCountNone')}
-                                    </span>
-                                  </div>
-                                </div>
-                                <span
-                                  className={`console-status console-status--${base.status} knowledge-base__status`}
-                                >
-                                  {t(STATUS_LABEL_KEY[base.status])}
+                        {items.map((base) => (
+                          <li className="knowledge-base-row" key={base.id}>
+                            <Link
+                              className="knowledge-base"
+                              to={`/ai/ai/knowledge/${base.id}/${tabForKind(
+                                base.kind ?? 'document',
+                              )}`}
+                            >
+                              <div className="knowledge-base__body">
+                                <strong className="knowledge-base__name">
+                                  {base.name}
+                                </strong>
+                                <span className="knowledge-base__description">
+                                  {base.description}
                                 </span>
-                              </Link>
-                              <RowMenu
-                                label={t('ai.knowledge.rowActions', { name: base.name })}
-                                items={[
-                                  {
-                                    id: 'rename',
-                                    label: t('ai.knowledge.rename'),
-                                    onSelect: () => openRename(base),
-                                  },
-                                  ...(canPromoteThis
-                                    ? [
-                                        {
-                                          id: 'promote',
-                                          label: t('ai.knowledge.promote'),
-                                          onSelect: () => openPromote(base),
-                                        },
-                                      ]
-                                    : []),
-                                  {
-                                    id: 'delete',
-                                    label: t('ai.knowledge.delete'),
-                                    destructive: true,
-                                    onSelect: () => setPendingDelete(base),
-                                  },
-                                ]}
-                              />
-                            </li>
-                          )
-                        })}
+                                <div className="knowledge-base__meta">
+                                  {base.kind === 'document' ? (
+                                    <span>
+                                      {t('ai.knowledge.documentCount', {
+                                        count: base.documentCount,
+                                      })}
+                                    </span>
+                                  ) : null}
+                                  <span>
+                                    {base.agentCount > 0
+                                      ? t('ai.knowledge.agentCount', {
+                                        count: base.agentCount,
+                                      })
+                                      : t('ai.knowledge.agentCountNone')}
+                                  </span>
+                                </div>
+                              </div>
+                              <span
+                                className={`console-status console-status--${base.status} knowledge-base__status`}
+                              >
+                                {t(STATUS_LABEL_KEY[base.status])}
+                              </span>
+                            </Link>
+                            <RowMenu
+                              label={t('ai.knowledge.rowActions', { name: base.name })}
+                              items={[
+                                {
+                                  id: 'rename',
+                                  label: t('ai.knowledge.rename'),
+                                  onSelect: () => openRename(base),
+                                },
+                                ...(userCanPromoteBase(base.id)
+                                  ? [
+                                    {
+                                      id: 'promote',
+                                      label: t('ai.knowledge.promote'),
+                                      onSelect: () => openPromote(base),
+                                    },
+                                  ]
+                                  : []),
+                                {
+                                  id: 'delete',
+                                  label: t('ai.knowledge.delete'),
+                                  destructive: true,
+                                  onSelect: () => setPendingDelete(base),
+                                },
+                              ]}
+                            />
+                          </li>
+                        ))}
                       </ul>
                     </section>
                   ))}
@@ -708,9 +697,8 @@ export function KnowledgeBasesPage() {
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        className={`console-kind-card${
-                          selected ? ' console-kind-card--selected' : ''
-                        }`}
+                        className={`console-kind-card${selected ? ' console-kind-card--selected' : ''
+                          }`}
                         onClick={() => setKind(option)}
                         disabled={isSaving}
                       >
@@ -913,7 +901,6 @@ export function KnowledgeBasesPage() {
           />
         </FormField>
 
-        {/* ---- Visibility picker ---- */}
         <div className="console-form__section">
           <h4>{t('ai.knowledge.promoteVisibility', 'Who can see this template?')}</h4>
           <p>

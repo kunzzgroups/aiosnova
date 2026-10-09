@@ -1,4 +1,5 @@
 export const users: Record<string, string> = {
+  'users.clearFilters': '清除筛选条件',
   'users.assignedCompanies': '分配的公司',
   'users.designEmployee': '员工',
   'users.designCompanies': '公司',

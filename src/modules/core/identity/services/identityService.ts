@@ -35,6 +35,10 @@ export async function fetchCompanies() {
   return apiRequest<{ items: CompanyListItem[] }>('/api/identity/companies', { auth: true })
 }
 
+export async function fetchAccessibleCompanies() {
+  return apiRequest<{ items: CompanyListItem[] }>('/api/identity/accessible-companies', { auth: true, cache: 'no-store' })
+}
+
 export async function fetchCompany(id: string) {
   return apiRequest<{ company: CompanyListItem; members: CompanyMember[] }>(
     `/api/identity/companies/${id}`,
@@ -172,6 +176,7 @@ export async function fetchPositions(companyId?: string) {
 }
 
 export async function createPosition(payload: {
+  level?: PositionRecord['level']
   companyId?: string
   organizationId?: string | null
   code?: string
@@ -187,7 +192,7 @@ export async function createPosition(payload: {
 
 export async function updatePosition(
   id: string,
-  payload: Partial<Pick<PositionRecord, 'name' | 'description' | 'status' | 'organizationId'>>,
+  payload: Partial<Pick<PositionRecord, 'name' | 'description' | 'status' | 'organizationId' | 'level'>>,
 ) {
   return apiRequest<PositionRecord>(`/api/identity/positions/${id}`, {
     method: 'PATCH',

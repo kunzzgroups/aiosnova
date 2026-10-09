@@ -113,6 +113,19 @@ function directoryActor(request: Request) {
   return identityUsers.find(u=>u.id===id)
 }
 
+function canAccessCompany(request: Request, companyId: string | null | undefined) {
+  const actor = directoryActor(request)
+  const company = identityCompanies.find(item => item.id === companyId && item.merchantId === DEMO_MERCHANT_ID && item.status === 'active')
+  if (!actor || actor.status !== 'active' || !company) return false
+  if (actor.isOwner) return true
+  const today = new Date().toLocaleDateString('en-CA')
+  return identityMemberships.some(item => item.userId === actor.id && item.merchantId === company.merchantId && item.companyId === company.id && item.status === 'active' && item.validFrom <= today && (!item.validTo || item.validTo >= today))
+}
+
+function companyAccessDenied() {
+  return HttpResponse.json({ message: 'You do not have access to this company.' }, { status: 403 })
+}
+
 async function saveInvitation(request: Request, id?: string) {
     const actor = directoryActor(request)
     if (!actor?.isOwner && !actor?.canManageUsers && !actor?.canInvite) return HttpResponse.json({ message: 'You do not have permission to invite users.' }, { status: 403 })
@@ -179,6 +192,10 @@ async function saveInvitation(request: Request, id?: string) {
 }
 
 export const identityHandlers = [
+  http.get('/api/identity/accessible-companies', async ({ request }) => {
+    await loadSavedDirectory()
+    return HttpResponse.json({ items: identityCompanies.filter(company => canAccessCompany(request, company.id)).map(withMemberCount) })
+  }),
   http.post('/api/mock/invitations/:token/activate', async ({ request }) => {
     const response = await fetch(bypass(request))
     const result = await response.json()
@@ -189,7 +206,12 @@ export const identityHandlers = [
   http.get('/api/identity/invitation-options', async ({ request }) => {
     await loadSavedDirectory()
     const actor=directoryActor(request)
-    return HttpResponse.json(mockInvitationOptions(Boolean(actor?.isOwner || actor?.canManageUsers || actor?.canInvite)))
+    const options = mockInvitationOptions(Boolean(actor?.isOwner || actor?.canManageUsers || actor?.canInvite))
+    return HttpResponse.json({
+      ...options,
+      companies: options.companies.filter(company => canAccessCompany(request, company.id)),
+      departments: options.departments.filter(department => canAccessCompany(request, identityOrganizations.find(item => item.id === department.id)?.companyId)),
+    })
   }),
   http.get('/api/identity/meta', () => {
     return HttpResponse.json({
@@ -402,9 +424,11 @@ export const identityHandlers = [
     return HttpResponse.json(withMemberCount(company))
   }),
 
-  http.get('/api/identity/organizations', ({ request }) => {
+  http.get('/api/identity/organizations', async ({ request }) => {
+    await loadSavedDirectory()
     const companyId = new URL(request.url).searchParams.get('companyId')
-    const items = identityOrganizations.filter(item => !companyId || item.companyId===companyId).sort((a, b) => a.sortOrder - b.sortOrder)
+    if (companyId && !canAccessCompany(request, companyId)) return companyAccessDenied()
+    const items = identityOrganizations.filter(item => item.merchantId === DEMO_MERCHANT_ID && canAccessCompany(request, item.companyId) && (!companyId || item.companyId===companyId)).sort((a, b) => a.sortOrder - b.sortOrder)
     return HttpResponse.json({ items })
   }),
 
@@ -427,6 +451,9 @@ export const identityHandlers = [
     const parentId = body.parentId ?? null
     const companyId = body.companyId ?? 'company-retail'
 
+    if (!canAccessCompany(request, companyId)) return companyAccessDenied()
+    if (body.managerPositionId && !identityPositions.some(item => item.id === body.managerPositionId && item.companyId === companyId && item.merchantId === DEMO_MERCHANT_ID)) return companyAccessDenied()
+
     if (!code || !name) {
       return HttpResponse.json({ message: 'Code and name are required.' }, { status: 400 })
     }
@@ -435,7 +462,7 @@ export const identityHandlers = [
       return HttpResponse.json({ message: 'Organization code already exists in this merchant.' }, { status: 409 })
     }
 
-    if (parentId && !identityOrganizations.some((item) => item.id === parentId)) {
+    if (parentId && !identityOrganizations.some((item) => item.id === parentId && item.companyId === companyId && item.merchantId === DEMO_MERCHANT_ID)) {
       return HttpResponse.json({ message: 'Parent organization not found.' }, { status: 400 })
     }
 
@@ -461,6 +488,7 @@ export const identityHandlers = [
     const actor=directoryActor(request)
     if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const node = identityOrganizations.find((item) => item.id === params.id)
+    if (!node || node.merchantId !== DEMO_MERCHANT_ID || !canAccessCompany(request, node.companyId)) return companyAccessDenied()
     if (!node) {
       return HttpResponse.json({ message: 'Organization not found.' }, { status: 404 })
     }
@@ -469,11 +497,13 @@ export const identityHandlers = [
       Pick<OrganizationNode, 'name' | 'status' | 'parentId' | 'type' | 'managerPositionId'>
     >
 
+    if (body.managerPositionId && !identityPositions.some(item => item.id === body.managerPositionId && item.companyId === node.companyId && item.merchantId === node.merchantId)) return companyAccessDenied()
+
     if (body.parentId !== undefined) {
       if (wouldCreateCycle(node.id, body.parentId)) {
         return HttpResponse.json({ message: 'Cannot move organization under its descendant.' }, { status: 409 })
       }
-      if (body.parentId && !identityOrganizations.some((item) => item.id === body.parentId)) {
+      if (body.parentId && !identityOrganizations.some((item) => item.id === body.parentId && item.companyId === node.companyId && item.merchantId === node.merchantId)) {
         return HttpResponse.json({ message: 'Parent organization not found.' }, { status: 400 })
       }
       node.parentId = body.parentId
@@ -498,6 +528,7 @@ export const identityHandlers = [
     const actor=directoryActor(request)
     if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const index = identityOrganizations.findIndex((item) => item.id === params.id)
+    if (index < 0 || identityOrganizations[index]!.merchantId !== DEMO_MERCHANT_ID || !canAccessCompany(request, identityOrganizations[index]!.companyId)) return companyAccessDenied()
     if (index < 0) {
       return HttpResponse.json({ message: 'Organization not found.' }, { status: 404 })
     }
@@ -522,9 +553,11 @@ export const identityHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.get('/api/identity/positions', ({ request }) => {
+  http.get('/api/identity/positions', async ({ request }) => {
+    await loadSavedDirectory()
     const companyId = new URL(request.url).searchParams.get('companyId')
-    return HttpResponse.json({ items: identityPositions.filter(item => !companyId || item.companyId===companyId) })
+    if (companyId && !canAccessCompany(request, companyId)) return companyAccessDenied()
+    return HttpResponse.json({ items: identityPositions.filter(item => item.merchantId === DEMO_MERCHANT_ID && canAccessCompany(request, item.companyId) && (!companyId || item.companyId===companyId)) })
   }),
 
   http.post('/api/identity/positions', async ({ request }) => {
@@ -537,6 +570,7 @@ export const identityHandlers = [
       companyId?: string
       organizationId?: string | null
       description?: string
+      level?: PositionRecord['level']
     }
 
     const code = body.code?.trim().toUpperCase() || createId('pos-code').toUpperCase()
@@ -547,6 +581,8 @@ export const identityHandlers = [
     }
 
     const companyId = body.companyId ?? 'company-retail'
+    if (!canAccessCompany(request, companyId)) return companyAccessDenied()
+    if (body.organizationId && !identityOrganizations.some(item => item.id === body.organizationId && item.companyId === companyId && item.merchantId === DEMO_MERCHANT_ID)) return companyAccessDenied()
     if (identityPositions.some((item) => item.code === code && item.companyId===companyId)) {
       return HttpResponse.json({ message: 'Position code already exists in this merchant.' }, { status: 409 })
     }
@@ -558,6 +594,7 @@ export const identityHandlers = [
       merchantId: DEMO_MERCHANT_ID,
       code,
       name,
+      level: body.level,
       description: body.description?.trim() ?? '',
       status: 'active',
     }
@@ -571,14 +608,18 @@ export const identityHandlers = [
     const actor=directoryActor(request)
     if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const position = identityPositions.find((item) => item.id === params.id)
+    if (!position || position.merchantId !== DEMO_MERCHANT_ID || !canAccessCompany(request, position.companyId)) return companyAccessDenied()
     if (!position) {
       return HttpResponse.json({ message: 'Position not found.' }, { status: 404 })
     }
 
     const body = (await request.json()) as Partial<
-      Pick<PositionRecord, 'name' | 'description' | 'status' | 'organizationId'>
+      Pick<PositionRecord, 'name' | 'description' | 'status' | 'organizationId' | 'level'>
     >
 
+    if (body.organizationId && !identityOrganizations.some(item => item.id === body.organizationId && item.companyId === position.companyId && item.merchantId === position.merchantId)) return companyAccessDenied()
+
+    if (body.level !== undefined) position.level = body.level
     if (body.name !== undefined) {
       position.name = body.name.trim()
     }
@@ -598,6 +639,7 @@ export const identityHandlers = [
     const actor=directoryActor(request)
     if (!actor?.isOwner && !actor?.canManageUsers) return HttpResponse.json({ message:'Permission denied.' }, { status:403 })
     const index=identityPositions.findIndex(item => item.id===params.id)
+    if (index < 0 || identityPositions[index]!.merchantId !== DEMO_MERCHANT_ID || !canAccessCompany(request, identityPositions[index]!.companyId)) return companyAccessDenied()
     if (index<0) return HttpResponse.json({ message:'Position not found.' }, { status:404 })
     if (identityMemberships.some(item => item.positionId===params.id && item.status==='active')) return HttpResponse.json({ message:'Position has active memberships.' }, { status:409 })
     if (identityOrganizations.some(item => item.managerPositionId===params.id)) return HttpResponse.json({ message:'Reassign managed departments first.' }, { status:409 })
