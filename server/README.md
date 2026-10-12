@@ -1,6 +1,63 @@
+## Company-scoped Organization permissions (V9)
+
+V9 has been applied to the configured development database. It adds the shared identity table `company_user_permission_grants` (merchant, company, user, permission). No existing employee-management grants or company memberships are copied into Organization grants. Existing owner access is preserved; other users default to no Organization access until explicitly granted `organization.read` or `organization.manage` for that company. Manage implies read, but neither permission grants company membership or access to another company.
+
+All Organization reads and writes enforce these grants server-side, including batch replays. `GET /api/identity/organization-companies` keeps accessible companies and adds `canRead`/`canManage` for navigation; `GET /organizations` also returns these capabilities. Company switching remains independent. The frontend hides Organization navigation without read access and existing mutation controls without management access; direct URLs still enforce backend denial. Navigation capability failures default to hidden; opening the page uses the existing translated error/retry state.
+
+The existing role/access pages remain mocked: this extends the backend's direct-grant model, not a database-backed role assignment system. Permission administration UI/API and audited grant delegation remain pending; do not assign grants from employee position names or employee-management toggles. No non-owner grants were provisioned. Restart the backend after updating. V7 remains pending and is not required by V9.
+
+Verification: frontend build, Maven package and rolled-back database checks passed for owner access, default denial, independence from employee management, read-only mutation denial, manage-implies-read, company/membership scope and revoked batch retries. Browser interactions have not been verified; existing Vite chunk/import warnings remain.
+
 # Backend development
 
+## Organization catalog (V4)
+
+`src/main/resources/db/migration/mysql/V4__create_organization_catalog.sql` was applied to the configured MySQL development database on 2026-10-12. Do not rerun it. It creates `organization_departments`, `organization_positions`, and `organization_position_assignments`, and adds the scoped membership unique key. Department executive links use `executive_position_id`.
+
+All three tables are initially empty. The schema was verified with 13 foreign keys and 8 check constraints; no existing data was backfilled.
+
+### Organization codes removed (V5)
+
+`src/main/resources/db/migration/mysql/V5__remove_organization_codes.sql` was applied on 2026-10-12. It removes department/position `code` columns and their unique indexes. All other values in 9 departments and 12 positions, and all 13 foreign keys, were preserved. Do not rerun V5. For a new database, apply V1 through V5 in order; preserve the already-applied V4. Company codes remain unchanged.
+
+### Organization APIs
+
+`V8__organization_batch_idempotency.sql` was applied on 2026-10-12 after V6; it does not require the deferred V7 triggers. Batch creation now requires a UUID `requestId`. The request key is scoped to merchant/company/actor, checked after current authorization, and recorded atomically with created IDs and audits. Identical retries reuse the created IDs and return current catalog data; using a key with different content returns 409. Failed transactions leave no completed-request record.
+
+OrganizationPage keeps the same key when retrying an unchanged queued batch; changed content or a newly opened dialog starts a new request. Closing/reloading the page does not retain its queue or retry key. Successful position edits update the local record/version and close the dialog before refreshing related data. A refresh failure shows a saved-but-refresh-failed notice; its Retry button only reads data, and stale-data mutations stay disabled until refresh succeeds. Authentication/access errors clear cached catalog data.
+
+Backend/frontend builds, rolled-back MySQL replay/scope/conflict checks and simulated frontend save/refresh failures passed. Browser rendering has not been verified. Restart the backend after updating; deployments must apply V8 before using the new batch contract.
+
+Department availability now includes every ancestor's status. Deactivating a department preserves saved child statuses; children display inherited inactivity and previously active children become available again on reactivation. OrganizationPage confirms deactivation of departments with descendants from both the status toggle and edit dialog. New/moved positions are rejected if any department in their ancestor chain is inactive. Executive headers omit status controls; position status remains available in the Positions tab.
+
+`V7__guard_inactive_department_assignments.sql` is prepared but **not applied**: the configured database account cannot create triggers while binary logging requires SUPER privileges. A database administrator must apply V7; server settings were not changed. It serializes assignment insertion/reassignment with company updates and blocks new active assignments under inactive branches, while preserving existing assignments and allowing them to end. Assignment CRUD remains unconnected to the UI. V1–V6 remain the applied schema baseline.
+
+`src/main/resources/db/migration/mysql/V6__remove_position_description.sql` was applied on 2026-10-12. It removes the unused position `description` column; all other values in 12 positions and all 13 foreign keys were preserved. Do not rerun V6. New database setup must apply V1 through V6 in order. Department/position API records no longer expose codes or descriptions.
+
+OrganizationPage now uses Spring JDBC APIs under `/api/identity`. Reads and writes require a real backend session; mock Google/password tokens are rejected. Reads require active company access and `organization.read` or `organization.manage`; writes require `organization.manage`. Existing owner access is preserved. Database company IDs are resolved by company code at the frontend adapter boundary while the existing company switcher remains mocked.
+
+- `GET /organization-companies`: accessible active database companies.
+- `GET /organizations?companyId=UUID`: departments and current management capability.
+- `GET /positions?companyId=UUID&date=YYYY-MM-DD`: positions, distinct active employee counts and assignment-history counts.
+- `POST /organizations`, `POST /positions`: create a department or position.
+- `PATCH /organizations/{id}`, `PATCH /positions/{id}`: update using the current `version` in the request body.
+- `DELETE /organizations/{id}?version=N`, `DELETE /positions/{id}?version=N`: delete an unreferenced record.
+- `POST /organization-batches`: atomically create queued departments or positions for a company; executive position creation can include `managedDepartmentIds`.
+- `POST /positions/bulk-delete`: atomically delete inactive positions using `{companyId, items:[{id,version}]}`.
+
+The API preserves the frontend field `managerPositionId`, mapped to `executive_position_id` in MySQL. Company/merchant scope, hierarchy cycles, executive management, active department placement, stale versions and deletion dependencies are enforced server-side. Writes and their audit records share a transaction. Department and position records use UUID IDs; they do not expose separate codes.
+
+Employee counts use `organization_position_assignments`, active effective company memberships and active users. Assignment CRUD, invitation/edit picker integration and migration of existing mock `department_ref`/`position_ref` values remain pending. Historical assignments prevent hard deletion; keep referenced positions inactive. No sample departments or positions are seeded automatically.
+
+Development Vite proxies these organization routes to port 8080; MSW passes them through. Restart the backend and Vite after updating. Deployment must route these API paths to the backend; frontend build success does not establish production hosting or database connectivity.
+
+Verification: Maven package, frontend build, rolled-back MySQL service checks for CRUD/hierarchy/counts/permissions/batch failures, and isolated HTTP checks rejecting mock sessions passed. Browser interaction with a real OTP/MFA session has not been verified.
+
 ## Saved user edits and sessions (V3)
+
+Audit `changes` now stores JSON for new user profile, department/position CRUD, executive-management and invitation lifecycle events. Only changed fields are included as `{field:{before:...,after:...}}`; creation/deletion uses null for the absent side. Profile email, names, phone and avatar changes use `{changed:true,redacted:true}` instead of copying personal values. Authentication tokens, OTPs, MFA credentials and invitation messages are never included. Updates without business-field changes store `{}`.
+
+Company changes include active memberships and pending invitation assignments. Audit inserts participate in their operation's existing transaction. Historical null entries cannot be backfilled reliably and are preserved. No schema migration is required. Maven package and rolled-back MySQL checks verified JSON persistence, before/after values, related management updates, pending company changes, redaction and no-op updates.
 
 `src/main/resources/db/migration/mysql/V3__user_edit_permissions_and_sessions.sql` has been applied to the configured development database. Do not rerun it. It adds session merchant/CSRF hashes, merchant-scoped permission grants and directory settings.
 

@@ -19,12 +19,13 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useNavLabel } from '@/i18n/useNavLabel'
 import { useAuthStore } from '@/stores/authStore'
-import { useCompanyStore } from '@/stores/companyStore'
+import { useCompanyStore, type CompanyGroupOption } from '@/stores/companyStore'
 import { logout } from '@/modules/core/auth/services/authService'
 import { fetchAccessibleCompanies } from '@/modules/core/identity/services/identityService'
 import type { CompanyRecord } from '@/modules/core/identity/types/identity'
 import type { CompanyGroupRecord } from '@/mocks/data/identity'
 import './Sidebar.css'
+import { useOrganizationAccess } from '@/modules/core/identity/OrganizationAccess'
 
 const COLLAPSED_STORAGE_KEY = 'aios.sidebar.collapsed'
 
@@ -77,27 +78,24 @@ function toCompanyOptions(items: Array<Pick<CompanyRecord, 'id' | 'name' | 'stat
     .map((item) => ({ value: item.id, label: item.name }))
 }
 
-function buildLevel2Items(
-  companies: CompanyOption[],
-  groups: CompanyGroupRecord[],
-): Level2Item[] {
+function buildLevel2Items(companies: CompanyOption[], groups: CompanyGroupOption[]): Level2Item[] {
   const companyMap = new Map(companies.map((item) => [item.value, item]))
-  const groupedIds = new Set(groups.flatMap((group) => group.companyIds))
-
-  const groupItems: Level2Item[] = groups.map((group) => ({
+  const accessibleGroups = groups.filter((group) =>
+    group.hasFullAccess && group.companyIds.length > 0 && group.companyIds.every((id) => companyMap.has(id)),
+  )
+  const groupedIds = new Set(accessibleGroups.flatMap((group) => group.companyIds))
+  const groupItems: Level2Item[] = accessibleGroups.map((group) => ({
     kind: 'group',
     id: group.id,
     label: group.name,
-    companies: group.companyIds
-      .map((id) => companyMap.get(id))
-      .filter((item): item is CompanyOption => Boolean(item)),
+    companies: group.companyIds.map((id) => companyMap.get(id)!),
   }))
-
   const standalone: Level2Item[] = companies
     .filter((item) => !groupedIds.has(item.value))
     .map((item) => ({ kind: 'company', id: item.value, label: item.label }))
-
-  return [...groupItems, ...standalone]
+  return [...groupItems, ...standalone].sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: 'base', numeric: true }),
+  )
 }
 
 async function loadGroupCompaniesData(): Promise<{
@@ -478,6 +476,7 @@ function SectionBlock({
 }
 
 export function Sidebar() {
+  const { canRead }=useOrganizationAccess()
   const location = useLocation()
   const user = useAuthStore((state) => state.user)
   const isHydrated = useAuthStore((state) => state.isHydrated)
@@ -508,7 +507,12 @@ export function Sidebar() {
   const hideFlyoutTimerRef = useRef<number | null>(null)
   const shellRef = useRef<HTMLDivElement>(null)
 
-  const sections = useMemo(() => filterSidebarSections(query), [query])
+  const sections = useMemo(() => {
+    function visible(nodes:SidebarNode[]):SidebarNode[] {
+      return nodes.flatMap<SidebarNode>(node=>node.kind==='link' ? (canRead||!node.path.endsWith('/organization') ? [node] : []) : [{ ...node,children:visible(node.children) }])
+    }
+    return filterSidebarSections(query).map(section=>({ ...section,children:visible(section.children) }))
+  }, [query,canRead])
   const { t } = useTranslation()
   const navLabel = useNavLabel()
   const currentSectionId = useMemo(

@@ -23,6 +23,7 @@ import {
 } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
+import { useCompanyStore } from '@/stores/companyStore'
 import type { CompanyListItem } from '@/modules/core/identity/services/identityService'
 import type { IdentityUser,UserStatus,InvitationOptions,InvitationAssignment,InvitationPayload } from '@/modules/core/identity/types/identity'
 import {
@@ -79,6 +80,8 @@ export function UsersPage() {
         ? t('users.mfaEnabled')
         :t('users.mfaDisabled')
   const sessionUser=useAuthStore((state) => state.user)
+  const activeCompanyId=useCompanyStore((state) => state.companyId)
+  const accessibleCompanies=useCompanyStore((state) => state.companies)
   const [users,setUsers]=useState<IdentityUser[]>([])
   const [companies,setCompanies]=useState<CompanyListItem[]>([])
   const [email,setEmail]=useState('')
@@ -169,6 +172,7 @@ export function UsersPage() {
   const filteredUsers=useMemo(() => {
     const normalizedQuery=query.trim().toLowerCase()
     return users.filter((user) => {
+      if(!isOwner&&(!accessibleCompanies.some(company=>company.value===activeCompanyId)||!memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&m.status!=='ended'))) return false
       if(user.isOwner&&user.id!==sessionUser?.id&&!canManageUsers) return false
       if(!matchesSearch(user,normalizedQuery)) {
         return false
@@ -201,7 +205,7 @@ export function UsersPage() {
       const order=typeof left==='number'&&typeof right==='number' ? left-right : String(left).localeCompare(String(right),i18n.language)
       return sort.descending ? -order : order
     })
-  },[users,query,statusFilter,companyFilter,mfaFilter,memberships,companies,sessionUser?.id,canManageUsers,sort,i18n.language,t])
+  },[users,query,statusFilter,companyFilter,mfaFilter,memberships,companies,sessionUser?.id,canManageUsers,sort,i18n.language,t,activeCompanyId,accessibleCompanies,isOwner])
 
   function clearFieldError(field: InviteField) {
     setFieldErrors(current => ({ ...current, [field]: undefined }))
@@ -258,6 +262,7 @@ export function UsersPage() {
   const someVisibleUsersSelected=selectableVisibleUsers.some(user=>selectedUserIds.includes(user.id))
   const pendingBulkUsers=users.filter(user=>pendingBulkDeleteIds.includes(user.id))
   useEffect(()=>{setSelectedUserIds([]);setPendingBulkDeleteIds([])},[query,statusFilter,companyFilter,mfaFilter,sessionUser?.id,showInvite])
+  useEffect(()=>{if(!isOwner){setCompanyFilter('all');setPage(1);setPendingDelete(null);setSelectedUserIds([]);setPendingBulkDeleteIds([])}},[activeCompanyId,isOwner])
   useEffect(()=>{if(selectAllUsersRef.current) selectAllUsersRef.current.indeterminate=someVisibleUsersSelected&&!allVisibleUsersSelected},[someVisibleUsersSelected,allVisibleUsersSelected,statusFilter,isOwner])
   useEffect(() => { setPage(1) },[query,statusFilter,companyFilter,mfaFilter,effectivePageSize,sort])
   useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,effectivePageSize])

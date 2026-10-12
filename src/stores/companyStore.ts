@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/authStore'
 import type { CompanyGroupRecord } from '@/mocks/data/identity'
 
 export type CompanyOption = { value: string; label: string }
+export type CompanyGroupOption = CompanyGroupRecord & { hasFullAccess: boolean }
 
 export const COMPANY_STORAGE_KEY = 'aios.companyId'
 
@@ -10,7 +11,7 @@ type CompanyState = {
   /** Active companies, as returned by the identity service. */
   companies: CompanyOption[]
   /** Company groups (a group has no page of its own, only member companies). */
-  groups: CompanyGroupRecord[]
+  groups: CompanyGroupOption[]
   companyId: string
   /**
    * Company whose group the top bar previews. Set while hovering a row in the
@@ -89,7 +90,7 @@ export const useCompanyStore = create<CompanyState>((set, get) => ({
       }
     }
     const allowedIds = new Set(companies.map(item => item.value))
-    set({ companies, groups: groups.map(group => ({ ...group, companyIds: group.companyIds.filter(id => allowedIds.has(id)) })).filter(group => group.companyIds.length > 0), companyId: next, previewCompanyId: null, pinnedGroupId: null })
+    set({ companies, groups: groups.map(group => ({ ...group, hasFullAccess: group.companyIds.length > 0 && group.companyIds.every(id => allowedIds.has(id)), companyIds: group.companyIds.filter(id => allowedIds.has(id)) })).filter(group => group.companyIds.length > 0), companyId: next, previewCompanyId: null, pinnedGroupId: null })
   },
   setCompany: (companyId) => {
     if (!get().companies.some(item => item.value === companyId)) return

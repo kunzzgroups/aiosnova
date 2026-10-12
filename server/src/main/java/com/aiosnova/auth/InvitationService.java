@@ -7,6 +7,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import com.aiosnova.audit.AuditChanges;
 import com.aiosnova.mail.EmailService;
 import com.google.zxing.WriterException;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,7 +71,9 @@ public class InvitationService {
         for (AuthRepository.Company company : companies) {
             repository.assignCompany(UUID.randomUUID().toString(), merchantId, id, company.id());
         }
-        repository.audit(merchantId, actor.id(), "invitation.sent", "invitation", id);
+        repository.audit(merchantId, actor.id(), "invitation.sent", "invitation", id,
+                AuditChanges.between(Map.of(), Map.of("status", "sent", "companyCodes", companies.stream().map(AuthRepository.Company::code).sorted().toList(),
+                        "requireMfa", request.requireMfa())));
         String link = frontendUrl + "/activate?token=" + token;
         boolean chinese = "zh-CN".equals(request.language());
         String body = request.personalMessage() + "\n\n"
@@ -111,6 +116,7 @@ public class InvitationService {
         if (companies.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT);
         boolean requireMfa = requiresMfa(invite, companies);
         Instant now = Instant.now();
+        String previousUserStatus = repository.userById(invite.userId()).status();
         if (requireMfa) {
             AuthRepository.Mfa enrollment = repository.enrollment(invite.id());
             if (enrollment == null) throw new ResponseStatusException(HttpStatus.CONFLICT);
@@ -124,7 +130,10 @@ public class InvitationService {
             repository.enableMfa(enrollment.id(), counter, now);
         }
         repository.activate(invite, companies, now);
-        repository.audit(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation", invite.id());
+        Map<String, Object> changes = new LinkedHashMap<>();
+        AuditChanges.add(changes, "status", invite.status(), "accepted");
+        AuditChanges.add(changes, "userStatus", previousUserStatus, repository.userById(invite.userId()).status());
+        repository.audit(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation", invite.id(), changes);
         return account(invite.email());
     }
 

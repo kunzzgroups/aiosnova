@@ -5,7 +5,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -13,9 +15,11 @@ import org.springframework.stereotype.Repository;
 public class AuthRepository {
 
     private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
 
-    public AuthRepository(JdbcTemplate jdbc) {
+    public AuthRepository(JdbcTemplate jdbc, ObjectMapper json) {
         this.jdbc = jdbc;
+        this.json = json;
     }
 
     public User user(String email, boolean lock) {
@@ -29,8 +33,28 @@ public class AuthRepository {
         jdbc.queryForObject("SELECT id FROM users WHERE id = ? FOR UPDATE", String.class, id);
     }
 
+    public List<String> userCompanyCodes(String merchantId, String userId) {
+        return jdbc.queryForList("""
+                SELECT c.code FROM companies c WHERE c.merchant_id = ? AND (
+                    EXISTS(SELECT 1 FROM company_memberships cm WHERE cm.merchant_id = c.merchant_id
+                        AND cm.company_id = c.id AND cm.user_id = ? AND cm.status = 'active')
+                    OR EXISTS(SELECT 1 FROM invitation_company_assignments a
+                        JOIN invitations i ON i.merchant_id = a.merchant_id AND i.id = a.invitation_id
+                        JOIN users u ON u.id = i.user_id AND u.status = 'invited'
+                        WHERE a.merchant_id = c.merchant_id AND a.company_id = c.id AND i.user_id = ? AND i.status = 'sent'))
+                ORDER BY c.code
+                """, String.class, merchantId, userId, userId);
+    }
+
     public boolean hasMfa(String userId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM user_mfa_methods WHERE user_id = ? AND status = 'active')", Boolean.class, userId));
+    }
+
+    public boolean hasCompanyPermission(String merchantId, String companyId, String userId, String permission) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM company_user_permission_grants
+                    WHERE merchant_id = ? AND company_id = ? AND user_id = ? AND permission_code = ?)
+                """, Boolean.class, merchantId, companyId, userId, permission));
     }
 
     public SessionService.Actor actor(String merchantId, String userId) {
@@ -326,11 +350,11 @@ public class AuthRepository {
                 + " mfa_verified_at = UTC_TIMESTAMP(6), version = version + 1 WHERE id = ?", id);
     }
 
-    public void audit(String merchantId, String actorId, String action, String resourceType, String resourceId) {
+    public void audit(String merchantId, String actorId, String action, String resourceType, String resourceId, Map<String, Object> changes) {
         jdbc.update("""
-                INSERT INTO audit_logs (id, merchant_id, actor_user_id, action, resource_type, resource_id, result)
-                VALUES (?, ?, ?, ?, ?, ?, 'success')
-                """, UUID.randomUUID().toString(), merchantId, actorId, action, resourceType, resourceId);
+                INSERT INTO audit_logs (id, merchant_id, actor_user_id, action, resource_type, resource_id, changes, result)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'success')
+                """, UUID.randomUUID().toString(), merchantId, actorId, action, resourceType, resourceId, json.writeValueAsString(changes));
     }
 
     private Mfa mfa(ResultSet rs, int row) throws SQLException {

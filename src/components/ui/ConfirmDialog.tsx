@@ -6,6 +6,7 @@ import './ConfirmDialog.css'
 
 type ConfirmDialogProps = {
   open: boolean
+  className?: string
   title: string
   description: ReactNode
   warning?: string
@@ -21,6 +22,7 @@ type ConfirmDialogProps = {
 
 export function ConfirmDialog({
   open,
+  className = '',
   title,
   description,
   warning = 'This action cannot be undone.',
@@ -77,7 +79,7 @@ export function ConfirmDialog({
         }
       }}
     >
-      <div ref={dialogRef} tabIndex={-1} className="ui-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
+      <div ref={dialogRef} tabIndex={-1} className={['ui-confirm-dialog',className].filter(Boolean).join(' ')} role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
         <div className="ui-confirm-dialog__icon" aria-hidden>
           <IconAlertTriangle />
         </div>

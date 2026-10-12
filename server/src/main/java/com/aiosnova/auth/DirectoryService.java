@@ -2,6 +2,9 @@ package com.aiosnova.auth;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import com.aiosnova.audit.AuditChanges;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,10 +54,33 @@ public class DirectoryService {
             if (selected.size() != request.companyCodes().size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
         repository.lockUser(userId);
+        AuthRepository.DirectoryUser before = repository.directoryUser(actor.merchantId(), userId);
+        List<String> previousCompanies = repository.userCompanyCodes(actor.merchantId(), userId);
         repository.updateProfile(actor.merchantId(), userId, request);
         if (selected != null) repository.replaceCompanies(actor.merchantId(), userId, selected);
-        repository.audit(actor.merchantId(), actor.id(), "identity.user.updated", "user", userId);
-        return repository.directoryUser(actor.merchantId(), userId);
+        AuthRepository.DirectoryUser after = repository.directoryUser(actor.merchantId(), userId);
+        Map<String, Object> changes = AuditChanges.between(auditFields(before), auditFields(after));
+        AuditChanges.add(changes, "companyCodes", previousCompanies, repository.userCompanyCodes(actor.merchantId(), userId));
+        AuditChanges.personal(changes, "email", before.email(), after.email());
+        AuditChanges.personal(changes, "fullName", before.fullName(), after.fullName());
+        AuditChanges.personal(changes, "displayName", before.displayName(), after.displayName());
+        AuditChanges.personal(changes, "phone", before.phone(), after.phone());
+        AuditChanges.personal(changes, "avatarUrl", before.avatarUrl(), after.avatarUrl());
+        repository.audit(actor.merchantId(), actor.id(), "identity.user.updated", "user", userId, changes);
+        return after;
+    }
+
+    private Map<String, Object> auditFields(AuthRepository.DirectoryUser user) {
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("status", user.status());
+        fields.put("language", user.language());
+        fields.put("timezone", user.timezone());
+        fields.put("departmentId", user.departmentId());
+        fields.put("positionId", user.positionId());
+        fields.put("requireMfa", user.requireMfa());
+        fields.put("canInvite", user.canInvite());
+        fields.put("canManageUsers", user.canManageUsers());
+        return fields;
     }
 
     public record Profile(String email, String fullName, String displayName, String phone, String avatarUrl,
