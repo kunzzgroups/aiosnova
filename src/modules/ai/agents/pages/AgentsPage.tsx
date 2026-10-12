@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
@@ -14,6 +14,9 @@ import type { KnowledgeBaseListItem } from '@/modules/ai/knowledge/types/knowled
 import { ApiError } from '@/services/httpClient'
 import { createAgent, fetchAgent, fetchAgents, updateAgent } from '../services/agentService'
 import { IconPlus, IconPencil } from '@/components/icons/Icons'
+import { TablePanel } from '@/components/ui/TablePanel'
+import { TablePagination } from '@/components/ui/TablePagination'
+import { TableToolbar } from '@/components/ui/TableToolbar'
 import {
   DEFAULT_AGENT_MODEL,
   type AgentListItem,
@@ -47,13 +50,6 @@ const MODELS_BY_PROVIDER: Record<AgentModelProvider, string[]> = {
   azure: ['gpt-4o-azure', 'gpt-4-turbo-azure'],
 }
 
-/**
- * The Agent screen.
- *
- * Flat, A–Z list. No category grouping: the category is metadata, not a
- * navigation aid — a search box replaces it. Status is clickable so the
- * operator can cycle active → draft → disabled.
- */
 export function AgentsPage() {
   const { t } = useTranslation()
   const companyId = useCompanyStore((state) => state.companyId)
@@ -80,6 +76,13 @@ export function AgentsPage() {
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState(0.3)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  // ---- 分页状态 (完全对齐 Employees) ----
+  const [pageSize, setPageSize] = useState(0) // 0 代表自动适应
+  const [autoPageSize, setAutoPageSize] = useState(10)
+  const [page, setPage] = useState(1)
+  const tableRef = useRef<HTMLDivElement>(null)
+  const autoFitRowMeasurement = useRef({ width: 0, height: 0 })
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -122,7 +125,6 @@ export function AgentsPage() {
     [baseIdFilter, knowledgeBases],
   )
 
-  /** Flat, filtered, A→Z sorted list. */
   const visibleAgents = useMemo(() => {
     let list = agents
     if (baseIdFilter) {
@@ -138,6 +140,68 @@ export function AgentsPage() {
     }
     return list.slice().sort((a, b) => a.name.localeCompare(b.name))
   }, [agents, baseIdFilter, query])
+
+  // ---- 分页计算逻辑 (完全对齐 Employees) ----
+  const effectivePageSize = pageSize || autoPageSize
+  const pageCount = Math.max(1, Math.ceil(visibleAgents.length / effectivePageSize))
+  const currentPage = Math.min(page, pageCount)
+  const paginatedAgents = visibleAgents.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize)
+
+  // 条件变化时重置页码
+  useEffect(() => {
+    setPage(1)
+  }, [query, baseIdFilter, effectivePageSize])
+
+  // 自动高度测量逻辑 (完全对齐 Employees)
+  useEffect(() => {
+    if (isLoading || !visibleAgents.length || pageSize !== 0) return
+    const container = tableRef.current
+    const table = container?.querySelector('table')
+    if (!container || !table) return
+    let frame = 0
+
+    function measureRows() {
+      if (!container || !table) return
+      const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr'))
+      if (!rows.length) return
+      rows.forEach(row => row.style.removeProperty('height'))
+      
+      const availableHeight = container.clientHeight - (table.querySelector('thead')?.getBoundingClientRect().height ?? 0)
+      if (availableHeight <= 0) return
+      
+      const width = container.clientWidth
+      if (autoFitRowMeasurement.current.width !== width) {
+        autoFitRowMeasurement.current = { width, height: 0 }
+      }
+      
+      if (currentPage === 1 || !autoFitRowMeasurement.current.height) {
+        const naturalHeight = Math.max(1, ...rows.map(row => row.getBoundingClientRect().height))
+        autoFitRowMeasurement.current.height = Math.max(autoFitRowMeasurement.current.height, naturalHeight)
+      }
+      
+      const limit = Math.max(1, Math.floor(availableHeight / autoFitRowMeasurement.current.height))
+      setAutoPageSize(current => current === limit ? current : limit)
+      
+      const uniformHeight = availableHeight / limit
+      rows.forEach(row => { row.style.height = uniformHeight + 'px' })
+    }
+
+    function scheduleMeasure() {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measureRows)
+    }
+
+    const observer = new ResizeObserver(scheduleMeasure)
+    observer.observe(container)
+    observer.observe(table)
+    scheduleMeasure()
+
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+      table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => row.style.removeProperty('height'))
+    }
+  }, [isLoading, visibleAgents.length, pageSize, currentPage, effectivePageSize])
 
   function clearBaseFilter() {
     const next = new URLSearchParams(searchParams)
@@ -267,26 +331,28 @@ export function AgentsPage() {
         onClearMessage={() => setMessage(null)}
       />
 
-      <section className="console-panel">
-        <div className="console-panel__title-row">
-          <TextField
-            className="console-panel__search console-panel__search--lead"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('ai.agents.searchPlaceholder', 'Search agents…')}
-            aria-label={t('ai.agents.searchAria', 'Search agents')}
-          />
-          <div className="console-panel__actions">
+      <TablePanel>
+        <TableToolbar
+          search={
+            <TextField
+              className="ui-table-toolbar__search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('ai.agents.searchPlaceholder', 'Search agents…')}
+              aria-label={t('ai.agents.searchAria', 'Search agents')}
+            />
+          }
+          actions={
             <Button onClick={openCreate}>
               <IconPlus />
               {t('ai.agents.newAgent')}
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {activeBase ? (
-          <div className="console-filter-chip">
+          <div className="console-filter-chip" style={{ margin: '0 24px 12px' }}>
             <span>{t('ai.agents.filteredByKnowledge', { name: activeBase.name })}</span>
             <button
               type="button"
@@ -299,98 +365,121 @@ export function AgentsPage() {
           </div>
         ) : null}
 
+        {/* 表格区域：绑定 ref 用于自动高度测量 */}
         {isLoading ? (
-          <p className="console-empty">{t('ai.agents.loading')}</p>
+          <p className="console-empty" style={{ padding: '0 24px 24px' }}>{t('ai.agents.loading')}</p>
         ) : isEmpty ? (
-          <p className="console-empty">
-            {agents.length === 0
-              ? t('ai.agents.empty')
-              : t('ai.agents.emptyFiltered')}
+          <p className="console-empty" style={{ padding: '0 24px 24px' }}>
+            {agents.length === 0 ? t('ai.agents.empty') : t('ai.agents.emptyFiltered')}
           </p>
         ) : (
-          <div className="console-table-wrap">
-            <table className="console-table">
-              <thead>
-                <tr>
-                  <th>{t('ai.agents.colName')}</th>
-                  <th>{t('ai.agents.colDescription')}</th>
-                  <th>{t('ai.agents.colModel')}</th>
-                  <th>{t('ai.agents.colKnowledge')}</th>
-                  <th>{t('ai.agents.colStatus')}</th>
-                  <th className="console-table__actions">{t('ai.agents.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleAgents.map((agent) => (
-                  <tr
-                    key={agent.id}
-                    className={
-                      agent.id === highlightAgentId
-                        ? 'console-table__row--highlight'
-                        : undefined
-                    }
-                  >
-                    <td>
-                      <span className="console-table__name">
-                        <span>{agent.name}</span>
-                      </span>
-                    </td>
-                    <td className="console-table__muted">{agent.description || '—'}</td>
-                    <td>
-                      {agent.model && agent.model.provider !== 'auto' ? (
-                        <span className="console-chip">
-                          {agent.model.provider} · {agent.model.model || '—'}
-                        </span>
-                      ) : (
-                        <span className="console-chip console-chip--muted">
-                          {t('ai.agents.modelAuto', 'Auto')}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {agent.knowledgeBaseCount > 0 ? (
-                        <Link
-                          className="console-chip console-chip--link"
-                          to={`/ai/ai/knowledge?agentId=${encodeURIComponent(agent.id)}`}
-                        >
-                          {t('ai.agents.knowledgeCount', {
-                            count: agent.knowledgeBaseCount,
-                          })}
-                        </Link>
-                      ) : (
-                        <span className="console-chip console-chip--muted">
-                          {t('ai.agents.knowledgeCountNone')}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={`console-status console-status--${agent.status} console-status--clickable`}
-                        onClick={() => void cycleAgentStatus(agent.id, agent.status)}
-                        title={t('ai.agents.statusClickHint', 'Click to change status')}
-                      >
-                        {t(STATUS_LABEL_KEY[agent.status])}
-                      </button>
-                    </td>
-                    <td className="console-table__actions">
-                      <button
-                        type="button"
-                        className="console-icon-button"
-                        aria-label={t('ai.agents.edit')}
-                        title={t('ai.agents.edit')}
-                        onClick={() => void openEdit(agent)}
-                      >
-                        <IconPencil />
-                      </button>
-                    </td>
+          <>
+            <div className="console-table-wrap" ref={tableRef}>
+              <table className="console-table console-table--fixed console-table--agents">
+                <colgroup>
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '14%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>{t('ai.agents.colName')}</th>
+                    <th>{t('ai.agents.colDescription')}</th>
+                    <th>{t('ai.agents.colModel')}</th>
+                    <th>{t('ai.agents.colKnowledge')}</th>
+                    <th>{t('ai.agents.colStatus')}</th>
+                    <th className="console-table__actions">{t('ai.agents.colActions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedAgents.map((agent) => (
+                    <tr
+                      key={agent.id}
+                      className={
+                        agent.id === highlightAgentId
+                          ? 'console-table__row--highlight'
+                          : undefined
+                      }
+                    >
+                      <td>
+                        <span className="console-table__name">
+                          <span>{agent.name}</span>
+                        </span>
+                      </td>
+                      <td className="console-table__muted">{agent.description || '—'}</td>
+                      <td>
+                        {agent.model && agent.model.provider !== 'auto' ? (
+                          <span className="console-chip">
+                            {agent.model.provider} · {agent.model.model || '—'}
+                          </span>
+                        ) : (
+                          <span className="console-chip console-chip--muted">
+                            {t('ai.agents.modelAuto', 'Auto')}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {agent.knowledgeBaseCount > 0 ? (
+                          <Link
+                            className="console-chip console-chip--link"
+                            to={`/ai/ai/knowledge?agentId=${encodeURIComponent(agent.id)}`}
+                          >
+                            {t('ai.agents.knowledgeCount', {
+                              count: agent.knowledgeBaseCount,
+                            })}
+                          </Link>
+                        ) : (
+                          <span className="console-chip console-chip--muted">
+                            {t('ai.agents.knowledgeCountNone')}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`console-status console-status--${agent.status} console-status--clickable`}
+                          onClick={() => void cycleAgentStatus(agent.id, agent.status)}
+                          title={t('ai.agents.statusClickHint', 'Click to change status')}
+                        >
+                          {t(STATUS_LABEL_KEY[agent.status])}
+                        </button>
+                      </td>
+                      <td className="console-table__actions">
+                        <button
+                          type="button"
+                          className="console-icon-button"
+                          aria-label={t('ai.agents.edit')}
+                          title={t('ai.agents.edit')}
+                          onClick={() => void openEdit(agent)}
+                        >
+                          <IconPencil />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 分页组件 */}
+            <TablePagination
+              id="agents-pagination"
+              total={visibleAgents.length}
+              pageSize={pageSize}
+              autoPageSize={autoPageSize}
+              effectivePageSize={effectivePageSize}
+              currentPage={currentPage}
+              pageCount={pageCount}
+              pagesLabel={t('users.directoryPages')}
+              onPageSizeChange={setPageSize}
+              onPageChange={setPage}
+            />
+          </>
         )}
-      </section>
+      </TablePanel>
 
       <Drawer
         open={formOpen}
