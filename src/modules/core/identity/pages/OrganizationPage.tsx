@@ -220,11 +220,21 @@ export function OrganizationPage() {
     if (refreshAfterSave&&useCompanyStore.getState().companyId===scope) void refreshStructure(scope)
   }
 
-  const dependentPositions=pendingDelete?.kind==='department' ? positions.filter(position => position.organizationId===pendingDelete.item.id).length : 0
-  const childDepartments=pendingDelete?.kind==='department' ? items.filter(item => item.parentId===pendingDelete.item.id).length : 0
-  const managedDepartments=pendingDelete?.kind==='position' ? departments.filter(d=>d.managerPositionId===pendingDelete.item.id).length : 0
-  const activeAssignments=pendingDelete ? positions.filter(position=>pendingDelete.kind==='department' ? position.organizationId===pendingDelete.item.id : position.id===pendingDelete.item.id).reduce((count,position)=>count+position.assignmentCount,0) : 0
-  const deleteBlocked=Boolean(dependentPositions||childDepartments||managedDepartments||activeAssignments)
+  const deletingDepartmentIds=new Set<string>()
+  if(pendingDelete?.kind==='department') {
+    deletingDepartmentIds.add(pendingDelete.item.id)
+    let expanded=true
+    while(expanded) {
+      expanded=false
+      for(const department of departments) if(department.parentId&&deletingDepartmentIds.has(department.parentId)&&!deletingDepartmentIds.has(department.id)) { deletingDepartmentIds.add(department.id); expanded=true }
+    }
+  }
+  const deletingPositions=pendingDelete ? positions.filter(position=>pendingDelete.kind==='department' ? deletingDepartmentIds.has(position.organizationId||'') : position.id===pendingDelete.item.id) : []
+  const dependentPositions=pendingDelete?.kind==='department' ? deletingPositions.length : 0
+  const childDepartments=Math.max(0,deletingDepartmentIds.size-1)
+  const managedDepartments=departments.filter(d=>deletingPositions.some(position=>position.id===d.managerPositionId)).length
+  const activeAssignments=deletingPositions.reduce((count,position)=>count+position.assignmentCount,0)
+  const deleteBlocked=Boolean(managedDepartments||activeAssignments)
 
   async function remove() {
     if (!canManage||!pendingDelete||deleteBlocked||submittingRef.current) return
@@ -236,10 +246,11 @@ export function OrganizationPage() {
       if (kind==='department') await deleteOrganization(pendingDelete.item as OrganizationNode)
       else await deletePosition(pendingDelete.item as PositionRecord)
       if (useCompanyStore.getState().companyId!==scope) return
-      if (kind==='department') setItems(current => current.filter(item => item.id!==id))
+      if (kind==='department') { setItems(current => current.filter(item => !deletingDepartmentIds.has(item.id))); setPositions(current => current.filter(position => !deletingDepartmentIds.has(position.organizationId||''))) }
       else setPositions(current => current.filter(item => item.id!==id))
-      if (editor?.item?.id===id) setEditor(null)
+      if (editor?.item&&(editor.item.id===id||deletingDepartmentIds.has(editor.item.id)||deletingPositions.some(position=>position.id===editor.item?.id))) setEditor(null)
       setPendingDelete(null)
+      void refreshStructure(scope)
     } catch(err) { if (useCompanyStore.getState().companyId===scope) setDeleteError(err instanceof ApiError ? err.message : t('org.errDeleteOrganization')) }
     finally { submittingRef.current=false; setIsDeleting(false) }
   }

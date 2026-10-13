@@ -17,7 +17,7 @@ export function OrganizationAccessProvider({ children }:{ children:ReactNode }) 
   useEffect(()=>{
     let current=true
     setAccess(null)
-    if (companyId&&userId&&token) fetchOrganizationAccess(companyId).then(result=>{
+    if (companyId&&userId&&token?.startsWith('backend_')) fetchOrganizationAccess(companyId).then(result=>{
       if(current) setAccess({ scope,canRead:result.canRead,canManage:result.canManage })
     }).catch(()=>{ if(current) setAccess(null) })
     return ()=>{ current=false }

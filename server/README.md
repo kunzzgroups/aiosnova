@@ -146,3 +146,19 @@ Endpoints:
 Invitation, activation, enrollment and MFA state persists across backend restarts. TOTP secrets use AES-256-GCM with a random nonce and account-bound authenticated data; OTP verifiers use server-keyed HMAC-SHA256 bound to the challenge UUID; high-entropy invitation and ticket tokens use SHA-256 hashes. Activation, membership creation and invitation consumption run in one transaction; user row locks serialize OTP and MFA consumption. Failed MFA attempts commit even when the API returns a rejection. Secrets are not sent to any external QR service.
 
 This remains a local integration: email delivery, unsent drafts, organization/role catalogs, password login and Google login remain mocked. OTP/MFA sessions, profile edits, company selection and the user-management permission are backend/database-backed. MFA recovery and real Google OAuth are not implemented. A mock Google/password session cannot authorize database edits; activate the owner and use OTP/MFA login. Existing demo-account MFA and authenticated MFA settings screens still use their original frontend mocks. Previously issued in-memory invitations/accounts cannot be recovered into MySQL; create new invitations using the updated backend.
+
+## Local Google-button test login
+
+This is a localhost test shortcut, not Google OAuth. In this workspace, ignored `server/.env.local` has `LOCAL_TEST_LOGIN_ENABLED=true`, and ignored root `.env.local` has `VITE_LOCAL_TEST_LOGIN=true`. Restart both backend and Vite, then click Google sign-in. It issues an ordinary database-backed session for the existing active `demo@aios.dev` account without OTP/MFA; no user is created or activated, and permissions/company access are unchanged. To use another existing test account, set `LOCAL_TEST_LOGIN_EMAIL` in the backend local configuration. Non-owners need explicit company-scoped Organization grants.
+
+`POST /api/auth/local-test-login` exists only in the local profile, with prod/production profiles excluded, and only when explicitly enabled (default false). It requires a loopback peer and host, a loopback configured frontend URL, an exact matching Origin, and no forwarding headers. Session creation and the `identity.session.local_test_login` audit event share a transaction. Do not expose the development server through a public proxy/tunnel or deploy the ignored opt-in settings. Production frontend builds never use the shortcut. This does not enable Google CRUD on the deployed website.
+
+Mock sessions now skip Organization navigation capability requests, avoiding the 401/refresh cycle; database-backed Organization still requires a real session. Employees continues to combine database profiles/memberships with mock features.
+
+Verification: frontend build and Maven package passed; local HTTP checks verified endpoint disabled by default, rejection of missing/external Origin, a real session and CSRF cookies, and an authenticated Organization database read. The verification session was revoked. Browser interaction and deployed authentication were not verified.
+
+## Department subtree deletion
+
+Deleting a department now deletes all descendant departments and their attached positions in one company-scoped transaction. The backend prechecks every affected position for any assignment history (active or ended), blocks the whole operation on dependencies, deletes positions before departments and departments from leaves upward, and audits each deletion. Executive positions managing the department remain intact. Confirmation counts include the entire subtree, with matching English/Chinese copy; the frontend removes the affected rows and refreshes the catalog separately. No schema migration is required.
+
+Frontend build, Maven package and rolled-back database checks passed for nested deletion, historical-assignment blocking without partial removal, unrelated executive preservation and per-record audits. Restart the backend; browser interaction remains unverified.

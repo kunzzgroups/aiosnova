@@ -119,12 +119,29 @@ public class OrganizationService {
         actor = access(actor, companyId, true);
         Department target = department(actor, companyId, id);
         version(target.version(), version);
-        if (repository.departments(actor.merchantId(), companyId).stream().anyMatch(d -> id.equals(d.parentId()))
-                || repository.positions(actor.merchantId(), companyId, LocalDate.now()).stream().anyMatch(p -> id.equals(p.organizationId()))) {
+        List<Department> allDepartments = repository.departments(actor.merchantId(), companyId);
+        List<Department> branch = new ArrayList<>();
+        branch.add(target);
+        HashSet<String> branchIds = new HashSet<>();
+        branchIds.add(id);
+        for (int index = 0; index < branch.size(); index++) {
+            String parentId = branch.get(index).id();
+            for (Department child : allDepartments) {
+                if (parentId.equals(child.parentId()) && branchIds.add(child.id())) branch.add(child);
+            }
+        }
+        List<Position> positions = repository.positions(actor.merchantId(), companyId, LocalDate.now()).stream()
+                .filter(position -> branchIds.contains(position.organizationId())).toList();
+        if (positions.stream().anyMatch(position -> position.assignmentCount() > 0
+                || allDepartments.stream().anyMatch(department -> position.id().equals(department.managerPositionId())))) {
             fail(HttpStatus.CONFLICT, "org.hasDependencies");
         }
-        repository.delete("organization_departments", actor.merchantId(), companyId, id, version);
-        auth.audit(actor.merchantId(), actor.id(), "identity.department.deleted", "department", id, AuditChanges.between(auditFields(target), Map.of()));
+        for (Position position : positions) deletePositionInCompany(actor, companyId, position.id(), position.version(), false);
+        for (int index = branch.size() - 1; index >= 0; index--) {
+            Department department = branch.get(index);
+            repository.delete("organization_departments", actor.merchantId(), companyId, department.id(), department.version());
+            auth.audit(actor.merchantId(), actor.id(), "identity.department.deleted", "department", department.id(), AuditChanges.between(auditFields(department), Map.of()));
+        }
     }
 
     @Transactional
