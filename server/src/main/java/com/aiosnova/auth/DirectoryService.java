@@ -19,11 +19,23 @@ public class DirectoryService {
     }
 
     @Transactional(readOnly = true)
-    public InvitationService.Directory directory(SessionService.Actor actor) {
-        List<AuthRepository.DirectoryUser> users = repository.directoryUsers(actor.merchantId()).stream()
-                .map(user -> actor.owner() || actor.manageUsers() || actor.id().equals(user.id()) ? user : user.hidePhone())
-                .toList();
-        return new InvitationService.Directory(users, repository.directoryMemberships(actor.merchantId()));
+    public InvitationService.Directory directory(SessionService.Actor actor, String companyId, String userId) {
+        actor = repository.actor(actor.merchantId(), actor.id());
+        if (actor == null || !"active".equals(actor.status())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        final var current = actor;
+        var accessible = repository.accessibleCompanies(actor);
+        var company = accessible.stream().filter(item -> item.id().equals(companyId)).findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
+        var allowedCodes = accessible.stream().map(AuthRepository.Company::code).toList();
+        var memberships = repository.directoryMemberships(actor.merchantId(), allowedCodes);
+        var selectedUserIds = memberships.stream().filter(item -> item.companyCode().equals(company.code()))
+                .map(AuthRepository.DirectoryMembership::userId).distinct().toList();
+        if (userId != null && !selectedUserIds.contains(userId) && !actor.id().equals(userId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        var users = repository.directoryUsers(actor.merchantId(), userId == null ? selectedUserIds : List.of(userId)).stream()
+                .filter(user -> current.owner() || current.manageUsers() || current.id().equals(user.id()) || !user.isOwner())
+                .map(user -> current.owner() || current.manageUsers() || current.id().equals(user.id()) ? user : user.hidePhone()).toList();
+        var visibleUserIds = users.stream().map(AuthRepository.DirectoryUser::id).toList();
+        return new InvitationService.Directory(users, memberships.stream().filter(item -> visibleUserIds.contains(item.userId())).toList());
     }
 
     @Transactional

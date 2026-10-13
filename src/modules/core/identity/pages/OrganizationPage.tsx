@@ -113,10 +113,11 @@ export function OrganizationPage() {
 
   useEffect(() => {
     let current=true
+    const controller=new AbortController()
     batchRequestRef.current=null; setRefreshError(null); setIsRefreshing(false); setEditor(null); setPendingDelete(null); setPendingDeactivate(null); setItems([]); setPositions([]); setDatabaseCompanyId(''); setHasManagementAccess(false); setError(null); setLoadError(null); setDeleteError(null); setSuccessMessage(''); setRecentIds([])
     if (!companyId||!companies.some(company=>company.value===companyId)) { setIsLoading(false); return }
     setIsLoading(true)
-    fetchOrganizationStructure(companyId).then(result => {
+    fetchOrganizationStructure(companyId,controller.signal).then(result => {
       if (!current) return
       setItems(result.departments); setPositions(result.positions); setDatabaseCompanyId(result.companyId); setHasManagementAccess(result.canManage)
     }).catch(err => {
@@ -124,7 +125,7 @@ export function OrganizationPage() {
       const status=err instanceof ApiError ? err.status : undefined
       setLoadError({ message:status===401 ? t('org.sessionExpired') : err instanceof ApiError ? err.message : t('org.errLoadOrganizations'),retryable:status!==401&&status!==403 })
     }).finally(() => { if (current) setIsLoading(false) })
-    return () => { current=false }
+    return () => { current=false;controller.abort() }
   },[companyId,companies,sessionUser?.id,accessToken,t,reloadKey])
 
   useEffect(() => { setCollapsed({}); setSearch(''); setDepartmentFilter('all'); setLevelFilter('all'); setStatusFilter('active'); setPositionSort({ key:'name',descending:false }); setPage(1) },[companyId,sessionUser?.id])

@@ -82,6 +82,9 @@ export function UsersPage() {
   const sessionUser=useAuthStore((state) => state.user)
   const activeCompanyId=useCompanyStore((state) => state.companyId)
   const accessibleCompanies=useCompanyStore((state) => state.companies)
+  const accessToken=useAuthStore(state=>state.accessToken)
+  const loadGeneration=useRef(0)
+  const loadController=useRef<AbortController|null>(null)
   const [users,setUsers]=useState<IdentityUser[]>([])
   const [companies,setCompanies]=useState<CompanyListItem[]>([])
   const [email,setEmail]=useState('')
@@ -106,8 +109,8 @@ export function UsersPage() {
   const tableRef=useRef<HTMLDivElement>(null)
   const invitePageRef=useRef<HTMLDivElement>(null)
   const mfaRequiredByPolicy=assignments.some(a => inviteOptions?.companies.find(c => c.id===a.companyId)?.requireMfa)
-  const isOwner=users.some(u => u.id===sessionUser?.id&&u.isOwner)
-  const canManageUsers=isOwner||users.some(u => u.id===sessionUser?.id&&u.canManageUsers)
+  const isOwner=Boolean(sessionUser?.isOwner)||users.some(u => u.id===sessionUser?.id&&u.isOwner)
+  const canManageUsers=isOwner||Boolean(sessionUser?.canManageUsers)||users.some(u => u.id===sessionUser?.id&&u.canManageUsers)
   // Replace the owner fallback with the Permissions-module capability when available.
   const canManageUserStatus = isOwner
   const [query,setQuery]=useState('')
@@ -135,24 +138,31 @@ export function UsersPage() {
   const deleteInProgress=useRef(false)
 
   const loadUsers=useCallback(async () => {
+    loadController.current?.abort()
+    const controller=new AbortController()
+    loadController.current=controller
+    const generation=++loadGeneration.current
+    setUsers([]);setMemberships([])
     setIsLoading(true)
     setError(null)
     try {
-      const [usersResult,companiesResult,optionsResult,membershipsResult]=await Promise.all([fetchUsers(),fetchCompanies(),fetchInvitationOptions(),fetchMemberships()])
+      const [usersResult,companiesResult,optionsResult,membershipsResult]=await Promise.all([fetchUsers(controller.signal),fetchCompanies(controller.signal),fetchInvitationOptions(controller.signal),fetchMemberships(controller.signal)])
+      if(generation!==loadGeneration.current||useCompanyStore.getState().companyId!==activeCompanyId) return
       setUsers(usersResult.items)
       const activeCompanies=companiesResult.items.filter((item) => item.status==='active')
       setCompanies(activeCompanies)
       setInviteOptions(optionsResult)
       setMemberships(membershipsResult.items)
     } catch(err) {
-      setError(err instanceof ApiError? err.message:t('users.errLoad'))
+      if(!controller.signal.aborted&&generation===loadGeneration.current) setError(err instanceof ApiError? err.message:t('users.errLoad'))
     } finally {
-      setIsLoading(false)
+      if(generation===loadGeneration.current) setIsLoading(false)
     }
-  },[])
+  },[activeCompanyId,sessionUser?.id,accessToken])
 
   useEffect(() => {
     void loadUsers()
+    return ()=>{loadController.current?.abort();loadGeneration.current++}
   },[loadUsers])
 
   useEffect(() => {
@@ -163,7 +173,7 @@ export function UsersPage() {
     return () => window.clearTimeout(timeoutId)
   },[message])
 
-  const companyNamesFor=(userId: string) => memberships.filter(m => m.userId===userId).map(m => companies.find(c => c.id===m.companyId)?.name||'').filter(Boolean)
+  const companyNamesFor=(userId: string) => [...new Set(memberships.filter(m => m.userId===userId&&m.status!=='ended'&&(isOwner||accessibleCompanies.some(company=>company.value===m.companyId))).map(m => companies.find(c => c.id===m.companyId)?.name||'').filter(Boolean))]
 
   function sortHeading(key: SortKey,label: string) {
     return <button className="directory-design-sort" onClick={() => setSort({ key,descending:sort.key===key&&!sort.descending })}>{label}<span aria-hidden="true">{sort.key===key&&sort.descending ? '↓' : '↑'}</span></button>
@@ -172,7 +182,7 @@ export function UsersPage() {
   const filteredUsers=useMemo(() => {
     const normalizedQuery=query.trim().toLowerCase()
     return users.filter((user) => {
-      if(!isOwner&&(!accessibleCompanies.some(company=>company.value===activeCompanyId)||!memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&m.status!=='ended'))) return false
+      if(!accessibleCompanies.some(company=>company.value===activeCompanyId)||!memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&m.status!=='ended')) return false
       if(user.isOwner&&user.id!==sessionUser?.id&&!canManageUsers) return false
       if(!matchesSearch(user,normalizedQuery)) {
         return false
@@ -262,7 +272,7 @@ export function UsersPage() {
   const someVisibleUsersSelected=selectableVisibleUsers.some(user=>selectedUserIds.includes(user.id))
   const pendingBulkUsers=users.filter(user=>pendingBulkDeleteIds.includes(user.id))
   useEffect(()=>{setSelectedUserIds([]);setPendingBulkDeleteIds([])},[query,statusFilter,companyFilter,mfaFilter,sessionUser?.id,showInvite])
-  useEffect(()=>{if(!isOwner){setCompanyFilter('all');setPage(1);setPendingDelete(null);setSelectedUserIds([]);setPendingBulkDeleteIds([])}},[activeCompanyId,isOwner])
+  useEffect(()=>{setCompanyFilter('all');setPage(1);setPendingDelete(null);setSelectedUserIds([]);setPendingBulkDeleteIds([])},[activeCompanyId])
   useEffect(()=>{if(selectAllUsersRef.current) selectAllUsersRef.current.indeterminate=someVisibleUsersSelected&&!allVisibleUsersSelected},[someVisibleUsersSelected,allVisibleUsersSelected,statusFilter,isOwner])
   useEffect(() => { setPage(1) },[query,statusFilter,companyFilter,mfaFilter,effectivePageSize,sort])
   useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,effectivePageSize])
@@ -482,13 +492,12 @@ export function UsersPage() {
 
 
 
-        {isLoading? <p className="identity-empty">{t('users.loading')}</p>:null}
         {!isLoading&&users.length===0? <p className="identity-empty">{t('users.empty')}</p>:null}
         {!isLoading&&users.length>0&&filteredUsers.length===0? (
           <div className="identity-empty directory-design-empty"><p role="status">{t('users.emptyFiltered')}</p>{query||companyFilter!=='all'||statusFilter!=='all'||mfaFilter!=='all' ? <Button variant="secondary" onClick={()=>{setQuery('');setCompanyFilter('all');setStatusFilter('all');setMfaFilter('all')}}>{t('users.clearFilters')}</Button> : null}</div>
         ):null}
-        {filteredUsers.length>0? (
-          <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('users.staffDirectory')}>
+        {isLoading||filteredUsers.length>0? (
+          <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-busy={isLoading} aria-label={t(isLoading ? 'users.loading' : 'users.staffDirectory')}>
             <table className={`identity-table identity-table--packed directory-design-table${pageSize===0 ? ' directory-design-table--auto-fit' : ''}`}>
               <thead>
                 <tr>
@@ -502,9 +511,9 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleUsers.map((user) => {
-                  const assigned=memberships.filter(m => m.userId===user.id)
-                  const companyNames=assigned.map(m => companies.find(c => c.id===m.companyId)?.name||'').filter(Boolean)
+                {isLoading ? Array.from({length:Math.min(effectivePageSize,6)},(_,index)=><tr key={index} className="directory-design-skeleton" aria-hidden="true"><td><div className="directory-design-employee"><span className="directory-design-skeleton__avatar" /><div className="directory-design-skeleton__name"><span /><span /></div></div></td>{[0,1,2,3,4,5].map(column=><td key={column}><span className={'directory-design-skeleton__line'+(column===1 ? ' directory-design-skeleton__status' : '')} /></td>)}</tr>) : visibleUsers.map((user) => {
+                  const assigned=memberships.filter(m => m.userId===user.id&&(!isOwner||m.status!=='ended'))
+                  const companyNames=companyNamesFor(user.id)
                   const positionNames=[...new Set(assigned.map(m => inviteOptions?.companies.find(c => c.id===m.companyId)?.departments.find(d => d.id===m.organizationId)?.positions.find(p => p.id===m.positionId)?.name).filter(Boolean))]
                   const canEdit=user.status==='draft' ? isOwner : canManageUsers||sessionUser?.id===user.id
                   return (
@@ -521,8 +530,8 @@ export function UsersPage() {
                       </div>
                     </td>
                     <td>
-                      <div className="directory-design-companies"><span>{companyNames[0]||'—'}</span>
-                        {companyNames.length>1 ? <Popover label={t('users.assignedCompanies')} trigger={<>+{companyNames.length-1}</>}>
+                      <div className="directory-design-companies"><span>{companies.find(company=>company.id===activeCompanyId)?.name||'—'}</span>
+                        {companyNames.length>1 ? <Popover label={t('users.assignedCompanies')} trigger={<>+{isOwner ? companyNames.length : companyNames.length-1}</>}>
                           <header className="directory-company-popover__header">
                             <h2>{t('users.assignedCompanies')}</h2>
                             <span>{companyNames.length}</span>

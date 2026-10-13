@@ -148,7 +148,10 @@ public class AuthRepository {
         }
     }
 
-    public List<DirectoryUser> directoryUsers(String merchantId) {
+    public List<DirectoryUser> directoryUsers(String merchantId) { return directoryUsers(merchantId, null); }
+
+    public List<DirectoryUser> directoryUsers(String merchantId, List<String> userIds) {
+        if (userIds != null && userIds.isEmpty()) return List.of();
         return jdbc.query("""
                 SELECT u.id, u.email, COALESCE(u.display_name, u.full_name, u.email) AS display_name,
                     COALESCE(u.full_name, '') AS full_name, COALESCE(u.phone, '') AS phone,
@@ -164,33 +167,60 @@ public class AuthRepository {
                     EXISTS(SELECT 1 FROM user_mfa_methods m WHERE m.user_id = u.id AND m.status = 'active') AS mfa_enabled
                 FROM users u JOIN merchants m ON m.id = ?
                 LEFT JOIN user_directory_settings s ON s.merchant_id = m.id AND s.user_id = u.id
-                WHERE m.owner_user_id = u.id OR EXISTS(SELECT 1 FROM invitations i WHERE i.user_id = u.id AND i.merchant_id = m.id)
-                ORDER BY u.created_at DESC, u.id
-                """, (rs, row) -> new DirectoryUser(rs.getString("id"), rs.getString("email"),
+                WHERE (m.owner_user_id = u.id OR EXISTS(SELECT 1 FROM invitations i WHERE i.user_id = u.id AND i.merchant_id = m.id)
+                    OR EXISTS(SELECT 1 FROM company_memberships cm WHERE cm.user_id = u.id AND cm.merchant_id = m.id))
+                """ + (userIds == null ? "" : " AND u.id IN (" + String.join(",", java.util.Collections.nCopies(userIds.size(), "?")) + ")")
+                + " ORDER BY u.created_at DESC, u.id", (rs, row) -> new DirectoryUser(rs.getString("id"), rs.getString("email"),
                 rs.getString("display_name"), rs.getString("full_name"), rs.getString("phone"),
                 rs.getString("avatar_url"), rs.getString("language"), rs.getString("timezone"),
                 rs.getString("status"), "active".equals(rs.getString("status")) ? "otp" : null,
                 rs.getBoolean("mfa_enabled"), rs.getTimestamp("last_active_at") == null ? null
                         : rs.getTimestamp("last_active_at").toInstant(), rs.getTimestamp("created_at").toInstant(),
                 rs.getBoolean("is_owner"), rs.getBoolean("manage_users"), rs.getString("department_ref"),
-                rs.getString("position_ref"), rs.getBoolean("require_mfa"), rs.getBoolean("can_invite"), rs.getString("created_by")), merchantId);
+                rs.getString("position_ref"), rs.getBoolean("require_mfa"), rs.getBoolean("can_invite"), rs.getString("created_by")), directoryArguments(merchantId, userIds));
     }
 
-    public List<DirectoryMembership> directoryMemberships(String merchantId) {
+    private Object[] directoryArguments(String merchantId, List<String> values) {
+        var args = new java.util.ArrayList<Object>();
+        args.add(merchantId);
+        if (values != null) args.addAll(values);
+        return args.toArray();
+    }
+
+    public List<Company> accessibleCompanies(SessionService.Actor actor) {
+        return jdbc.query("""
+                SELECT c.id, c.code, c.name, c.require_mfa FROM companies c
+                WHERE c.merchant_id = ? AND c.status = 'active' AND (? OR EXISTS(
+                    SELECT 1 FROM company_memberships cm WHERE cm.merchant_id = c.merchant_id AND cm.company_id = c.id
+                    AND cm.user_id = ? AND cm.status = 'active' AND cm.joined_at <= UTC_TIMESTAMP(6)
+                    AND (cm.ended_at IS NULL OR cm.ended_at > UTC_TIMESTAMP(6))))
+                """, (rs, row) -> new Company(rs.getString("id"), rs.getString("code"), rs.getString("name"), rs.getBoolean("require_mfa")), actor.merchantId(), actor.owner(), actor.id());
+    }
+
+    public List<DirectoryMembership> directoryMemberships(String merchantId) { return directoryMemberships(merchantId, null); }
+
+    public List<DirectoryMembership> directoryMemberships(String merchantId, List<String> companyCodes) {
+        if (companyCodes != null && companyCodes.isEmpty()) return List.of();
+        String scope = companyCodes == null ? "" : " AND c.code IN (" + String.join(",", java.util.Collections.nCopies(companyCodes.size(), "?")) + ")";
+        var args = new java.util.ArrayList<Object>();
+        java.util.Collections.addAll(args, directoryArguments(merchantId, companyCodes));
+        java.util.Collections.addAll(args, directoryArguments(merchantId, companyCodes));
         return jdbc.query("""
                 SELECT cm.id, cm.user_id, c.code AS company_code, cm.status,
                     cm.joined_at AS valid_from, cm.ended_at AS valid_to
                 FROM company_memberships cm JOIN companies c ON c.merchant_id = cm.merchant_id AND c.id = cm.company_id
                 WHERE cm.merchant_id = ? AND cm.status = 'active'
+                    AND cm.joined_at <= UTC_TIMESTAMP(6) AND (cm.ended_at IS NULL OR cm.ended_at > UTC_TIMESTAMP(6))
+                """ + scope + """
                 UNION ALL
                 SELECT a.id, i.user_id, c.code, 'invited', i.sent_at, NULL
                 FROM invitation_company_assignments a
                 JOIN invitations i ON i.merchant_id = a.merchant_id AND i.id = a.invitation_id
                 JOIN companies c ON c.merchant_id = a.merchant_id AND c.id = a.company_id
                 WHERE a.merchant_id = ? AND i.status = 'sent'
-                """, (rs, row) -> new DirectoryMembership(rs.getString("id"), rs.getString("user_id"),
+                """ + scope, (rs, row) -> new DirectoryMembership(rs.getString("id"), rs.getString("user_id"),
                 rs.getString("company_code"), rs.getString("status"), rs.getTimestamp("valid_from").toInstant(),
-                rs.getTimestamp("valid_to") == null ? null : rs.getTimestamp("valid_to").toInstant()), merchantId, merchantId);
+                rs.getTimestamp("valid_to") == null ? null : rs.getTimestamp("valid_to").toInstant()), args.toArray());
     }
 
     public void createUser(String id, String email, String name, String language) {

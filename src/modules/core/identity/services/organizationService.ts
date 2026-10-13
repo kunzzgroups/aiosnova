@@ -17,12 +17,12 @@ async function request<T>(path: string, options: Parameters<typeof apiRequest<T>
   }
 }
 
-export async function fetchOrganizationAccess(companyId: string) {
-  const result = await request<{ items: { id: string; code: string; name: string; canRead: boolean; canManage: boolean }[] }>('/api/identity/organization-companies')
+export async function fetchOrganizationAccess(companyId: string,signal?:AbortSignal) {
+  const result = await request<{ items: { id: string; code: string; name: string; canRead: boolean; canManage: boolean }[] }>('/api/identity/organization-companies',{signal})
   let company = result.items.find(item => item.id === companyId)
   if (!company) {
     // The existing company switcher still uses mock catalog IDs; match through its stable company code.
-    const directory = await fetchCompanies()
+    const directory = await fetchCompanies(signal)
     const code = directory.items.find(item => item.id === companyId)?.code
     company = result.items.find(item => item.code === code)
   }
@@ -30,13 +30,13 @@ export async function fetchOrganizationAccess(companyId: string) {
   return company
 }
 
-export async function fetchOrganizationStructure(companyId: string) {
-  const company = await fetchOrganizationAccess(companyId)
+export async function fetchOrganizationStructure(companyId: string,signal?:AbortSignal) {
+  const company = await fetchOrganizationAccess(companyId,signal)
   if (!company.canRead) throw new ApiError(String(i18n.t('org.permissionDenied')), 403)
   const query = '?companyId=' + encodeURIComponent(company.id)
   const [departments, positions] = await Promise.all([
-    request<{ items: DatabaseDepartment[]; canRead: boolean; canManage: boolean }>('/api/identity/organizations' + query),
-    request<{ items: DatabasePosition[] }>('/api/identity/positions' + query + '&date=' + new Date().toLocaleDateString('en-CA')),
+    request<{ items: DatabaseDepartment[]; canRead: boolean; canManage: boolean }>('/api/identity/organizations' + query,{signal}),
+    request<{ items: DatabasePosition[] }>('/api/identity/positions' + query + '&date=' + new Date().toLocaleDateString('en-CA'),{signal}),
   ])
   return { companyId: company.id, departments: departments.items, positions: positions.items, canRead: departments.canRead, canManage: departments.canManage }
 }

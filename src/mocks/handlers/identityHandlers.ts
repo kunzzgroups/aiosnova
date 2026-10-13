@@ -1,7 +1,9 @@
 import { bypass, HttpResponse, http } from 'msw'
 import type { ActivatedAccount } from '@/modules/core/auth/types/auth'
 import { useAuthStore } from '@/stores/authStore'
-import { apiRequest } from '@/services/httpClient'
+import { useCompanyStore } from '@/stores/companyStore'
+import { i18n } from '@/i18n'
+import { apiRequest, ApiError } from '@/services/httpClient'
 import {
   MOCK_MFA_CODE,
   activateInvitedMockUser,
@@ -75,12 +77,49 @@ type SavedDirectory = {
   }[]
 }
 
-let directoryRequest: Promise<void> | undefined
+const directoryRequests = new Map<string,Promise<SavedDirectory>>()
+const directoryControllers = new Map<string,{companyId:string;controller:AbortController}>()
+let companyLookup:{token:string;controller:AbortController;promise:Promise<{items:{id:string;code:string}[]}>}|undefined
 
-function loadSavedDirectory() {
-  if (!useAuthStore.getState().accessToken?.startsWith('backend_')) return Promise.resolve()
-  if (!directoryRequest) {
-    directoryRequest = apiRequest<SavedDirectory>('/api/mock/invitations/directory', { cache: 'no-store', auth: true }).then(directory => {
+function directoryCompanyIds(token:string) {
+  if(companyLookup?.token===token) return companyLookup.promise
+  const controller=new AbortController()
+  const promise=apiRequest<{items:{id:string;code:string}[]}>('/api/identity/organization-companies',{cache:'no-store',auth:true,signal:controller.signal})
+    .then(result=>({items:result.items.map(({id,code})=>({id,code}))}))
+  const lookup={token,controller,promise}
+  companyLookup=lookup
+  void promise.catch(()=>{if(companyLookup===lookup) companyLookup=undefined})
+  return promise
+}
+
+function cancelDirectoryLoads(companyId?:string) {
+  for(const [key,entry] of directoryControllers) if(companyId===undefined||entry.companyId!==companyId) {
+    entry.controller.abort();directoryControllers.delete(key);directoryRequests.delete(key)
+  }
+}
+useAuthStore.subscribe((state,previous)=>{
+  if(state.accessToken!==previous.accessToken||state.user?.id!==previous.user?.id){cancelDirectoryLoads();companyLookup?.controller.abort();companyLookup=undefined}
+})
+useCompanyStore.subscribe((state,previous)=>{
+  if(state.companyId!==previous.companyId) cancelDirectoryLoads(state.companyId)
+})
+
+async function loadSavedDirectory(requestedCompanyId?:string,userId?:string):Promise<SavedDirectory|undefined> {
+  const activeCompanyId=useCompanyStore.getState().companyId
+  const companyId=requestedCompanyId||useCompanyStore.getState().companyId
+  const token=useAuthStore.getState().accessToken
+  if (!token?.startsWith('backend_')) return undefined
+  const result=await directoryCompanyIds(token)
+  if(useAuthStore.getState().accessToken!==token||useCompanyStore.getState().companyId!==activeCompanyId) throw new DOMException('Directory scope changed','AbortError')
+  const code=identityCompanies.find(company=>company.id===companyId)?.code
+  const company=result.items.find(company=>company.id===companyId||company.code===code)||(!requestedCompanyId ? result.items[0] : undefined)
+  if(!company) throw new ApiError(String(i18n.t('org.accessDenied')),403)
+  const key=JSON.stringify([token,company.id,userId])
+  if (!directoryRequests.has(key)) {
+    const controller=new AbortController()
+    directoryControllers.set(key,{companyId:identityCompanies.find(item=>item.code===company.code)?.id||company.id,controller})
+    const pending=apiRequest<SavedDirectory>('/api/mock/invitations/directory?companyId='+encodeURIComponent(company.id)+(userId ? '&userId='+encodeURIComponent(userId) : ''),{cache:'no-store',auth:true,signal:controller.signal}).then(directory => {
+      controller.signal.throwIfAborted()
       for (const user of directory.users) {
         const existing = identityUsers.find(item => item.id === user.id || item.email === user.email)
         if (existing) Object.assign(existing, user)
@@ -99,9 +138,11 @@ function loadSavedDirectory() {
           validFrom: membership.validFrom.slice(0, 10), validTo: membership.validTo?.slice(0, 10) ?? null,
         })
       }
-    }).finally(() => { directoryRequest = undefined })
+      return directory
+    }).finally(() => { if(directoryRequests.get(key)===pending){directoryRequests.delete(key);directoryControllers.delete(key)} })
+    directoryRequests.set(key,pending)
   }
-  return directoryRequest
+  return directoryRequests.get(key)!
 }
 
 function directoryActor(request: Request) {
@@ -221,19 +262,23 @@ export const identityHandlers = [
   }),
 
   http.get('/api/identity/users', async ({request}) => {
-    await loadSavedDirectory()
-    return HttpResponse.json({ items: identityUsers.filter(u=>directoryActor(request)?.isOwner || directoryActor(request)?.canManageUsers || u.id === directoryActor(request)?.id || !u.isOwner) })
+    let saved:SavedDirectory|undefined
+    try { saved=await loadSavedDirectory(new URL(request.url).searchParams.get('companyId')||undefined) } catch(error) { return HttpResponse.json({message:error instanceof ApiError ? error.message : String(i18n.t('users.errLoad'))},{status:error instanceof ApiError ? error.status : 500}) }
+    const allowed=saved ? new Set(saved.users.map(user=>user.id)) : null
+    if(allowed&&useAuthStore.getState().user?.isOwner) for(const user of identityUsers) if(user.status==='draft'&&identityMemberships.some(m=>m.userId===user.id&&m.companyId===useCompanyStore.getState().companyId)) allowed.add(user.id)
+    return HttpResponse.json({ items: identityUsers.filter(user=>!allowed||allowed.has(user.id)).filter(u=>directoryActor(request)?.isOwner || directoryActor(request)?.canManageUsers || u.id === directoryActor(request)?.id || !u.isOwner) })
   }),
 
   http.get('/api/identity/users/:id', async ({ params, request }) => {
-    await loadSavedDirectory()
-    const user = identityUsers.find((item) => item.id === params.id)
+    let saved:SavedDirectory|undefined
+    try { saved=await loadSavedDirectory(new URL(request.url).searchParams.get('companyId')||undefined,String(params.id)) } catch(error) { return HttpResponse.json({message:error instanceof ApiError ? error.message : String(i18n.t('users.errLoadUser'))},{status:error instanceof ApiError ? error.status : 500}) }
+    const user = identityUsers.find((item) => item.id === params.id&&(!saved||saved.users.some(user=>user.id===item.id)))
     if (!user || (user.isOwner && !directoryActor(request)?.isOwner && !directoryActor(request)?.canManageUsers && user.id !== directoryActor(request)?.id)) {
       return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
     }
 
     const memberships = identityMemberships
-      .filter((item) => item.userId === user.id)
+      .filter((item) => item.userId === user.id&&(!saved||saved.memberships.some(membership=>membership.id===item.id)))
       .map((item) => ({
         ...item,
         companyName:
@@ -342,14 +387,16 @@ export const identityHandlers = [
     return HttpResponse.json({ items: identityCompanies.map(withMemberCount) })
   }),
 
-  http.get('/api/identity/companies/:id', ({ params }) => {
+  http.get('/api/identity/companies/:id', async ({ params }) => {
+    let saved:SavedDirectory|undefined
+    try { saved=await loadSavedDirectory(String(params.id)) } catch(error) { return HttpResponse.json({message:error instanceof ApiError ? error.message : String(i18n.t('users.errLoad'))},{status:error instanceof ApiError ? error.status : 500}) }
     const company = identityCompanies.find((item) => item.id === params.id)
     if (!company) {
       return HttpResponse.json({ message: 'Company not found.' }, { status: 404 })
     }
 
     const members = identityMemberships
-      .filter((item) => item.companyId === company.id)
+      .filter((item) => item.companyId === company.id&&(!saved||saved.memberships.some(membership=>membership.id===item.id)))
       .map((item) => {
         const user = identityUsers.find((entry) => entry.id === item.userId)
         return {
@@ -648,9 +695,10 @@ export const identityHandlers = [
   }),
 
   http.get('/api/identity/memberships', async ({ request }) => {
-    await loadSavedDirectory()
+    let saved:SavedDirectory|undefined
+    try { saved=await loadSavedDirectory(new URL(request.url).searchParams.get('companyId')||undefined) } catch(error) { return HttpResponse.json({message:error instanceof ApiError ? error.message : String(i18n.t('users.errLoad'))},{status:error instanceof ApiError ? error.status : 500}) }
     const ownerIds=new Set(identityUsers.filter(u=>u.isOwner).map(u=>u.id))
-    return HttpResponse.json({ items: identityMemberships.filter(m=>directoryActor(request)?.isOwner || !ownerIds.has(m.userId)) })
+    return HttpResponse.json({ items: identityMemberships.filter(m=>!saved||saved.memberships.some(item=>item.id===m.id)||(useAuthStore.getState().user?.isOwner&&identityUsers.some(user=>user.id===m.userId&&user.status==='draft')&&m.companyId===useCompanyStore.getState().companyId)).filter(m=>directoryActor(request)?.isOwner || !ownerIds.has(m.userId)) })
   }),
 
   http.post('/api/identity/memberships', async ({ request }) => {

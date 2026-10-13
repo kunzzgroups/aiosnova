@@ -40,8 +40,9 @@ public class InvitationController {
     }
 
     @GetMapping("/directory")
-    public InvitationService.Directory directory(HttpServletRequest request) {
-        return directoryService.directory(sessions.authenticate(request));
+    public org.springframework.http.ResponseEntity<InvitationService.Directory> directory(@RequestParam String companyId, @RequestParam(required = false) String userId, HttpServletRequest request) {
+        return org.springframework.http.ResponseEntity.ok().header("Cache-Control", "private, no-store")
+                .body(directoryService.directory(sessions.authenticate(request), companyId, userId));
     }
 
     @PatchMapping("/users/{userId}")

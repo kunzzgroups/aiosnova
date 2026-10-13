@@ -9,6 +9,7 @@ import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { AppShellHeaderContext } from '@/layouts/AppShell'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
+import { useCompanyStore } from '@/stores/companyStore'
 import { isIdentityProfileComplete, type IdentityUser, type InvitationOptions } from '@/modules/core/identity/types/identity'
 import { fetchUser, fetchUsers, fetchInvitationOptions, updateUser, type MembershipWithLabels } from '@/modules/core/identity/services/identityService'
 import './IdentityPage.css'
@@ -20,6 +21,10 @@ export function UserDetailPage() {
   const navigate = useNavigate()
   const setShellHeader = useContext(AppShellHeaderContext)
   const sessionUser = useAuthStore(state => state.user)
+  const companyId=useCompanyStore(state=>state.companyId)
+  const accessToken=useAuthStore(state=>state.accessToken)
+  const loadGeneration=useRef(0)
+  const loadController=useRef<AbortController|null>(null)
   const pageRef = useRef<HTMLDivElement>(null)
   const [user,setUser] = useState<IdentityUser|null>(null)
   const [memberships,setMemberships] = useState<MembershipWithLabels[]>([])
@@ -56,21 +61,26 @@ export function UserDetailPage() {
   }
 
   const loadUser = useCallback(async () => {
+    loadController.current?.abort()
+    const controller=new AbortController()
+    loadController.current=controller
+    const generation=++loadGeneration.current
     setIsLoading(true)
+    setError(null)
     try {
-      const [result,invitationOptions,directory] = await Promise.all([fetchUser(userId),fetchInvitationOptions(),fetchUsers()])
+      const [result,invitationOptions,directory] = await Promise.all([fetchUser(userId,controller.signal),fetchInvitationOptions(controller.signal),accessToken?.startsWith('backend_') ? Promise.resolve({items:[] as IdentityUser[]}) : fetchUsers(controller.signal)])
+      if(generation!==loadGeneration.current||useCompanyStore.getState().companyId!==companyId) return
       setUser(result.user)
       setMemberships(result.memberships)
       setOptions(invitationOptions)
-      setIsOwner(directory.items.some(item => item.id === sessionUser?.id && item.isOwner))
-      setIsAdmin(directory.items.some(item => item.id === sessionUser?.id && item.canManageUsers))
+      setIsOwner(Boolean(sessionUser?.isOwner)||directory.items.some(item => item.id === sessionUser?.id && item.isOwner))
+      setIsAdmin(Boolean(sessionUser?.canManageUsers)||directory.items.some(item => item.id === sessionUser?.id && item.canManageUsers))
       applyProfileForm(result.user,result.memberships)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('users.errLoadUser'))
-      setUser(null)
-    } finally { setIsLoading(false) }
-  },[userId,sessionUser?.id])
-  useEffect(() => { void loadUser() },[loadUser])
+      if(!controller.signal.aborted&&generation===loadGeneration.current){setError(err instanceof ApiError ? err.message : t('users.errLoadUser'));setUser(null)}
+    } finally { if(generation===loadGeneration.current) setIsLoading(false) }
+  },[userId,sessionUser?.id,companyId,accessToken])
+  useEffect(() => { void loadUser();return ()=>{loadController.current?.abort();loadGeneration.current++} },[loadUser])
   useEffect(() => {
     setShellHeader({ titleKey: isEditing ? 'users.editUserTitle' : 'users.viewUserTitle', descriptionKey: 'users.profileDescription' })
     return () => setShellHeader(null)
@@ -121,7 +131,12 @@ export function UserDetailPage() {
 
   return <div ref={pageRef} className="identity-page identity-users-page identity-users-page--inviting">
     <FlashToasts error={error} message={message} onClearError={() => setError(null)} onClearMessage={() => setMessage(null)} />
-    {isLoading ? <p className="identity-empty">{t('users.loading')}</p> : !user ? <Button variant="secondary" onClick={() => navigate('/system/core/employees')}>{t('users.backToUsers')}</Button> :
+    {isLoading ? <div className="identity-invite identity-invite--page identity-profile-skeleton" role="status" aria-label={t('users.loading')} aria-busy="true">
+      <div className="identity-invite-content" aria-hidden="true"><div className="identity-invite-sections">
+        <section className="identity-panel"><div className="identity-profile-skeleton__heading" /><div className="identity-invite-fields">{[0,1,2,3,4].map(index=><div className="identity-profile-skeleton__field" key={index}><span /><div /></div>)}</div></section>
+        <section className="identity-panel"><div className="identity-profile-skeleton__heading" /><div className="identity-profile-skeleton__hint" /><div className="identity-company-buttons">{[0,1,2].map(index=><div className="identity-profile-skeleton__company" key={index} />)}</div></section>
+      </div></div><footer className="identity-invite-page-footer" aria-hidden="true"><div className="identity-profile-skeleton__button" /></footer>
+    </div> : !user ? <Button variant="secondary" onClick={() => navigate('/system/core/employees')}>{t('users.backToUsers')}</Button> :
     <form className="identity-invite identity-invite--page" onSubmit={event => void handleSaveProfile(event)}>
       <div className="identity-invite-content">
         <fieldset className="identity-invite-sections" disabled={!isEditing || !canEdit || isSaving}>

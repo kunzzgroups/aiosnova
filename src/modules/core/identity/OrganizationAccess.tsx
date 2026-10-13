@@ -16,11 +16,12 @@ export function OrganizationAccessProvider({ children }:{ children:ReactNode }) 
   const scope=JSON.stringify([companyId,userId,token,pathname])
   useEffect(()=>{
     let current=true
+    const controller=new AbortController()
     setAccess(null)
-    if (companyId&&userId&&token?.startsWith('backend_')) fetchOrganizationAccess(companyId).then(result=>{
+    if (companyId&&userId&&token?.startsWith('backend_')) fetchOrganizationAccess(companyId,controller.signal).then(result=>{
       if(current) setAccess({ scope,canRead:result.canRead,canManage:result.canManage })
     }).catch(()=>{ if(current) setAccess(null) })
-    return ()=>{ current=false }
+    return ()=>{ current=false;controller.abort() }
   },[companyId,userId,token,scope])
   return <OrganizationAccessContext.Provider value={access?.scope===scope ? access : { canRead:false,canManage:false }}>{children}</OrganizationAccessContext.Provider>
 }

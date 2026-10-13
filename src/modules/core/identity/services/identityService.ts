@@ -1,4 +1,5 @@
 import { apiRequest } from '@/services/httpClient'
+import { useCompanyStore } from '@/stores/companyStore'
 import type {
   InvitationPayload,
   InvitationOptions,
@@ -31,8 +32,8 @@ export type CompanyMember = {
   positionName: string | null
 }
 
-export async function fetchCompanies() {
-  return apiRequest<{ items: CompanyListItem[] }>('/api/identity/companies', { auth: true })
+export async function fetchCompanies(signal?:AbortSignal) {
+  return apiRequest<{ items: CompanyListItem[] }>('/api/identity/companies', { auth: true,signal })
 }
 
 export async function fetchAccessibleCompanies() {
@@ -71,19 +72,19 @@ export type MembershipWithLabels = MembershipRecord & {
   positionName: string | null
 }
 
-export async function fetchUsers() {
-  return apiRequest<{ items: IdentityUser[] }>('/api/identity/users', { auth: true })
+export async function fetchUsers(signal?:AbortSignal) {
+  return apiRequest<{ items: IdentityUser[] }>('/api/identity/users?companyId='+encodeURIComponent(useCompanyStore.getState().companyId), { auth: true,cache:'no-store',signal })
 }
 
-export async function fetchUser(id: string) {
+export async function fetchUser(id: string,signal?:AbortSignal) {
   return apiRequest<{ user: IdentityUser; memberships: MembershipWithLabels[] }>(
-    `/api/identity/users/${id}`,
-    { auth: true },
+    `/api/identity/users/${id}?companyId=${encodeURIComponent(useCompanyStore.getState().companyId)}`,
+    { auth: true,cache:'no-store',signal },
   )
 }
 
-export async function fetchInvitationOptions() {
-  return apiRequest<InvitationOptions>('/api/identity/invitation-options', { auth: true })
+export async function fetchInvitationOptions(signal?:AbortSignal) {
+  return apiRequest<InvitationOptions>('/api/identity/invitation-options', { auth: true,signal })
 }
 
 export async function createUser(payload: InvitationPayload) {
@@ -205,8 +206,8 @@ export async function deletePosition(id: string) {
   return apiRequest<void>(`/api/identity/positions/${id}`, { method:'DELETE',auth:true })
 }
 
-export async function fetchMemberships() {
-  return apiRequest<{ items: MembershipRecord[] }>('/api/identity/memberships', { auth: true })
+export async function fetchMemberships(signal?:AbortSignal) {
+  return apiRequest<{ items: MembershipRecord[] }>('/api/identity/memberships?companyId='+encodeURIComponent(useCompanyStore.getState().companyId), { auth: true,cache:'no-store',signal })
 }
 
 export async function createMembership(payload: {

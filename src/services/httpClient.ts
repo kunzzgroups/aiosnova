@@ -36,6 +36,7 @@ type RequestOptions = {
   auth?: boolean
   csrf?: boolean
   skipRefresh?: boolean
+  signal?: AbortSignal
   cache?: RequestCache
 }
 
@@ -81,7 +82,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = false, csrf = false, skipRefresh = false, cache } = options
+  const { method = 'GET', body, auth = false, csrf = false, skipRefresh = false, cache, signal } = options
   const headers = new Headers()
 
   if (body !== undefined) {
@@ -105,10 +106,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const response = await fetch(path, {
     method,
     cache,
+    signal,
     credentials: 'include',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
+
+  signal?.throwIfAborted()
 
   if (response.status === 401 && auth && !skipRefresh) {
     const refreshed = await tryRefresh()
