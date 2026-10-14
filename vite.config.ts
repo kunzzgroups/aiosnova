@@ -12,6 +12,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+    '/api/identity/users': 'http://localhost:8080',
+    '/api/identity/invitation-organization': 'http://localhost:8080',
     '/api/auth/local-test-login': 'http://localhost:8080',
     '/api/identity/organizations': 'http://localhost:8080',
     '/api/identity/positions': 'http://localhost:8080',

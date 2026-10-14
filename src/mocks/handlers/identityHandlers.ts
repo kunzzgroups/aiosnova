@@ -3,11 +3,11 @@ import type { ActivatedAccount } from '@/modules/core/auth/types/auth'
 import { useAuthStore } from '@/stores/authStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { i18n } from '@/i18n'
+import { fetchInvitationOrganization } from '@/modules/core/identity/services/organizationService'
 import { apiRequest, ApiError } from '@/services/httpClient'
 import {
   MOCK_MFA_CODE,
   activateInvitedMockUser,
-  removeMockAuthUser,
   setMockUserMfaEnabled,
   updateMockAuthUser,
 } from '@/mocks/data/users'
@@ -73,7 +73,7 @@ type SavedDirectory = {
   users: IdentityUser[]
   memberships: {
     id: string; userId: string; companyCode: string; status: MembershipRecord['status']
-    validFrom: string; validTo: string | null
+    validFrom: string; validTo: string | null; departmentId:string|null; positionId:string|null; departmentName:string|null; positionName:string|null; departmentDeleted:boolean; positionDeleted:boolean
   }[]
 }
 
@@ -133,7 +133,8 @@ async function loadSavedDirectory(requestedCompanyId?:string,userId?:string):Pro
         const company = identityCompanies.find(item => item.code === membership.companyCode)
         if (company) identityMemberships.push({
           id: membership.id, merchantId: DEMO_MERCHANT_ID, userId: membership.userId,
-          companyId: company.id, organizationId: directory.users.find(u => u.id === membership.userId)?.departmentId || null, positionId: directory.users.find(u => u.id === membership.userId)?.positionId || null, roleIds: [],
+          companyId: company.id, organizationId: membership.departmentId || null, positionId: membership.positionId || null, roleIds: [],
+          organizationName:membership.departmentName,positionName:membership.positionName,organizationDeleted:membership.departmentDeleted,positionDeleted:membership.positionDeleted,
           isPrimary: false, status: membership.status,
           validFrom: membership.validFrom.slice(0, 10), validTo: membership.validTo?.slice(0, 10) ?? null,
         })
@@ -180,6 +181,14 @@ async function saveInvitation(request: Request, id?: string) {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (body.settings?.sendNow && (!body.fullName?.trim() || !body.assignments?.length)) || !Array.isArray(body.assignments) || body.settings?.expiryDays!==7 || !['en','zh-CN'].includes(body.settings.language)) {
       return HttpResponse.json({ message: 'Complete the staff details and invitation settings.' }, { status: 400 })
     }
+    if(body.placementCompanyId!==useCompanyStore.getState().companyId) return companyAccessDenied()
+    let placementCompanyId=''
+    try {
+      const catalog=await fetchInvitationOrganization(body.placementCompanyId)
+      placementCompanyId=catalog.companyId
+      options.departments=catalog.departments
+
+    } catch(error) { return HttpResponse.json({message:error instanceof ApiError ? error.message : String(i18n.t('users.errCreate'))},{status:error instanceof ApiError ? error.status : 500}) }
     const selectedDepartment = options.departments.find(d => d.id === body.departmentId)
     if (typeof body.departmentId !== 'string' || typeof body.positionId !== 'string' ||
       (body.departmentId && !selectedDepartment) ||
@@ -190,7 +199,7 @@ async function saveInvitation(request: Request, id?: string) {
     for (const assignment of body.assignments) {
       const company=options.companies.find(c=>c.id===assignment.companyId)
       const department=options.departments.find(d=>d.id===assignment.organizationId)
-      if (assignment.organizationId !== body.departmentId || assignment.positionId !== body.positionId || !company || companyIds.has(assignment.companyId) || (assignment.organizationId && !department) || (assignment.positionId && !department?.positions.some(p=>p.id===assignment.positionId)) || !Array.isArray(assignment.roleIds) || assignment.roleIds.some(id=>!options.roles.some(r=>r.id===id))) {
+      if (assignment.organizationId !== (assignment.companyId===body.placementCompanyId ? body.departmentId : '') || assignment.positionId !== (assignment.companyId===body.placementCompanyId ? body.positionId : '') || !company || companyIds.has(assignment.companyId) || (assignment.organizationId && !department) || (assignment.positionId && !department?.positions.some(p=>p.id===assignment.positionId)) || !Array.isArray(assignment.roleIds) || assignment.roleIds.some(id=>!options.roles.some(r=>r.id===id))) {
         return HttpResponse.json({ message: 'Invalid company, department, position or role assignment.' }, { status: 400 })
       }
       companyIds.add(assignment.companyId)
@@ -213,7 +222,7 @@ async function saveInvitation(request: Request, id?: string) {
           userId: user.id, email: user.email, fullName: user.fullName,
           companyCodes: identityCompanies.filter(c => companyIds.has(c.id)).map(c => c.code),
           requireMfa: Boolean(body.requireMfa), language: body.settings.language,
-          personalMessage: body.settings.personalMessage,
+          personalMessage: body.settings.personalMessage, departmentId:body.departmentId,positionId:body.positionId,placementCompanyId,
         },
       })
       user.id = invitation.userId
@@ -284,9 +293,9 @@ export const identityHandlers = [
         companyName:
           identityCompanies.find((company) => company.id === item.companyId)?.name ?? null,
         organizationName:
-          identityOrganizations.find((org) => org.id === item.organizationId)?.name ?? null,
+          item.organizationDeleted ? String(i18n.t('users.removedDepartmentName',{ name:item.organizationName||'' })) : item.organizationName ?? identityOrganizations.find((org) => org.id === item.organizationId)?.name ?? null,
         positionName:
-          identityPositions.find((position) => position.id === item.positionId)?.name ?? null,
+          item.positionDeleted ? String(i18n.t('users.removedPositionName',{ name:item.positionName||'' })) : item.positionName ?? identityPositions.find((position) => position.id === item.positionId)?.name ?? null,
       }))
 
     const actor = directoryActor(request)
@@ -346,9 +355,12 @@ export const identityHandlers = [
     const { assignments, ...profile } = body
     const companyCodes = assignments?.map(a => identityCompanies.find(c => c.id === a.companyId)?.code)
     if (companyCodes?.some(code => !code)) return HttpResponse.json({ message: 'Invalid company.' }, { status: 400 })
+    const token=useAuthStore.getState().accessToken
+    const activeCode=identityCompanies.find(company=>company.id===useCompanyStore.getState().companyId)?.code
+    const placementCompanyId=token?.startsWith('backend_') ? (await directoryCompanyIds(token)).items.find(company=>company.code===activeCode||company.id===useCompanyStore.getState().companyId)?.id : undefined
     const response = await fetch(bypass('/api/mock/invitations/users/' + encodeURIComponent(String(params.id)), {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: request.headers.get('Authorization') || '' },
-      body: JSON.stringify({ ...profile, ...(assignments ? { companyCodes } : {}) }),
+      body: JSON.stringify({ ...profile, ...(assignments ? { companyCodes } : {}),...(profile.departmentId!==undefined||profile.positionId!==undefined ? {placementCompanyId} : {}) }),
     }))
     if (!response.ok) return HttpResponse.json({ message: response.status === 403
       ? 'You do not have permission to edit this account or its access.'
@@ -358,29 +370,6 @@ export const identityHandlers = [
     if (existing) Object.assign(existing, user)
     updateMockAuthUser(user.id, { email: user.email, name: user.displayName })
     return HttpResponse.json(user)
-  }),
-
-  http.delete('/api/identity/users/:id', ({ params, request }) => {
-    const index = identityUsers.findIndex((item) => item.id === params.id)
-    if (index < 0) {
-      return HttpResponse.json({ message: 'User not found.' }, { status: 404 })
-    }
-
-    const id = String(params.id)
-    const auth = request.headers.get('Authorization')
-    const actorMatch = auth?.startsWith('Bearer ') ? /^access_(.+)$/.exec(auth.slice(7)) : null
-    if (actorMatch?.[1] === id) {
-      return HttpResponse.json({ message: 'You cannot delete your own account.' }, { status: 409 })
-    }
-
-    identityUsers.splice(index, 1)
-    for (let i = identityMemberships.length - 1; i >= 0; i -= 1) {
-      if (identityMemberships[i]?.userId === id) {
-        identityMemberships.splice(i, 1)
-      }
-    }
-    removeMockAuthUser(id)
-    return new HttpResponse(null, { status: 204 })
   }),
 
   http.get('/api/identity/companies', () => {
@@ -408,9 +397,9 @@ export const identityHandlers = [
           isPrimary: item.isPrimary,
           status: item.status,
           organizationName:
-            identityOrganizations.find((org) => org.id === item.organizationId)?.name ?? null,
+            item.organizationDeleted ? String(i18n.t('users.removedDepartment')) : item.organizationName ?? identityOrganizations.find((org) => org.id === item.organizationId)?.name ?? null,
           positionName:
-            identityPositions.find((position) => position.id === item.positionId)?.name ?? null,
+            item.positionDeleted ? String(i18n.t('users.removedPosition')) : item.positionName ?? identityPositions.find((position) => position.id === item.positionId)?.name ?? null,
         }
       })
 

@@ -31,6 +31,11 @@ public class OrganizationController {
         return service.departments(sessions.authenticate(request), companyId);
     }
 
+    @GetMapping("/invitation-organization")
+    public OrganizationService.InvitationCatalog invitationCatalog(@RequestParam String companyId, HttpServletRequest request) {
+        return service.invitationCatalog(sessions.authenticate(request), companyId);
+    }
+
     @GetMapping("/positions")
     public Map<String, ?> positions(@RequestParam String companyId, @RequestParam(required = false) LocalDate date, HttpServletRequest request) {
         return Map.of("items", service.positions(sessions.authenticate(request), companyId, date == null ? LocalDate.now(ZoneOffset.UTC) : date));
@@ -49,6 +54,17 @@ public class OrganizationController {
     @DeleteMapping("/organizations/{id}")
     public ResponseEntity<Void> deleteDepartment(@PathVariable String id, @RequestParam long version, HttpServletRequest request) {
         service.deleteDepartment(sessions.authenticate(request), id, version);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/organizations/{id}/removal-impact")
+    public OrganizationService.RemovalImpact removalImpact(@PathVariable String id, HttpServletRequest request) {
+        return service.removalImpact(sessions.authenticate(request), id);
+    }
+
+    @PostMapping("/organizations/{id}/remove")
+    public ResponseEntity<Void> removeWithEmployees(@PathVariable String id, @RequestBody OrganizationService.RemoveDepartment input, HttpServletRequest request) {
+        service.removeWithEmployees(sessions.authenticate(request), id, input);
         return ResponseEntity.noContent().build();
     }
 

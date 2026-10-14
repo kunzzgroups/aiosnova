@@ -65,7 +65,7 @@ public class AuthRepository {
                     COALESCE(s.can_invite, FALSE) AS can_invite
                 FROM users u JOIN merchants m ON m.id = ? AND m.status <> 'disabled'
                 LEFT JOIN user_directory_settings s ON s.merchant_id = m.id AND s.user_id = u.id
-                WHERE u.id = ? AND (m.owner_user_id = u.id
+                WHERE u.id = ? AND s.deleted_at IS NULL AND (m.owner_user_id = u.id
                     OR EXISTS(SELECT 1 FROM invitations i WHERE i.merchant_id = m.id AND i.user_id = u.id)
                     OR EXISTS(SELECT 1 FROM company_memberships cm WHERE cm.merchant_id = m.id AND cm.user_id = u.id))
                 """, (rs, row) -> new SessionService.Actor(rs.getString("id"), merchantId,
@@ -103,7 +103,7 @@ public class AuthRepository {
     }
 
     public DirectoryUser directoryUser(String merchantId, String userId) {
-        return directoryUsers(merchantId).stream().filter(user -> user.id().equals(userId)).findFirst().orElse(null);
+        return directoryUsers(merchantId, List.of(userId)).stream().findFirst().orElse(null);
     }
 
     public void updateProfile(String merchantId, String userId, DirectoryService.Profile request) {
@@ -148,6 +148,16 @@ public class AuthRepository {
         }
     }
 
+    public void saveInvitationPlacement(String merchantId, String userId, String departmentId, String positionId, boolean requireMfa) {
+        jdbc.update("""
+                INSERT INTO user_directory_settings (merchant_id, user_id, department_ref, position_ref, require_mfa)
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE department_ref = ?, position_ref = ?, require_mfa = ?
+                """, merchantId, userId, departmentId, positionId, requireMfa, departmentId, positionId, requireMfa);
+        var companies = jdbc.queryForList("SELECT company_id FROM organization_departments WHERE merchant_id = ? AND id = ?", String.class, merchantId, departmentId);
+        if (!companies.isEmpty()) saveCompanyPlacement(merchantId, companies.getFirst(), userId, departmentId, positionId);
+    }
+
     public List<DirectoryUser> directoryUsers(String merchantId) { return directoryUsers(merchantId, null); }
 
     public List<DirectoryUser> directoryUsers(String merchantId, List<String> userIds) {
@@ -167,7 +177,7 @@ public class AuthRepository {
                     EXISTS(SELECT 1 FROM user_mfa_methods m WHERE m.user_id = u.id AND m.status = 'active') AS mfa_enabled
                 FROM users u JOIN merchants m ON m.id = ?
                 LEFT JOIN user_directory_settings s ON s.merchant_id = m.id AND s.user_id = u.id
-                WHERE (m.owner_user_id = u.id OR EXISTS(SELECT 1 FROM invitations i WHERE i.user_id = u.id AND i.merchant_id = m.id)
+                WHERE s.deleted_at IS NULL AND (m.owner_user_id = u.id OR EXISTS(SELECT 1 FROM invitations i WHERE i.user_id = u.id AND i.merchant_id = m.id)
                     OR EXISTS(SELECT 1 FROM company_memberships cm WHERE cm.user_id = u.id AND cm.merchant_id = m.id))
                 """ + (userIds == null ? "" : " AND u.id IN (" + String.join(",", java.util.Collections.nCopies(userIds.size(), "?")) + ")")
                 + " ORDER BY u.created_at DESC, u.id", (rs, row) -> new DirectoryUser(rs.getString("id"), rs.getString("email"),
@@ -185,6 +195,37 @@ public class AuthRepository {
         args.add(merchantId);
         if (values != null) args.addAll(values);
         return args.toArray();
+    }
+
+
+    public void saveCompanyPlacement(String merchantId, String companyId, String userId, String departmentId, String positionId) {
+        jdbc.update("""
+                INSERT INTO company_employee_placements (merchant_id, company_id, user_id, department_id, position_id)
+                VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
+                ON DUPLICATE KEY UPDATE department_id = NULLIF(?, ''), position_id = NULLIF(?, ''), version = version + 1
+                """, merchantId, companyId, userId, departmentId, positionId, departmentId, positionId);
+    }
+
+    public Map<String, Object> companyPlacement(String merchantId, String companyId, String userId) {
+        var rows = jdbc.queryForList("SELECT department_id, position_id FROM company_employee_placements WHERE merchant_id = ? AND company_id = ? AND user_id = ?", merchantId, companyId, userId);
+        return rows.isEmpty() ? null : rows.getFirst();
+    }
+
+    public void clearEmployeePlacement(String merchantId, String userId) {
+        jdbc.update("UPDATE company_employee_placements SET department_id = NULL, position_id = NULL, version = version + 1 WHERE merchant_id = ? AND user_id = ?", merchantId, userId);
+        jdbc.update("""
+                INSERT INTO user_directory_settings (merchant_id, user_id, department_ref, position_ref)
+                VALUES (?, ?, '', '') ON DUPLICATE KEY UPDATE department_ref = '', position_ref = '', can_invite = FALSE
+                """, merchantId, userId);
+    }
+
+    public void deleteEmployee(String merchantId, String userId, String actorId) {
+        jdbc.update("UPDATE company_memberships SET status = 'ended', ended_at = GREATEST(joined_at, UTC_TIMESTAMP(6)), version = version + 1 WHERE merchant_id = ? AND user_id = ? AND status = 'active'", merchantId, userId);
+        revokeInvitations(merchantId, userId);
+        jdbc.update("DELETE FROM user_permission_grants WHERE merchant_id = ? AND user_id = ?", merchantId, userId);
+        jdbc.update("DELETE FROM company_user_permission_grants WHERE merchant_id = ? AND user_id = ?", merchantId, userId);
+        jdbc.update("UPDATE auth_sessions SET status = 'revoked', revoked_at = UTC_TIMESTAMP(6), version = version + 1 WHERE merchant_id = ? AND user_id = ? AND status IN ('active', 'restricted')", merchantId, userId);
+        jdbc.update("UPDATE user_directory_settings SET deleted_at = UTC_TIMESTAMP(6), deleted_by = ? WHERE merchant_id = ? AND user_id = ?", actorId, merchantId, userId);
     }
 
     public List<Company> accessibleCompanies(SessionService.Actor actor) {
@@ -207,20 +248,29 @@ public class AuthRepository {
         java.util.Collections.addAll(args, directoryArguments(merchantId, companyCodes));
         return jdbc.query("""
                 SELECT cm.id, cm.user_id, c.code AS company_code, cm.status,
-                    cm.joined_at AS valid_from, cm.ended_at AS valid_to
+                    cm.joined_at AS valid_from, cm.ended_at AS valid_to, od.id AS department_id, op.id AS position_id,
+                    od.name AS department_name, op.name AS position_name, od.deleted_at IS NOT NULL AS department_deleted, op.deleted_at IS NOT NULL AS position_deleted
                 FROM company_memberships cm JOIN companies c ON c.merchant_id = cm.merchant_id AND c.id = cm.company_id
+                LEFT JOIN user_directory_settings ds ON ds.merchant_id = c.merchant_id AND ds.user_id = cm.user_id
+                LEFT JOIN company_employee_placements pl ON pl.merchant_id = c.merchant_id AND pl.company_id = c.id AND pl.user_id = ds.user_id
+                LEFT JOIN organization_departments od ON od.merchant_id = c.merchant_id AND od.company_id = c.id AND od.id = CASE WHEN pl.user_id IS NOT NULL THEN pl.department_id ELSE ds.department_ref END
+                LEFT JOIN organization_positions op ON op.merchant_id = c.merchant_id AND op.company_id = c.id AND op.department_id = od.id AND op.id = CASE WHEN pl.user_id IS NOT NULL THEN pl.position_id ELSE ds.position_ref END
                 WHERE cm.merchant_id = ? AND cm.status = 'active'
                     AND cm.joined_at <= UTC_TIMESTAMP(6) AND (cm.ended_at IS NULL OR cm.ended_at > UTC_TIMESTAMP(6))
                 """ + scope + """
                 UNION ALL
-                SELECT a.id, i.user_id, c.code, 'invited', i.sent_at, NULL
+                SELECT a.id, i.user_id, c.code, 'invited', i.sent_at, NULL, od.id, op.id, od.name, op.name, od.deleted_at IS NOT NULL, op.deleted_at IS NOT NULL
                 FROM invitation_company_assignments a
                 JOIN invitations i ON i.merchant_id = a.merchant_id AND i.id = a.invitation_id
                 JOIN companies c ON c.merchant_id = a.merchant_id AND c.id = a.company_id
+                LEFT JOIN user_directory_settings ds ON ds.merchant_id = c.merchant_id AND ds.user_id = i.user_id
+                LEFT JOIN company_employee_placements pl ON pl.merchant_id = c.merchant_id AND pl.company_id = c.id AND pl.user_id = ds.user_id
+                LEFT JOIN organization_departments od ON od.merchant_id = c.merchant_id AND od.company_id = c.id AND od.id = CASE WHEN pl.user_id IS NOT NULL THEN pl.department_id ELSE ds.department_ref END
+                LEFT JOIN organization_positions op ON op.merchant_id = c.merchant_id AND op.company_id = c.id AND op.department_id = od.id AND op.id = CASE WHEN pl.user_id IS NOT NULL THEN pl.position_id ELSE ds.position_ref END
                 WHERE a.merchant_id = ? AND i.status = 'sent'
                 """ + scope, (rs, row) -> new DirectoryMembership(rs.getString("id"), rs.getString("user_id"),
                 rs.getString("company_code"), rs.getString("status"), rs.getTimestamp("valid_from").toInstant(),
-                rs.getTimestamp("valid_to") == null ? null : rs.getTimestamp("valid_to").toInstant()), args.toArray());
+                rs.getTimestamp("valid_to") == null ? null : rs.getTimestamp("valid_to").toInstant(), rs.getString("department_id"), rs.getString("position_id"), rs.getString("department_name"), rs.getString("position_name"), rs.getBoolean("department_deleted"), rs.getBoolean("position_deleted")), args.toArray());
     }
 
     public void createUser(String id, String email, String name, String language) {
@@ -308,10 +358,10 @@ public class AuthRepository {
         for (Company company : companies) {
             jdbc.update("""
                     INSERT INTO company_memberships (id, merchant_id, user_id, company_id, joined_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, UTC_TIMESTAMP(6))
                     ON DUPLICATE KEY UPDATE status = 'active', ended_at = NULL, version = version + 1
                     """, UUID.randomUUID().toString(), invite.merchantId(), invite.userId(),
-                    company.id(), Timestamp.from(now));
+                    company.id());
         }
         jdbc.update("UPDATE invitations SET status = 'accepted', accepted_at = ?, version = version + 1 WHERE id = ?",
                 Timestamp.from(now), invite.id());
@@ -411,5 +461,5 @@ public class AuthRepository {
         }
     }
     public record DirectoryMembership(String id, String userId, String companyCode, String status,
-                                      Instant validFrom, Instant validTo) { }
+                                      Instant validFrom, Instant validTo, String departmentId, String positionId, String departmentName, String positionName, boolean departmentDeleted, boolean positionDeleted) { }
 }

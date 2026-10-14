@@ -1,4 +1,5 @@
-import { apiRequest } from '@/services/httpClient'
+import { apiRequest, ApiError } from '@/services/httpClient'
+import { i18n } from '@/i18n'
 import { useCompanyStore } from '@/stores/companyStore'
 import type {
   InvitationPayload,
@@ -100,10 +101,19 @@ export async function updateUser(id: string, payload: IdentityProfilePayload) {
 }
 
 export async function deleteUser(id: string) {
-  return apiRequest<void>(`/api/identity/users/${id}`, {
-    method: 'DELETE',
-    auth: true,
-  })
+  return deleteEmployees(`/api/identity/users/${id}`, { method:'DELETE' })
+}
+
+export async function deleteUsers(userIds:string[]) {
+  return deleteEmployees('/api/identity/users/bulk-delete',{ method:'POST',body:{ userIds } })
+}
+
+async function deleteEmployees(path:string,options:Parameters<typeof apiRequest<void>>[1]) {
+  try { return await apiRequest<void>(path,{ ...options,auth:true }) }
+  catch(error) {
+    if(error instanceof ApiError&&error.message.startsWith('users.')) throw new ApiError(String(i18n.t(error.message)),error.status,error.retryAfter)
+    throw error
+  }
 }
 
 export async function disableUserMfa(id: string, code: string) {

@@ -1,4 +1,4 @@
--- Current schema reference: MySQL 8.4, after V4–V6, V8 and V9 (V7 deferred).
+-- Current schema reference: MySQL 8.4, after V4–V6 and V8–V12 (V7 deferred).
 -- Not a registered migration. Use the versioned migrations for setup.
 
 CREATE TABLE organization_departments (
@@ -9,12 +9,15 @@ CREATE TABLE organization_departments (
   executive_position_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
   name VARCHAR(200) NOT NULL,
   status VARCHAR(24) NOT NULL DEFAULT 'active',
+  deleted_at DATETIME(6) NULL,
+  deleted_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
   sort_order INT NOT NULL DEFAULT 0,
   created_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   updated_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  CONSTRAINT fk_org_departments_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   UNIQUE KEY uq_org_departments_scope (merchant_id,company_id,id),
   KEY ix_org_departments_tree (merchant_id,company_id,parent_id,sort_order,id),
   KEY ix_org_departments_executive (merchant_id,company_id,executive_position_id),
@@ -35,11 +38,14 @@ CREATE TABLE organization_positions (
   name VARCHAR(200) NOT NULL,
   level VARCHAR(24) NOT NULL,
   status VARCHAR(24) NOT NULL DEFAULT 'active',
+  deleted_at DATETIME(6) NULL,
+  deleted_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
   created_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   updated_by CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  CONSTRAINT fk_org_positions_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
   UNIQUE KEY uq_org_positions_scope (merchant_id,company_id,id),
   KEY ix_org_positions_department (merchant_id,company_id,department_id),
   KEY ix_org_positions_directory (merchant_id,company_id,status,level,name,id),
@@ -126,4 +132,19 @@ CREATE TABLE company_user_permission_grants (
     PRIMARY KEY (merchant_id, company_id, user_id, permission_code),
     CONSTRAINT fk_company_grants_company FOREIGN KEY (merchant_id, company_id) REFERENCES companies(merchant_id, id) ON DELETE RESTRICT,
     CONSTRAINT fk_company_grants_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+
+CREATE TABLE company_employee_placements (
+    merchant_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    company_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    user_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    department_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    position_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (merchant_id, company_id, user_id),
+    FOREIGN KEY (merchant_id, company_id) REFERENCES companies(merchant_id, id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (merchant_id, company_id, department_id) REFERENCES organization_departments(merchant_id, company_id, id),
+    FOREIGN KEY (merchant_id, company_id, position_id) REFERENCES organization_positions(merchant_id, company_id, id)
 ) ENGINE=InnoDB;

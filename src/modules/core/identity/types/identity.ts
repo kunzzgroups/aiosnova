@@ -147,6 +147,10 @@ export type PositionRecord = {
 export type MembershipStatus = 'active' | 'ended' | 'invited'
 
 export type MembershipRecord = {
+  organizationName?: string | null
+  positionName?: string | null
+  organizationDeleted?: boolean
+  positionDeleted?: boolean
   id: string
   merchantId: string
   userId: string
@@ -175,6 +179,7 @@ export type CompanyOption = CompanyRecord
 
 export type InvitationAssignment = { companyId: string; organizationId: string; positionId: string; roleIds: string[] }
 export type InvitationPayload = {
+  placementCompanyId?: string
   email: string; fullName: string; phone: string; assignments: InvitationAssignment[]; departmentId: string; positionId: string
 
   requireMfa: boolean; canInvite: boolean

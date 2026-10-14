@@ -6,7 +6,7 @@ import type { OrganizationNode, PositionRecord } from '../types/identity'
 export type DatabaseDepartment = Omit<OrganizationNode, 'code'> & { version: number }
 export type DatabasePosition = Omit<PositionRecord, 'code' | 'description'> & { version: number; employeeCount: number; assignmentCount: number }
 type DepartmentInput = { name: string; status?: OrganizationNode['status']; parentId?: string | null; managerPositionId?: string | null }
-type PositionInput = { name: string; organizationId: string | null; level: NonNullable<PositionRecord['level']>; managedDepartmentIds?: string[] }
+type PositionInput = { name: string; organizationId: string | null; level: NonNullable<PositionRecord['level']>; managedDepartmentIds?: string[]; managedDepartmentVersions?: Record<string,number> }
 
 async function request<T>(path: string, options: Parameters<typeof apiRequest<T>>[1] = {}) {
   try {
@@ -41,6 +41,11 @@ export async function fetchOrganizationStructure(companyId: string,signal?:Abort
   return { companyId: company.id, departments: departments.items, positions: positions.items, canRead: departments.canRead, canManage: departments.canManage }
 }
 
+export async function fetchInvitationOrganization(companyId:string,signal?:AbortSignal) {
+  const company=await fetchOrganizationAccess(companyId,signal)
+  return request<{ companyId:string; departments:{ id:string; name:string; parentId:string|null; positions:{id:string;name:string}[] }[] }>('/api/identity/invitation-organization?companyId='+encodeURIComponent(company.id),{signal})
+}
+
 export function updateOrganization(item: DatabaseDepartment, payload: Partial<DepartmentInput>) {
   return request<DatabaseDepartment>('/api/identity/organizations/' + item.id, { method: 'PATCH', body: { ...payload, version: item.version } })
 }
@@ -51,6 +56,16 @@ export function updatePosition(item: DatabasePosition, payload: Partial<Position
 
 export function createOrganizationBatch(companyId: string, payload: { departments?: DepartmentInput[]; positions?: PositionInput[] }, requestId: string) {
   return request<{ departments: DatabaseDepartment[]; positions: DatabasePosition[]; departmentIds: string[]; positionIds: string[] }>('/api/identity/organization-batches', { method: 'POST', body: { companyId, ...payload, requestId } })
+}
+
+export type DepartmentRemovalImpact = { employeeCount:number; groups:{key:string;departmentId:string;departmentName:string;positionId:string|null;positionName:string|null;employeeCount:number}[];snapshot:string;canReassign:boolean }
+
+export function fetchDepartmentRemovalImpact(item:DatabaseDepartment,signal?:AbortSignal) {
+  return request<DepartmentRemovalImpact>('/api/identity/organizations/'+item.id+'/removal-impact',{signal})
+}
+
+export function removeDepartmentWithEmployees(item:DatabaseDepartment,payload:{mode:'retain'|'reassign';departmentId:string;positionMappings:{sourceKey:string;positionId:string}[];snapshot:string}) {
+  return request<void>('/api/identity/organizations/'+item.id+'/remove',{method:'POST',body:{...payload,version:item.version}})
 }
 
 export function deleteOrganization(item: DatabaseDepartment) {

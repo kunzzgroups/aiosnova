@@ -13,9 +13,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class DirectoryService {
     private final AuthRepository repository;
+    private final com.aiosnova.organization.OrganizationAssignmentService assignments;
 
-    public DirectoryService(AuthRepository repository) {
+    public DirectoryService(AuthRepository repository, com.aiosnova.organization.OrganizationAssignmentService assignments) {
         this.repository = repository;
+        this.assignments = assignments;
     }
 
     @Transactional(readOnly = true)
@@ -49,7 +51,7 @@ public class DirectoryService {
         boolean manager = actor.owner() || actor.manageUsers();
         if (!manager && !actor.id().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         if (!manager && (request.companyCodes() != null || request.departmentId() != null || request.positionId() != null
-                || request.requireMfa() != null || request.canInvite() != null)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                || request.requireMfa() != null || request.canInvite() != null || request.placementCompanyId() != null)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         if (!actor.owner() && (request.canManageUsers() != null || request.status() != null)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         if (target.isOwner() && (request.status() != null || request.canManageUsers() != null)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         if (request.status() != null && (!List.of("active", "disabled").contains(request.status())
@@ -68,8 +70,22 @@ public class DirectoryService {
         repository.lockUser(userId);
         AuthRepository.DirectoryUser before = repository.directoryUser(actor.merchantId(), userId);
         List<String> previousCompanies = repository.userCompanyCodes(actor.merchantId(), userId);
+        if ((request.departmentId() != null || request.positionId() != null) && request.placementCompanyId() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        var scoped = request.placementCompanyId() == null ? null : repository.companyPlacement(actor.merchantId(), request.placementCompanyId(), userId);
+        String previousDepartmentId = scoped == null ? before.departmentId() : java.util.Objects.toString(scoped.get("department_id"), "");
+        String previousPositionId = scoped == null ? before.positionId() : java.util.Objects.toString(scoped.get("position_id"), "");
+        String departmentId = request.departmentId() == null ? previousDepartmentId : request.departmentId();
+        String positionId = request.positionId() == null ? previousPositionId : request.positionId();
+        if (request.placementCompanyId() != null && repository.accessibleCompanies(actor).stream().noneMatch(company -> company.id().equals(request.placementCompanyId()))) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        if (!departmentId.equals(previousDepartmentId) || !positionId.equals(previousPositionId)) {
+            String placementCompanyId = assignments.validate(actor.merchantId(), departmentId, positionId);
+            if (placementCompanyId != null && (request.placementCompanyId() != null && !request.placementCompanyId().equals(placementCompanyId)
+                    || repository.accessibleCompanies(actor).stream().noneMatch(company -> company.id().equals(placementCompanyId)))) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         repository.updateProfile(actor.merchantId(), userId, request);
+        if (manager && request.placementCompanyId() != null && (request.departmentId() != null || request.positionId() != null)) repository.saveCompanyPlacement(actor.merchantId(), request.placementCompanyId(), userId, departmentId, positionId);
         if (selected != null) repository.replaceCompanies(actor.merchantId(), userId, selected);
+        if (manager) assignments.synchronize(actor.merchantId(), userId, actor.id());
         AuthRepository.DirectoryUser after = repository.directoryUser(actor.merchantId(), userId);
         Map<String, Object> changes = AuditChanges.between(auditFields(before), auditFields(after));
         AuditChanges.add(changes, "companyCodes", previousCompanies, repository.userCompanyCodes(actor.merchantId(), userId));
@@ -95,14 +111,43 @@ public class DirectoryService {
         return fields;
     }
 
+    @Transactional
+    public void delete(SessionService.Actor actor, List<String> userIds) {
+        repository.merchantOwner(actor.merchantId());
+        actor = repository.actor(actor.merchantId(), actor.id());
+        if (actor == null || !"active".equals(actor.status())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "users.deleteSessionExpired");
+        if (!actor.owner()) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "users.deleteOwnerOnly");
+        if (userIds == null || userIds.isEmpty() || userIds.stream().anyMatch(id -> id == null || id.isBlank())
+                || userIds.stream().distinct().count() != userIds.size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "users.deleteInvalidRequest");
+        var targets = new java.util.ArrayList<AuthRepository.DirectoryUser>();
+        for (String userId : userIds.stream().sorted().toList()) {
+            repository.lockUser(userId);
+            var target = repository.directoryUser(actor.merchantId(), userId);
+            if (target == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "users.deleteNotFound");
+            if (target.isOwner() || actor.id().equals(userId)) throw new ResponseStatusException(HttpStatus.CONFLICT, "users.deleteProtectedAccount");
+            if (!"disabled".equals(target.status())) throw new ResponseStatusException(HttpStatus.CONFLICT, "users.deleteInactiveRequired");
+            targets.add(target);
+        }
+        for (var target : targets) {
+            var companies = repository.userCompanyCodes(actor.merchantId(), target.id());
+            repository.clearEmployeePlacement(actor.merchantId(), target.id());
+            assignments.synchronize(actor.merchantId(), target.id(), actor.id());
+            repository.deleteEmployee(actor.merchantId(), target.id(), actor.id());
+            repository.audit(actor.merchantId(), actor.id(), "identity.user.deleted", "user", target.id(),
+                    AuditChanges.between(Map.of("deleted", false, "companyCodes", companies), Map.of("deleted", true, "companyCodes", List.of())));
+        }
+    }
+
     public record Profile(String email, String fullName, String displayName, String phone, String avatarUrl,
                           String language, String timezone, String status, String departmentId, String positionId,
-                          Boolean requireMfa, Boolean canInvite, Boolean canManageUsers, List<String> companyCodes) {
+                          Boolean requireMfa, Boolean canInvite, Boolean canManageUsers, List<String> companyCodes, String placementCompanyId) {
         public Profile {
             if (email != null) email = email.trim().toLowerCase(Locale.ROOT);
             if (fullName != null) fullName = fullName.trim();
             if (displayName != null) displayName = displayName.trim();
             if (phone != null) phone = phone.trim();
+            if (departmentId != null) departmentId = departmentId.trim();
+            if (positionId != null) positionId = positionId.trim();
         }
     }
 }

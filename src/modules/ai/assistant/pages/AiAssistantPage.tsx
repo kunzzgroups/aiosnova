@@ -25,6 +25,7 @@ import {
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import { TextField } from '@/components/ui/TextField'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useCompanyStore } from '@/stores/companyStore'
 import { AttachMenu } from '../components/AttachMenu'
 import type {
@@ -341,6 +342,8 @@ export function AiAssistantPage() {
   const companyLabel = companies.find((item) => item.value === companyId)?.label ?? null
 
   const [threads, setThreads] = useState<AssistantThread[]>(readThreads)
+  const [pendingDeleteThread,setPendingDeleteThread]=useState<AssistantThread|null>(null)
+  useEffect(()=>setPendingDeleteThread(null),[companyId])
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState('')
@@ -1030,7 +1033,7 @@ export function AiAssistantPage() {
           title={t('ai.assistant.deleteThread')}
           onClick={(event) => {
             event.stopPropagation()
-            deleteThread(thread.id)
+            setPendingDeleteThread(thread)
           }}
         >
           <svg
@@ -1757,6 +1760,7 @@ export function AiAssistantPage() {
         onChange={setPrefs}
         onClose={() => setSettingsOpen(false)}
       />
+      <ConfirmDialog variant="deletion" open={Boolean(pendingDeleteThread)} title={t('ai.assistant.deleteChatHeading')} items={pendingDeleteThread ? [{id:pendingDeleteThread.id,name:pendingDeleteThread.title}] : []} description={<p>{t('ai.assistant.deleteChatShort')}</p>} warning={t('ai.assistant.deleteChatWarning')} confirmLabel={t('ai.assistant.deleteThread')} onConfirm={()=>{if(pendingDeleteThread) deleteThread(pendingDeleteThread.id);setPendingDeleteThread(null)}} onCancel={()=>setPendingDeleteThread(null)} />
     </div>
   )
 }

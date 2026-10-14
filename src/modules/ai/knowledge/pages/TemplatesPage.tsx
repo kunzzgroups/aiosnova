@@ -62,6 +62,7 @@ export function TemplatesPage() {
     // ---- Delete dialog
     const [pendingDelete, setPendingDelete] = useState<TemplateListItem | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [deleteError, setDeleteError] = useState<string | null>(null)
 
     const companyLabel = companies.find((c) => c.value === companyId)?.label ?? ''
 
@@ -136,13 +137,14 @@ export function TemplatesPage() {
     async function handleDelete() {
         if (!pendingDelete || isDeleting) return
         setIsDeleting(true)
+        setDeleteError(null)
         try {
             await deleteKnowledgeTemplate(pendingDelete.id)
             setMessage(t('ai.knowledge.msgTemplateDeleted', 'Template deleted.'))
             setPendingDelete(null)
             await load()
         } catch (caught) {
-            setError(
+            setDeleteError(
                 caught instanceof ApiError
                     ? caught.message
                     : t('ai.knowledge.errTemplateDelete', 'Could not delete this template.'),
@@ -319,7 +321,7 @@ export function TemplatesPage() {
                                                                 className="console-icon-button console-icon-button--danger"
                                                                 aria-label={t('ai.knowledge.delete', 'Delete')}
                                                                 title={t('ai.knowledge.delete', 'Delete')}
-                                                                onClick={() => setPendingDelete(template)}
+                                                                onClick={() => { setDeleteError(null); setPendingDelete(template) }}
                                                             >
                                                                 <IconTrash />
                                                             </button>
@@ -510,22 +512,20 @@ export function TemplatesPage() {
             </Drawer>
 
             <ConfirmDialog
-                open={pendingDelete !== null}
-                title={t('ai.knowledge.deleteTemplateTitle', 'Delete "{{name}}"?', {
-                    name: pendingDelete?.name ?? '',
-                })}
-                description={t(
-                    'ai.knowledge.deleteTemplateBody',
-                    'Existing adoptions are not affected. The template will no longer be available.',
-                )}
-                warning={t('ai.knowledge.deleteWarning', 'This cannot be undone.')}
-                confirmLabel={t('ai.knowledge.delete')}
-                cancelLabel={t('ai.knowledge.cancel')}
-                busyLabel={t('ai.knowledge.deleting')}
-                busy={isDeleting}
-                onConfirm={() => void handleDelete()}
-                onCancel={() => setPendingDelete(null)}
-            />
+        variant="deletion"
+        open={pendingDelete !== null}
+        title={t('ai.knowledge.deleteTemplateHeading')}
+        items={pendingDelete ? [{id:pendingDelete.id,name:pendingDelete.name}] : []}
+        description={<p>{t('ai.knowledge.deleteTemplateShort')}</p>}
+        
+        error={deleteError}
+        confirmLabel={t('ai.knowledge.deleteTemplateAction')}
+        cancelLabel={t('ai.knowledge.cancel')}
+        busyLabel={t('ai.knowledge.deleting')}
+        busy={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setPendingDelete(null)}
+    />
         </div>
     )
 }

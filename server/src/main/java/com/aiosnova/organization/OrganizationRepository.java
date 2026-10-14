@@ -49,7 +49,7 @@ public class OrganizationRepository {
     }
 
     public List<Department> departments(String merchantId, String companyId) {
-        return jdbc.query("SELECT * FROM organization_departments WHERE merchant_id = ? AND company_id = ? ORDER BY sort_order, name, id",
+        return jdbc.query("SELECT * FROM organization_departments WHERE merchant_id = ? AND company_id = ? AND deleted_at IS NULL ORDER BY sort_order, name, id",
                 this::department, merchantId, companyId);
     }
 
@@ -64,13 +64,44 @@ public class OrganizationRepository {
                         WHERE a.merchant_id = p.merchant_id AND a.company_id = p.company_id AND a.position_id = p.id
                         AND a.status = 'active' AND m.status = 'active' AND a.valid_from <= ? AND (a.valid_to IS NULL OR a.valid_to >= ?)
                         AND m.joined_at <= UTC_TIMESTAMP(6) AND (m.ended_at IS NULL OR m.ended_at > UTC_TIMESTAMP(6))) AS employee_count
-                FROM organization_positions p WHERE p.merchant_id = ? AND p.company_id = ? ORDER BY p.name, p.id
+                FROM organization_positions p WHERE p.merchant_id = ? AND p.company_id = ? AND p.deleted_at IS NULL ORDER BY p.name, p.id
                 """, this::position, date, date, merchantId, companyId);
     }
 
     public String companyFor(String table, String merchantId, String id) {
-        List<String> rows = jdbc.queryForList("SELECT company_id FROM " + table + " WHERE merchant_id = ? AND id = ?", String.class, merchantId, id);
+        List<String> rows = jdbc.queryForList("SELECT company_id FROM " + table + " WHERE merchant_id = ? AND id = ? AND deleted_at IS NULL", String.class, merchantId, id);
         return rows.isEmpty() ? null : rows.getFirst();
+    }
+
+    public boolean departmentNameExists(String merchantId, String companyId, String parentId, String name, String excludedId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM organization_departments WHERE merchant_id = ? AND company_id = ? AND deleted_at IS NULL AND parent_id <=> ? AND name = ? AND NOT (id <=> ?)",
+                Long.class, merchantId, companyId, parentId, name, excludedId) > 0;
+    }
+
+    public boolean placementReferenced(String merchantId, String id) {
+        return jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM user_directory_settings WHERE merchant_id = ? AND (department_ref = ? OR position_ref = ?))", Boolean.class, merchantId, id, id);
+    }
+
+    public List<java.util.Map<String, Object>> employeePlacements(String merchantId, String companyId) {
+        return jdbc.queryForList("""
+                SELECT pl.user_id, pl.department_id, pl.position_id, pl.version AS placement_version,
+                    u.version AS user_version, d.name AS department_name, p.name AS position_name
+                FROM company_employee_placements pl JOIN users u ON u.id = pl.user_id
+                JOIN organization_departments d ON d.merchant_id = pl.merchant_id AND d.company_id = pl.company_id AND d.id = pl.department_id
+                LEFT JOIN organization_positions p ON p.merchant_id = pl.merchant_id AND p.company_id = pl.company_id AND p.id = pl.position_id
+                LEFT JOIN user_directory_settings s ON s.merchant_id = pl.merchant_id AND s.user_id = pl.user_id
+                WHERE pl.merchant_id = ? AND pl.company_id = ? AND s.deleted_at IS NULL AND (
+                    EXISTS(SELECT 1 FROM company_memberships m WHERE m.merchant_id = pl.merchant_id AND m.company_id = pl.company_id AND m.user_id = pl.user_id
+                        AND m.status = 'active' AND m.joined_at <= UTC_TIMESTAMP(6) AND (m.ended_at IS NULL OR m.ended_at > UTC_TIMESTAMP(6)))
+                    OR EXISTS(SELECT 1 FROM invitations i JOIN invitation_company_assignments a ON a.merchant_id = i.merchant_id AND a.invitation_id = i.id
+                        WHERE i.merchant_id = pl.merchant_id AND i.user_id = pl.user_id AND i.status = 'sent' AND a.company_id = pl.company_id))
+                ORDER BY pl.user_id
+                """, merchantId, companyId);
+    }
+
+    public boolean positionNameExists(String merchantId, String companyId, String departmentId, String name, String excludedId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM organization_positions WHERE merchant_id = ? AND company_id = ? AND deleted_at IS NULL AND department_id <=> ? AND name = ? AND NOT (id <=> ?)",
+                Long.class, merchantId, companyId, departmentId, name, excludedId) > 0;
     }
 
     public void createDepartment(Department d, String actorId) {
@@ -101,8 +132,8 @@ public class OrganizationRepository {
                 """, p.organizationId(), p.name(), p.level(), p.status(), actorId, p.merchantId(), p.companyId(), p.id(), p.version());
     }
 
-    public void delete(String table, String merchantId, String companyId, String id, long version) {
-        jdbc.update("DELETE FROM " + table + " WHERE merchant_id = ? AND company_id = ? AND id = ? AND version = ?", merchantId, companyId, id, version);
+    public int delete(String table, String merchantId, String companyId, String id, long version, String actorId) {
+        return jdbc.update("UPDATE " + table + " SET deleted_at = UTC_TIMESTAMP(6), deleted_by = ?, updated_by = ?, version = version + 1 WHERE merchant_id = ? AND company_id = ? AND id = ? AND version = ? AND deleted_at IS NULL", actorId, actorId, merchantId, companyId, id, version);
     }
 
     private Department department(ResultSet rs, int row) throws SQLException {

@@ -1,5 +1,5 @@
 import { useCallback,useContext,useEffect,useMemo,useRef,useState,type FormEvent } from 'react'
-import { Link,useNavigate } from 'react-router-dom'
+import { Link,useLocation,useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { TablePanel } from '@/components/ui/TablePanel'
@@ -33,12 +33,14 @@ import {
   createUser,
   updateInvitation,
   deleteUser,
+  deleteUsers,
   fetchCompanies,
   fetchInvitationOptions,
   fetchMemberships,
   fetchUsers,
   updateUser,
 } from '@/modules/core/identity/services/identityService'
+import { fetchInvitationOrganization } from '@/modules/core/identity/services/organizationService'
 import { AppShellHeaderContext } from '@/layouts/AppShell'
 import './IdentityPage.css'
 import './UsersDirectoryDesign.css'
@@ -68,6 +70,7 @@ export function UsersPage() {
   const setShellHeader = useContext(AppShellHeaderContext)
   const invitationMessage = (locale: string) => t('users.defaultInvitationMessage', { lng: locale })
   const navigate=useNavigate()
+  const location=useLocation()
 
   // Filter values are plain strings in the module-level constant; labels are
   // resolved here so they follow the active locale.
@@ -105,7 +108,10 @@ export function UsersPage() {
   const [autoPageSize,setAutoPageSize]=useState(10)
   const autoFitRowMeasurement=useRef({ width: 0, height: 0 })
   const [page,setPage]=useState(1)
-  const department = inviteOptions?.departments.find(d => d.id === departmentId)
+  const [invitationDepartments,setInvitationDepartments]=useState<Awaited<ReturnType<typeof fetchInvitationOrganization>>['departments']>([])
+  const [catalogLoading,setCatalogLoading]=useState(false)
+  const [catalogReady,setCatalogReady]=useState(false)
+  const department = invitationDepartments.find(d => d.id === departmentId)
   const tableRef=useRef<HTMLDivElement>(null)
   const invitePageRef=useRef<HTMLDivElement>(null)
   const mfaRequiredByPolicy=assignments.some(a => inviteOptions?.companies.find(c => c.id===a.companyId)?.requireMfa)
@@ -117,6 +123,7 @@ export function UsersPage() {
   const [statusFilter,setStatusFilter]=useState('active')
   const [companyFilter,setCompanyFilter]=useState('all')
   const [mfaFilter,setMfaFilter]=useState('all')
+  const [placementFilter,setPlacementFilter]=useState('all')
   const [showInvite,setShowInvite]=useState(false)
   const [fieldErrors,setFieldErrors]=useState<Partial<Record<InviteField,string>>>({})
   const [editingDraftId,setEditingDraftId]=useState<string|null>(null)
@@ -126,13 +133,21 @@ export function UsersPage() {
   }, [showInvite,editingDraftId,setShellHeader])
   const [error,setError]=useState<string|null>(null)
   const [message,setMessage]=useState<string|null>(null)
+  useEffect(()=>{
+    if (!location.state?.profileSaved) return
+    setMessage(t('users.msgProfileSaved'))
+    navigate({ pathname:location.pathname,search:location.search,hash:location.hash },{ replace:true,state:null })
+  },[location,navigate,t])
   const [isLoading,setIsLoading]=useState(true)
   const [isSubmitting,setIsSubmitting]=useState(false)
   const [statusUpdatingId,setStatusUpdatingId]=useState<string|null>(null)
   const [deletingId,setDeletingId]=useState<string|null>(null)
   const [pendingDelete,setPendingDelete]=useState<IdentityUser|null>(null)
+  const [deleteError,setDeleteError]=useState<string|null>(null)
+  const [deleteConflict,setDeleteConflict]=useState(false)
   const [selectedUserIds,setSelectedUserIds]=useState<string[]>([])
   const [pendingBulkDeleteIds,setPendingBulkDeleteIds]=useState<string[]>([])
+  useEffect(()=>setDeleteConflict(false),[pendingDelete?.id,pendingBulkDeleteIds])
   const [isBulkDeleting,setIsBulkDeleting]=useState(false)
   const selectAllUsersRef=useRef<HTMLInputElement>(null)
   const deleteInProgress=useRef(false)
@@ -191,6 +206,7 @@ export function UsersPage() {
       if(statusFilter!=='all'&&user.status!==statusFilter) {
         return false
       }
+      if(placementFilter==='needsReassignment'&&!memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&(m.organizationDeleted||m.positionDeleted))) return false
       if(mfaFilter==='enabled'&&(!user.signInMethod||!user.mfaEnabled)) {
         return false
       }
@@ -215,7 +231,7 @@ export function UsersPage() {
       const order=typeof left==='number'&&typeof right==='number' ? left-right : String(left).localeCompare(String(right),i18n.language)
       return sort.descending ? -order : order
     })
-  },[users,query,statusFilter,companyFilter,mfaFilter,memberships,companies,sessionUser?.id,canManageUsers,sort,i18n.language,t,activeCompanyId,accessibleCompanies,isOwner])
+  },[users,query,statusFilter,companyFilter,mfaFilter,placementFilter,memberships,companies,sessionUser?.id,canManageUsers,sort,i18n.language,t,activeCompanyId,accessibleCompanies,isOwner])
 
   function clearFieldError(field: InviteField) {
     setFieldErrors(current => ({ ...current, [field]: undefined }))
@@ -242,7 +258,7 @@ export function UsersPage() {
     setPhone(draft?.phone ?? user.phone)
     setDepartmentId(draft?.departmentId ?? savedAssignments[0]?.organizationId ?? '')
     setPositionId(draft?.positionId ?? savedAssignments[0]?.positionId ?? '')
-    setAssignments(savedAssignments.map(a => ({ ...a, roleIds: [...a.roleIds] })))
+    setAssignments(savedAssignments.map(assignment=>({...assignment,roleIds:[...assignment.roleIds]})))
     setRequireMfa(draft?.requireMfa ?? user.requireMfa ?? false)
     setCanInvite(draft?.canInvite ?? user.canInvite ?? false)
     const settings = draft?.settings ?? user.invitationSettings
@@ -251,6 +267,19 @@ export function UsersPage() {
     setError(null)
     setShowInvite(true)
   }
+
+  useEffect(()=>{
+    if(!showInvite) return
+    const controller=new AbortController()
+    setCatalogLoading(true);setCatalogReady(false);setInvitationDepartments([])
+    fetchInvitationOrganization(activeCompanyId,controller.signal).then(result=>{
+      if(controller.signal.aborted) return
+      setInvitationDepartments(result.departments);setCatalogReady(true)
+      setDepartmentId(current=>result.departments.some(department=>department.id===current) ? current : '')
+      setPositionId(current=>result.departments.find(department=>department.id===departmentId)?.positions.some(position=>position.id===current) ? current : '')
+    }).catch(error=>{if(!controller.signal.aborted) setError(error instanceof ApiError ? error.message : t('users.errLoad'))}).finally(()=>{if(!controller.signal.aborted) setCatalogLoading(false)})
+    return ()=>controller.abort()
+  },[showInvite,activeCompanyId,accessToken])
 
   function handleToggleInvite() {
     setShowInvite((open) => {
@@ -271,10 +300,10 @@ export function UsersPage() {
   const allVisibleUsersSelected=selectableVisibleUsers.length>0&&selectableVisibleUsers.every(user=>selectedUserIds.includes(user.id))
   const someVisibleUsersSelected=selectableVisibleUsers.some(user=>selectedUserIds.includes(user.id))
   const pendingBulkUsers=users.filter(user=>pendingBulkDeleteIds.includes(user.id))
-  useEffect(()=>{setSelectedUserIds([]);setPendingBulkDeleteIds([])},[query,statusFilter,companyFilter,mfaFilter,sessionUser?.id,showInvite])
-  useEffect(()=>{setCompanyFilter('all');setPage(1);setPendingDelete(null);setSelectedUserIds([]);setPendingBulkDeleteIds([])},[activeCompanyId])
+  useEffect(()=>{setSelectedUserIds([]);setPendingBulkDeleteIds([])},[query,statusFilter,companyFilter,mfaFilter,placementFilter,sessionUser?.id,showInvite])
+  useEffect(()=>{setCompanyFilter('all');setPlacementFilter('all');setPage(1);setPendingDelete(null);setSelectedUserIds([]);setPendingBulkDeleteIds([]);setShowInvite(false);setDepartmentId('');setPositionId('')},[activeCompanyId])
   useEffect(()=>{if(selectAllUsersRef.current) selectAllUsersRef.current.indeterminate=someVisibleUsersSelected&&!allVisibleUsersSelected},[someVisibleUsersSelected,allVisibleUsersSelected,statusFilter,isOwner])
-  useEffect(() => { setPage(1) },[query,statusFilter,companyFilter,mfaFilter,effectivePageSize,sort])
+  useEffect(() => { setPage(1) },[query,statusFilter,companyFilter,mfaFilter,placementFilter,effectivePageSize,sort])
   useEffect(() => { if(tableRef.current) tableRef.current.scrollTop=0 },[currentPage,effectivePageSize])
   useEffect(() => {
     if (showInvite || isLoading || !filteredUsers.length || pageSize !== 0) return
@@ -353,7 +382,7 @@ export function UsersPage() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if(!inviteOptions?.canInvite) return
+    if(!inviteOptions?.canInvite||!catalogReady||catalogLoading) return
     const sendNow = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') !== 'draft'
     const errors: Partial<Record<InviteField,string>> = {}
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'users.invalidWorkEmail'
@@ -376,9 +405,9 @@ export function UsersPage() {
     setMessage(null)
     try {
       const payload: InvitationPayload = {
-        departmentId, positionId,
+        departmentId, positionId,placementCompanyId:activeCompanyId,
         email: email.trim(),
-        fullName: fullName.trim(),phone: phone.trim(),assignments: assignments.map(a => ({ ...a, organizationId: departmentId, positionId, roleIds: [] })),requireMfa,canInvite,
+        fullName: fullName.trim(),phone: phone.trim(),assignments: assignments.map(assignment=>({...assignment,organizationId:assignment.companyId===activeCompanyId ? departmentId : '',positionId:assignment.companyId===activeCompanyId ? positionId : '',roleIds:[] })),requireMfa,canInvite,
         settings: { expiryDays: 7,language,personalMessage,sendNow },
       }
       if (editingDraftId) await updateInvitation(editingDraftId, payload)
@@ -417,6 +446,7 @@ export function UsersPage() {
       return
     }
     setError(null)
+    setDeleteError(null)
     setPendingDelete(user)
   }
 
@@ -425,6 +455,7 @@ export function UsersPage() {
     deleteInProgress.current=true
     setError(null)
     setMessage(null)
+    setDeleteError(null)
     setDeletingId(pendingDelete.id)
     try {
       await deleteUser(pendingDelete.id)
@@ -432,7 +463,8 @@ export function UsersPage() {
       setPendingDelete(null)
       setMessage(t('users.msgDeleted'))
     } catch(err) {
-      setError(err instanceof ApiError? err.message:t('users.errDelete'))
+      setDeleteError(err instanceof ApiError? err.message:t('users.errDelete'))
+      setDeleteConflict(err instanceof ApiError&&[403,404,409].includes(err.status||0))
     } finally {
       deleteInProgress.current=false
       setDeletingId(null)
@@ -443,19 +475,17 @@ export function UsersPage() {
     if(!isOwner||deleteInProgress.current||!pendingBulkUsers.length||pendingBulkUsers.some(user=>user.status!=='disabled'||user.id===sessionUser?.id)) return
     deleteInProgress.current=true
     const actorId=sessionUser?.id
-    setError(null);setMessage(null);setIsBulkDeleting(true)
+    setError(null);setDeleteError(null);setMessage(null);setIsBulkDeleting(true)
     try {
-      for(const user of pendingBulkUsers) {
-        if(useAuthStore.getState().user?.id!==actorId) return
-        await deleteUser(user.id)
-        if(useAuthStore.getState().user?.id!==actorId) return
-        setUsers(current=>current.filter(item=>item.id!==user.id))
-        setSelectedUserIds(current=>current.filter(id=>id!==user.id))
-        setPendingBulkDeleteIds(current=>current.filter(id=>id!==user.id))
-      }
+      const deletedIds=new Set(pendingBulkUsers.map(user=>user.id))
+      await deleteUsers([...deletedIds])
+      if(useAuthStore.getState().user?.id!==actorId) return
+      setUsers(current=>current.filter(item=>!deletedIds.has(item.id)))
+      setSelectedUserIds(current=>current.filter(id=>!deletedIds.has(id)))
+      setPendingBulkDeleteIds([])
       setMessage(t('users.bulkDeleted',{ count:pendingBulkUsers.length }))
     } catch(err) {
-      if(useAuthStore.getState().user?.id===actorId) setError(err instanceof ApiError ? err.message : t('users.errDelete'))
+      if(useAuthStore.getState().user?.id===actorId) {setDeleteError(err instanceof ApiError ? err.message : t('users.errDelete'));setDeleteConflict(err instanceof ApiError&&[403,404,409].includes(err.status||0))}
     } finally {deleteInProgress.current=false;setIsBulkDeleting(false)}
   }
 
@@ -486,15 +516,16 @@ export function UsersPage() {
               options={STATUS_FILTERS.map((value) => ({ value,label:statusLabel(value) }))} onChange={setStatusFilter} />
             <SidebarSelect id="directory-mfa" label={t('users.filterMfa')} value={mfaFilter}
               options={MFA_FILTERS.map((value) => ({ value,label:mfaLabel(value) }))} onChange={setMfaFilter} />
+            <SidebarSelect id="directory-placement" label={t('users.filterPlacement')} value={placementFilter} options={[{value:'all',label:t('users.allPlacements')},{value:'needsReassignment',label:t('users.needsReassignment')}]} onChange={value=>{setPlacementFilter(value);if(value==='needsReassignment')setStatusFilter('all')}} />
           </>}
-          actions={<>{selectedUsers.length>1 ? <Button variant="danger" disabled={Boolean(deletingId)||isBulkDeleting||Boolean(statusUpdatingId)} onClick={()=>{setError(null);setPendingBulkDeleteIds(selectedUsers.map(user=>user.id))}}><IconTrash aria-hidden="true" />{t('users.actionDelete')}</Button> : null}{inviteOptions?.canInvite? <Button disabled={Boolean(deletingId)||isBulkDeleting} onClick={handleToggleInvite}>{t('users.inviteUser')}</Button>:null}</>}
+          actions={<>{selectedUsers.length>1 ? <Button variant="danger" disabled={Boolean(deletingId)||isBulkDeleting||Boolean(statusUpdatingId)} onClick={()=>{setError(null);setDeleteError(null);setPendingBulkDeleteIds(selectedUsers.map(user=>user.id))}}><IconTrash aria-hidden="true" />{t('users.actionDelete')}</Button> : null}{inviteOptions?.canInvite? <Button disabled={Boolean(deletingId)||isBulkDeleting} onClick={handleToggleInvite}>{t('users.inviteUser')}</Button>:null}</>}
         />
 
 
 
         {!isLoading&&users.length===0? <p className="identity-empty">{t('users.empty')}</p>:null}
         {!isLoading&&users.length>0&&filteredUsers.length===0? (
-          <div className="identity-empty directory-design-empty"><p role="status">{t('users.emptyFiltered')}</p>{query||companyFilter!=='all'||statusFilter!=='all'||mfaFilter!=='all' ? <Button variant="secondary" onClick={()=>{setQuery('');setCompanyFilter('all');setStatusFilter('all');setMfaFilter('all')}}>{t('users.clearFilters')}</Button> : null}</div>
+          <div className="identity-empty directory-design-empty"><p role="status">{t('users.emptyFiltered')}</p>{query||companyFilter!=='all'||statusFilter!=='all'||mfaFilter!=='all'||placementFilter!=='all' ? <Button variant="secondary" onClick={()=>{setQuery('');setCompanyFilter('all');setStatusFilter('all');setMfaFilter('all');setPlacementFilter('all')}}>{t('users.clearFilters')}</Button> : null}</div>
         ):null}
         {isLoading||filteredUsers.length>0? (
           <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-busy={isLoading} aria-label={t(isLoading ? 'users.loading' : 'users.staffDirectory')}>
@@ -514,7 +545,7 @@ export function UsersPage() {
                 {isLoading ? Array.from({length:Math.min(effectivePageSize,6)},(_,index)=><tr key={index} className="directory-design-skeleton" aria-hidden="true"><td><div className="directory-design-employee"><span className="directory-design-skeleton__avatar" /><div className="directory-design-skeleton__name"><span /><span /></div></div></td>{[0,1,2,3,4,5].map(column=><td key={column}><span className={'directory-design-skeleton__line'+(column===1 ? ' directory-design-skeleton__status' : '')} /></td>)}</tr>) : visibleUsers.map((user) => {
                   const assigned=memberships.filter(m => m.userId===user.id&&(!isOwner||m.status!=='ended'))
                   const companyNames=companyNamesFor(user.id)
-                  const positionNames=[...new Set(assigned.map(m => inviteOptions?.companies.find(c => c.id===m.companyId)?.departments.find(d => d.id===m.organizationId)?.positions.find(p => p.id===m.positionId)?.name).filter(Boolean))]
+                  const positionNames=[...new Set(assigned.filter(m=>m.companyId===activeCompanyId).map(m => m.positionDeleted ? t('users.removedPositionName',{name:m.positionName||''}) : m.positionName||inviteOptions?.companies.find(c => c.id===m.companyId)?.departments.find(d => d.id===m.organizationId)?.positions.find(p => p.id===m.positionId)?.name).filter(Boolean))]
                   const canEdit=user.status==='draft' ? isOwner : canManageUsers||sessionUser?.id===user.id
                   return (
                   <tr key={user.id}>
@@ -525,6 +556,7 @@ export function UsersPage() {
                         <div className="directory-design-identity">
                           <Link className="identity-text-link" to={'/system/core/employees/'+user.id}>{user.displayName}</Link>
                           <span>{user.email}</span>
+                          {memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&(m.organizationDeleted||m.positionDeleted)) ? <span className="directory-needs-reassignment">{t('users.needsReassignment')}</span> : null}
                         </div>
                         {sessionUser?.id===user.id ? <span className="directory-design-you">{t('users.designYou')}</span> : null}
                       </div>
@@ -606,16 +638,16 @@ export function UsersPage() {
                 <TextField id="user-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" />
               </FormField>
               <FormField label={t('users.optionalDepartment')} htmlFor="user-department" error={fieldErrors.department ? t(fieldErrors.department) : undefined}>
-              <SidebarSelect id="user-department" hideLabel aria-invalid={Boolean(fieldErrors.department)} aria-describedby={fieldErrors.department ? 'user-department-error' : undefined} label={t('users.department')} value={departmentId} options={[{ value: '', label: t('users.selectDepartment') }, ...(inviteOptions?.departments.map(d => ({ value: d.id, label: d.name })) || [])]} onChange={id => {
+              <SidebarSelect id="user-department" hideLabel aria-invalid={Boolean(fieldErrors.department)} aria-describedby={fieldErrors.department ? 'user-department-error' : undefined} label={t('users.department')} value={departmentId} options={[{ value: '', label: t('users.selectDepartment') }, ...invitationDepartments.map(d => ({ value: d.id, label: d.name }))]} onChange={id => {
                 clearFieldError('department')
                 clearFieldError('position')
                 setDepartmentId(id)
-                const positions = inviteOptions?.departments.find(department => department.id === id)?.positions || []
+                const positions = invitationDepartments.find(department => department.id === id)?.positions || []
                 setPositionId(positions.length === 1 ? positions[0]!.id : '')
-              }} disabled={isSubmitting} />
+              }} disabled={isSubmitting||catalogLoading||!catalogReady} />
               </FormField>
               <FormField label={t('users.optionalPosition')} htmlFor="user-position" error={fieldErrors.position ? t(fieldErrors.position) : undefined}>
-              <SidebarSelect id="user-position" hideLabel aria-invalid={Boolean(fieldErrors.position)} aria-describedby={fieldErrors.position ? 'user-position-error' : undefined} label={t('users.colPosition')} value={positionId} options={[{ value: '', label: t('users.selectPosition') }, ...(department?.positions.map(p => ({ value: p.id, label: p.name })) || [])]} onChange={id => { setPositionId(id); clearFieldError('position') }} disabled={!department || isSubmitting} />
+              <SidebarSelect id="user-position" hideLabel aria-invalid={Boolean(fieldErrors.position)} aria-describedby={fieldErrors.position ? 'user-position-error' : undefined} label={t('users.colPosition')} value={positionId} options={[{ value: '', label: t('users.selectPosition') }, ...(department?.positions.map(p => ({ value: p.id, label: p.name })) || [])]} onChange={id => { setPositionId(id); clearFieldError('position') }} disabled={!department || isSubmitting||catalogLoading||!catalogReady} />
               </FormField>
 
             </div>
@@ -625,11 +657,9 @@ export function UsersPage() {
           <section className="identity-panel">
             <h3>{t('users.companySelection')}</h3>
             <p className="identity-directory-muted">{t('users.companySelectionHint')}</p>
-            <div className="identity-company-buttons">{inviteOptions?.companies.map(company => {
-              const selected = assignments.some(a => a.companyId === company.id)
-              return <Button id={company.id === inviteOptions.companies[0]?.id ? 'user-company' : undefined} aria-invalid={Boolean(fieldErrors.company)} aria-describedby={fieldErrors.company ? 'user-company-error' : undefined} key={company.id} variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} onClick={() => { clearFieldError('company'); setAssignments(current => selected ? current.filter(a => a.companyId !== company.id) : [...current, { companyId: company.id, organizationId: '', positionId: '', roleIds: [] }]) }}>
-                <span>{company.name}</span>
-              </Button>
+            <div className="identity-company-buttons">{inviteOptions?.companies.map(company=>{
+              const selected=assignments.some(assignment=>assignment.companyId===company.id)
+              return <Button id={company.id===inviteOptions.companies[0]?.id ? 'user-company' : undefined} key={company.id} variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} disabled={isSubmitting} onClick={()=>{clearFieldError('company');setAssignments(current=>selected ? current.filter(assignment=>assignment.companyId!==company.id) : [...current,{companyId:company.id,organizationId:'',positionId:'',roleIds:[]}])}}>{company.name}</Button>
             })}</div>
             {fieldErrors.company ? <p id="user-company-error" className="ui-form-field__error" role="alert">{t(fieldErrors.company)}</p> : null}
             <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={canInvite} onChange={e => setCanInvite(e.target.checked)} />{t('users.canInvite')}</label>
@@ -646,41 +676,19 @@ export function UsersPage() {
             </FormField>
             <div className="identity-delivery-actions">
               <Button type="button" variant="ghost" onClick={() => setPersonalMessage(invitationMessage(language))}>{t('users.restoreMessage')}</Button>
-              <Button type="submit" name="invitation-action" value="draft" formNoValidate variant="secondary" disabled={isSubmitting || !inviteOptions?.canInvite}>{t('users.saveDraft')}</Button>
+              <Button type="submit" name="invitation-action" value="draft" formNoValidate variant="secondary" disabled={isSubmitting || !inviteOptions?.canInvite||catalogLoading||!catalogReady}>{t('users.saveDraft')}</Button>
             </div>
           </section>
         </fieldset>
         </div>
         <footer className="identity-invite-page-footer">
           <Button variant="secondary" onClick={handleToggleInvite} disabled={isSubmitting}>{t('users.cancel')}</Button>
-          <Button type="submit" name="invitation-action" value="send" disabled={isSubmitting||!inviteOptions?.canInvite}>{isSubmitting ? t('users.saving') : t('users.sendInvitation')}</Button>
+          <Button type="submit" name="invitation-action" value="send" disabled={isSubmitting||!inviteOptions?.canInvite||catalogLoading||!catalogReady}>{isSubmitting ? t('users.saving') : t('users.sendInvitation')}</Button>
         </footer>
       </form>:null}
 
-      <ConfirmDialog open={Boolean(pendingBulkDeleteIds.length&&isOwner)} title={t('users.bulkDeleteTitle',{ count:pendingBulkUsers.length })} description={<div className="directory-design-delete-copy"><p>{t('users.bulkDeleteDescription',{ count:pendingBulkUsers.length })}</p><ul className="directory-design-delete-list">{pendingBulkUsers.map(user=><li key={user.id}>{user.displayName}<small>{user.email}</small></li>)}</ul></div>} warning={t('users.bulkDeleteMockWarning')} confirmLabel={t('users.deleteConfirm')} cancelLabel={t('users.cancel')} busyLabel={t('users.bulkDeleting')} busy={isBulkDeleting} onConfirm={()=>void handleBulkDelete()} onCancel={()=>{if(!isBulkDeleting) setPendingBulkDeleteIds([])}} />
-      <ConfirmDialog
-        open={Boolean(pendingDelete&&isOwner)}
-        title={t('users.deleteTitle')}
-        description={
-          pendingDelete? (
-            <>
-              {t('users.deleteDescriptionPrefix')}{' '}
-              <strong>
-                {pendingDelete.displayName} ({pendingDelete.email})
-              </strong>{' '}
-              {t('users.deleteDescriptionSuffix')}
-            </>
-          ):null
-        }
-        confirmLabel={t('users.deleteConfirm')}
-        busy={Boolean(deletingId)}
-        onConfirm={() => void handleConfirmDelete()}
-        onCancel={() => {
-          if(!deletingId) {
-            setPendingDelete(null)
-          }
-        }}
-      />
+      <ConfirmDialog variant="deletion" open={Boolean(pendingBulkDeleteIds.length&&isOwner)} title={t('users.bulkDeleteTitle',{ count:pendingBulkUsers.length })} items={pendingBulkUsers.map(user=>({id:user.id,name:user.displayName,details:user.email}))} description={<p>{t('users.removeEmployeeShort')}</p>} error={deleteError} confirmDisabled={deleteConflict||!pendingBulkUsers.length||pendingBulkUsers.some(user=>user.status!=='disabled'||user.isOwner||user.id===sessionUser?.id)} confirmLabel={t('users.removeEmployees')} cancelLabel={t('users.cancel')} busyLabel={t('users.removingEmployees')} busy={isBulkDeleting} onConfirm={handleBulkDelete} onCancel={()=>{if(!isBulkDeleting) setPendingBulkDeleteIds([])}} />
+      <ConfirmDialog variant="deletion" open={Boolean(pendingDelete&&isOwner)} title={t('users.deleteTitle')} items={pendingDelete ? [{id:pendingDelete.id,name:pendingDelete.displayName,details:pendingDelete.email}] : []} description={<p>{t('users.removeEmployeeShort')}</p>} error={deleteError} confirmDisabled={deleteConflict||pendingDelete?.status!=='disabled'||pendingDelete?.isOwner||pendingDelete?.id===sessionUser?.id} confirmLabel={t('users.removeEmployee')} cancelLabel={t('users.cancel')} busyLabel={t('users.removingEmployees')} busy={Boolean(deletingId)} onConfirm={handleConfirmDelete} onCancel={()=>{if(!deletingId) setPendingDelete(null)}} />
     </div>
   )
 }

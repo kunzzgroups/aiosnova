@@ -20,7 +20,7 @@ import { ApiError } from '@/services/httpClient'
 import { useCompanyStore } from '@/stores/companyStore'
 import { useAuthStore } from '@/stores/authStore'
 import type { DatabaseDepartment as OrganizationNode, DatabasePosition as PositionRecord } from '@/modules/core/identity/services/organizationService'
-import { fetchOrganizationStructure, createOrganizationBatch, deleteOrganization, updateOrganization, deletePosition, deletePositions, updatePosition } from '@/modules/core/identity/services/organizationService'
+import { fetchOrganizationStructure, createOrganizationBatch, fetchDepartmentRemovalImpact, removeDepartmentWithEmployees, updateOrganization, deletePosition, deletePositions, updatePosition } from '@/modules/core/identity/services/organizationService'
 import './IdentityPage.css'
 import './OrganizationPage.css'
 import './UsersDirectoryDesign.css'
@@ -61,6 +61,24 @@ export function OrganizationPage() {
   const [selectedPositionIds,setSelectedPositionIds]=useState<string[]>([])
   const [pendingBulkDeleteIds,setPendingBulkDeleteIds]=useState<string[]>([])
   const [isDeleting,setIsDeleting]=useState(false)
+  const [removalImpact,setRemovalImpact]=useState<Awaited<ReturnType<typeof fetchDepartmentRemovalImpact>>|null>(null)
+  const [impactLoading,setImpactLoading]=useState(false)
+  const [removalMode,setRemovalMode]=useState<'retain'|'reassign'>('retain')
+  const [reassignmentDepartment,setReassignmentDepartment]=useState('')
+  const [reassignmentPositions,setReassignmentPositions]=useState<Record<string,string>>({})
+  useEffect(()=>{
+    setRemovalImpact(null);setReassignmentDepartment('');setReassignmentPositions({});setRemovalMode('retain')
+    if(pendingDelete?.kind!=='department') {setImpactLoading(false);return}
+    const controller=new AbortController()
+    setImpactLoading(true)
+    fetchDepartmentRemovalImpact(pendingDelete.item as OrganizationNode,controller.signal).then(result=>{
+      if(controller.signal.aborted)return
+      setRemovalImpact(result);setRemovalMode(result.employeeCount&&result.canReassign ? 'reassign' : 'retain')
+    }).catch(err=>{if(!controller.signal.aborted)setDeleteError(err instanceof ApiError ? err.message : t('org.errLoadOrganizations'))})
+      .finally(()=>{if(!controller.signal.aborted)setImpactLoading(false)})
+    return()=>controller.abort()
+  },[pendingDelete?.item.id,companyId])
+
   const [editor,setEditor]=useState<Editor|null>(null)
   const [pendingDeactivate,setPendingDeactivate]=useState<{ department:OrganizationNode; source:'toggle' | 'editor' }|null>(null)
   const [drafts,setDrafts]=useState<Draft[]>([])
@@ -77,7 +95,10 @@ export function OrganizationPage() {
   const [refreshError,setRefreshError]=useState<string|null>(null)
   const [isRefreshing,setIsRefreshing]=useState(false)
   const batchRequestRef=useRef<{ requestId:string; fingerprint:string }|null>(null)
+  const managedDepartmentVersionsRef=useRef<Record<string,number>>({})
   const [deleteError,setDeleteError]=useState<string|null>(null)
+  const [deleteConflict,setDeleteConflict]=useState(false)
+  useEffect(()=>setDeleteConflict(false),[pendingDelete?.item.id,pendingBulkDeleteIds])
   const [updatingStatusId,setUpdatingStatusId]=useState<string|null>(null)
   const [editorError,setEditorError]=useState<string|null>(null)
   const [successMessage,setSuccessMessage]=useState('')
@@ -149,6 +170,7 @@ export function OrganizationPage() {
 
   function openEditor(next:Editor) {
     batchRequestRef.current=null
+    managedDepartmentVersionsRef.current=Object.fromEntries(departments.map(department=>[department.id,department.version]))
     const organization=next.kind==='department' ? next.item as OrganizationNode|undefined : undefined
     const position=next.kind==='position' ? next.item as PositionRecord|undefined : undefined
     setEditorError(null)
@@ -196,7 +218,7 @@ export function OrganizationPage() {
         const payload:Parameters<typeof createOrganizationBatch>[1]=editor.kind==='department' ? {
           departments:rows.map(row=>({ name:row.name,status:row.status,parentId:placement||null,managerPositionId:placement ? null : managerId||null }))
         } : {
-          positions:rows.map(row=>({ name:row.name,organizationId:placement==='company' ? null : placement,level:placement==='company' ? 'executive' : positionLevel,managedDepartmentIds:placement==='company' ? row.managedIds : [] }))
+          positions:rows.map(row=>({ name:row.name,organizationId:placement==='company' ? null : placement,level:placement==='company' ? 'executive' : positionLevel,managedDepartmentIds:placement==='company' ? row.managedIds : [],managedDepartmentVersions:managedDepartmentVersionsRef.current }))
         }
         const fingerprint=JSON.stringify({ companyId:databaseCompanyId,payload })
         if (batchRequestRef.current?.fingerprint!==fingerprint) batchRequestRef.current={ requestId:crypto.randomUUID(),fingerprint }
@@ -211,7 +233,7 @@ export function OrganizationPage() {
         setItems(current=>current.map(item=>item.id===result.id ? result : item)); created.push(result.id)
       } else {
         const row=rows[0]
-        const updated=await updatePosition(editor.item as PositionRecord,{ name:row.name,organizationId:placement==='company' ? null : placement,level:placement==='company' ? 'executive' : positionLevel,managedDepartmentIds:placement==='company' ? row.managedIds : [] })
+        const updated=await updatePosition(editor.item as PositionRecord,{ name:row.name,organizationId:placement==='company' ? null : placement,level:placement==='company' ? 'executive' : positionLevel,managedDepartmentIds:placement==='company' ? row.managedIds : [],managedDepartmentVersions:managedDepartmentVersionsRef.current })
         if (useCompanyStore.getState().companyId!==scope) return
         setPositions(current=>current.map(item=>item.id===updated.id ? updated : item)); created.push(updated.id); refreshAfterSave=true
       }
@@ -235,9 +257,26 @@ export function OrganizationPage() {
   const deletingPositions=pendingDelete ? positions.filter(position=>pendingDelete.kind==='department' ? deletingDepartmentIds.has(position.organizationId||'') : position.id===pendingDelete.item.id) : []
   const dependentPositions=pendingDelete?.kind==='department' ? deletingPositions.length : 0
   const childDepartments=Math.max(0,deletingDepartmentIds.size-1)
+  const cascadeDepartments=childDepartments ? t('org.deleteCascadeDepartments',{ count:childDepartments }) : ''
+  const cascadePositions=dependentPositions ? t('org.deleteCascadePositions',{ count:dependentPositions }) : ''
+  const cascadeItems=cascadeDepartments&&cascadePositions ? t('org.deleteCascadeBoth',{ departments:cascadeDepartments,positions:cascadePositions }) : cascadeDepartments||cascadePositions
   const managedDepartments=departments.filter(d=>deletingPositions.some(position=>position.id===d.managerPositionId)).length
-  const activeAssignments=deletingPositions.reduce((count,position)=>count+position.assignmentCount,0)
-  const deleteBlocked=Boolean(managedDepartments||activeAssignments)
+  const deleteBlocked=Boolean(managedDepartments)
+
+  const reassignmentTarget=departments.find(department=>department.id===reassignmentDepartment)
+  const reassignmentChoices=positions.filter(position=>position.organizationId===reassignmentDepartment&&position.status==='active')
+  const removalIncomplete=pendingDelete?.kind==='department'&&(impactLoading||!removalImpact||removalMode==='reassign'&&removalImpact.employeeCount>0&&(!reassignmentTarget||removalImpact.groups.some(group=>group.positionId&&!reassignmentPositions[group.key])))
+  const removalEmployeeControls=pendingDelete?.kind==='department' ? <div className="organization-removal-placement">
+    {impactLoading ? <p role="status">{t('org.loadingRemovalImpact')}</p> : removalImpact?.employeeCount ? <>
+      <p className="organization-removal-count">{t('org.affectedEmployees',{count:removalImpact.employeeCount})}</p>
+      <label><input type="radio" name="department-removal-mode" checked={removalMode==='reassign'} disabled={isDeleting||!removalImpact.canReassign} onChange={()=>setRemovalMode('reassign')} />{t('org.reassignBeforeRemoval')}</label>
+      <label><input type="radio" name="department-removal-mode" checked={removalMode==='retain'} disabled={isDeleting} onChange={()=>setRemovalMode('retain')} />{t('org.removeWithoutReassignment')}</label>
+      {removalMode==='retain' ? <p>{t('org.needsReassignmentAfterRemoval')}</p> : <>
+        <FormField label={t('org.destinationDepartment')} htmlFor="removal-destination"><SelectField id="removal-destination" label={t('org.destinationDepartment')} value={reassignmentDepartment} disabled={isDeleting} onChange={value=>{setReassignmentDepartment(value);setReassignmentPositions({})}} options={[{value:'',label:t('org.chooseDepartment')},...departments.filter(department=>!deletingDepartmentIds.has(department.id)&&departmentActive(department)).map(department=>({value:department.id,label:department.name}))]} /></FormField>
+        {removalImpact.groups.map(group=><FormField key={group.key} label={t('org.mapRemovalPosition',{name:group.positionName||group.departmentName,count:group.employeeCount})} htmlFor={'removal-position-'+group.key}><SelectField id={'removal-position-'+group.key} label={t('org.destinationPosition')} value={reassignmentPositions[group.key]||''} disabled={isDeleting||!reassignmentDepartment} onChange={value=>setReassignmentPositions(current=>({...current,[group.key]:value}))} options={[{value:'',label:t(group.positionId ? 'org.choosePosition' : 'org.noPosition')},...reassignmentChoices.map(position=>({value:position.id,label:position.name}))]} /></FormField>)}
+      </>}
+    </> : null}
+  </div> : null
 
   async function remove() {
     if (!canManage||!pendingDelete||deleteBlocked||submittingRef.current) return
@@ -246,7 +285,10 @@ export function OrganizationPage() {
     const scope=companyId
     setError(null); setDeleteError(null); setIsDeleting(true)
     try {
-      if (kind==='department') await deleteOrganization(pendingDelete.item as OrganizationNode)
+      if (kind==='department') {
+        if(!removalImpact)return
+        await removeDepartmentWithEmployees(pendingDelete.item as OrganizationNode,{mode:removalMode,departmentId:reassignmentDepartment,positionMappings:removalImpact.groups.map(group=>({sourceKey:group.key,positionId:reassignmentPositions[group.key]||''})),snapshot:removalImpact.snapshot})
+      }
       else await deletePosition(pendingDelete.item as PositionRecord)
       if (useCompanyStore.getState().companyId!==scope) return
       if (kind==='department') { setItems(current => current.filter(item => !deletingDepartmentIds.has(item.id))); setPositions(current => current.filter(position => !deletingDepartmentIds.has(position.organizationId||''))) }
@@ -254,7 +296,7 @@ export function OrganizationPage() {
       if (editor?.item&&(editor.item.id===id||deletingDepartmentIds.has(editor.item.id)||deletingPositions.some(position=>position.id===editor.item?.id))) setEditor(null)
       setPendingDelete(null)
       void refreshStructure(scope)
-    } catch(err) { if (useCompanyStore.getState().companyId===scope) setDeleteError(err instanceof ApiError ? err.message : t('org.errDeleteOrganization')) }
+    } catch(err) { if (useCompanyStore.getState().companyId===scope) {setDeleteError(err instanceof ApiError ? err.message : t('org.errDeleteOrganization'));setDeleteConflict(err instanceof ApiError&&[403,404,409].includes(err.status||0))} }
     finally { submittingRef.current=false; setIsDeleting(false) }
   }
 
@@ -306,13 +348,13 @@ export function OrganizationPage() {
 
   function actions(kind:Editor['kind'],item:OrganizationNode | PositionRecord,panel=false) {
     if (!canManage) return <span className="organization-menu-spacer" />
-    if (panel) return <div className="identity-inline-actions identity-directory-actions">{item.status==='active' ? <IconButton label={t('users.actionEdit')} disabled={busy} onClick={()=>openEditor({ kind,item })}><IconPencil /></IconButton> : <IconButton label={t('users.actionDelete')} variant="danger" disabled={busy} onClick={()=>{setDeleteError(null);setPendingDelete({ kind,item })}}><IconTrash /></IconButton>}</div>
+    if (panel) return <div className="identity-inline-actions identity-directory-actions">{item.status==='active' ? <IconButton label={t('users.actionEdit')} disabled={busy} onClick={()=>openEditor({ kind,item })}><IconPencil /></IconButton> : null}{item.status==='inactive' ? <IconButton label={t('org.removeAction')} variant="danger" disabled={busy} onClick={()=>{setDeleteError(null);setPendingDelete({ kind,item })}}><IconTrash /></IconButton> : null}</div>
     return <RowMenu label={t('org.itemActions',{ name:item.name })} disabled={busy} items={[
       ...(kind==='department' ? [
         { id:'add-subdepartment',label:t('org.addSubdepartment'),onSelect:() => openEditor({ kind:'department',parentId:item.id }) },
       ] : []),
       { id:'edit',label:t('users.actionEdit'),onSelect:() => openEditor({ kind,item }) },
-      ...(kind==='position'&&item.status==='active'&&inactivePositionDepartment(item as PositionRecord) ? [] : [{ id:'delete',label:t('users.actionDelete'),destructive:true,onSelect:() => { setDeleteError(null); setPendingDelete({ kind,item }) } }]),
+      ...(kind==='position'&&item.status==='active'&&inactivePositionDepartment(item as PositionRecord) ? [] : [{ id:'delete',label:t('org.removeAction'),destructive:true,onSelect:() => { setDeleteError(null); setPendingDelete({ kind,item }) } }]),
     ]} />
   }
 
@@ -375,8 +417,7 @@ export function OrganizationPage() {
   const selectedPositions=statusFilter==='inactive'&&canManage ? filteredPositions.filter(position=>position.status==='inactive'&&selectedPositionIds.includes(position.id)) : []
   const bulkPositions=positions.filter(position=>pendingBulkDeleteIds.includes(position.id))
   const bulkManaged=departments.filter(department=>pendingBulkDeleteIds.includes(department.managerPositionId||'')).length
-  const bulkAssignments=bulkPositions.reduce((count,position)=>count+position.assignmentCount,0)
-  const bulkDeleteBlocked=Boolean(bulkManaged||bulkAssignments)
+  const bulkDeleteBlocked=Boolean(bulkManaged)
   useEffect(()=>{setSelectedPositionIds([]);setPendingBulkDeleteIds([])},[companyId,sessionUser?.id,tab,search,departmentFilter,levelFilter,statusFilter])
   async function removeSelectedPositions() {
     if (!canManage||bulkDeleteBlocked||!bulkPositions.length||submittingRef.current||bulkPositions.some(position=>position.status!=='inactive')) return
@@ -391,7 +432,7 @@ export function OrganizationPage() {
       setSelectedPositionIds([]); setPendingBulkDeleteIds([])
       setSuccessMessage(t('org.deletedPositions',{ count:bulkPositions.length }))
     } catch(err) {
-      if (useCompanyStore.getState().companyId===scope) setDeleteError(err instanceof ApiError ? err.message : t('org.errDeleteOrganization'))
+      if (useCompanyStore.getState().companyId===scope) {setDeleteError(err instanceof ApiError ? err.message : t('org.errDeleteOrganization'));setDeleteConflict(err instanceof ApiError&&[403,404,409].includes(err.status||0))}
     } finally {submittingRef.current=false;setIsDeleting(false)}
   }
   const effectivePageSize=pageSize||autoPageSize
@@ -487,7 +528,7 @@ export function OrganizationPage() {
             <SidebarSelect id="organization-filter-level" label={t('org.level')} value={levelFilter} onChange={setLevelFilter} options={[{value:'all',label:t('org.allLevels')},...(['executive','manager','staff'] as const).map(value=>({value,label:t(value==='executive' ? 'org.levelExecutive' : value==='manager' ? 'org.levelManager' : 'org.levelStaff')}))]} />
             <SidebarSelect id="organization-filter-status" label={t('org.status')} value={statusFilter} onChange={setStatusFilter} options={[{value:'all',label:t('org.allStatus')},{value:'active',label:t('org.statusActive')},{value:'inactive',label:t('org.statusInactive')}]} />
             </>}
-            actions={canManage&&companyId ? <>{selectedPositions.length>1 ? <Button variant="danger" disabled={busy} onClick={()=>{setDeleteError(null);setPendingBulkDeleteIds(selectedPositions.map(position=>position.id))}}><IconTrash aria-hidden="true" />{t('users.actionDelete')}</Button> : null}<Button disabled={isLoading||busy} onClick={()=>openEditor({ kind:'position' })}>{t('org.addPosition')}</Button></> : null}
+            actions={canManage&&companyId ? <>{selectedPositions.length>1 ? <Button variant="danger" disabled={busy} onClick={()=>{setDeleteError(null);setPendingBulkDeleteIds(selectedPositions.map(position=>position.id))}}><IconTrash aria-hidden="true" />{t('org.removeAction')}</Button> : null}<Button disabled={isLoading||busy} onClick={()=>openEditor({ kind:'position' })}>{t('org.addPosition')}</Button></> : null}
           />
             <div className="identity-table-wrap identity-directory-scroll" ref={tableRef} tabIndex={0} aria-label={t('org.positionsTab')}>
               <table className={'identity-table identity-table--packed directory-design-table'+(pageSize===0 ? ' directory-design-table--auto-fit' : '')}>
@@ -502,11 +543,11 @@ export function OrganizationPage() {
       </>}
     </section>
     {isEditorOpen&&editor ? <dialog ref={createDialogRef} className={'organization-create-dialog'+(editor.kind==='position'&&!editor.item ? ' organization-create-dialog--position-flow' : '')} aria-labelledby="create-department-title" aria-describedby="create-department-description" onCancel={event=>{event.preventDefault();if (!busy) setEditor(null)}}><form aria-busy={isSubmitting} onSubmit={event=>void save(event)}>
-      <h2 id="create-department-title">{t(editor.item ? editor.kind==='position' ? 'org.editPosition' : 'org.editDepartment' : editor.kind==='position' ? 'org.addPositions' : 'org.addDepartments')}</h2><p id="create-department-description">{t(editor.kind==='position' ? editor.item ? 'org.positionBatchHint' : positionLevel==='executive' ? 'org.executiveCreationHint' : 'org.positionCreationHint' : editor.item ? 'org.departmentBatchHint' : 'org.departmentCreationHint')}</p>
+      <h2 id="create-department-title">{t(editor.item ? editor.kind==='position' ? 'org.editPosition' : 'org.editDepartment' : editor.kind==='position' ? 'org.addPositions' : 'org.addDepartments')}</h2><p id="create-department-description">{t(editor.kind==='position' ? editor.item ? 'org.positionBatchHint' : positionLevel==='executive' ? 'org.executiveCreationHint' : 'org.positionCreationHint' : 'org.departmentCreationHint')}</p>
       <fieldset disabled={isSubmitting} className="organization-editor-fields">
         {editor.kind==='position'&&!editor.item ? <h3 className="organization-flow-heading">{t('org.positionDetails')}</h3> : null}
         {editor.kind==='position'&&editor.item ? <fieldset className="organization-scope"><legend>{t(editor.item ? 'org.positionBelongsTo' : 'org.positionType')}</legend><label><input type="radio" name="position-scope" checked={placement!=='company'} onChange={()=>{setPlacement('');setPositionLevel('staff')}} />{t(editor.item ? 'org.departmentScope' : 'org.departmentPosition')}</label><label><input type="radio" name="position-scope" checked={placement==='company'} onChange={()=>{setPlacement('company');setPositionLevel('executive')}} />{t(editor.item ? 'org.companyWide' : 'org.executivePosition')}</label></fieldset> : null}
-        {editor.kind==='department'&&!editor.item ? <div className="organization-tabs organization-placement-tabs" role="tablist" aria-label={t('org.departmentPlacement')}>
+        {editor.kind==='department' ? <div className="organization-tabs organization-placement-tabs" role="tablist" aria-label={t('org.departmentPlacement')}>
           {(['parent','manager'] as const).map(mode=><button key={mode} type="button" role="tab" id={'department-placement-tab-'+mode} aria-controls="department-placement-panel" aria-selected={departmentPlacementTab===mode} tabIndex={departmentPlacementTab===mode ? 0 : -1} onClick={()=>{setDepartmentPlacementTab(mode);if(mode==='parent') setManagerId('');else setPlacement('')}} onKeyDown={event=>{
             if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
             event.preventDefault()
@@ -515,15 +556,15 @@ export function OrganizationPage() {
             document.getElementById('department-placement-tab-'+next)?.focus()
           }}>{t(mode==='parent' ? 'org.hierarchy' : 'org.leadership')}</button>)}
         </div> : null}
-        <div className="organization-editor-fields" id={editor.kind==='department'&&!editor.item ? 'department-placement-panel' : undefined} role={editor.kind==='department'&&!editor.item ? 'tabpanel' : undefined} aria-labelledby={editor.kind==='department'&&!editor.item ? 'department-placement-tab-'+departmentPlacementTab : undefined}>
+        <div className="organization-editor-fields" id={editor.kind==='department' ? 'department-placement-panel' : undefined} role={editor.kind==='department' ? 'tabpanel' : undefined} aria-labelledby={editor.kind==='department' ? 'department-placement-tab-'+departmentPlacementTab : undefined}>
         {editor.kind==='position'&&(!editor.item||placement!=='company') ? <FormField label={t('org.level')} htmlFor="organization-position-level" hint={!editor.item ? t('org.levelForAll') : undefined}><SelectField id="organization-position-level" label={t('org.level')} value={positionLevel} onChange={value=>{setPositionLevel(value as NonNullable<PositionRecord['level']>);if(!editor.item){if(value==='executive') setPlacement('company');else if(placement==='company') setPlacement('')}}} options={[{value:'staff',label:t('org.levelStaff')},{value:'manager',label:t('org.levelManager')},...(!editor.item ? [{value:'executive',label:t('org.levelExecutive')}] : [])]} /></FormField> : null}
-        {placement!=='company'&&(editor.kind!=='department'||editor.item||departmentPlacementTab==='parent') ? <FormField label={t(editor.kind==='department' ? 'org.parentDepartment' : editor.item ? 'org.departmentForAll' : 'org.department')} htmlFor="organization-placement" hint={editor.kind==='position'&&!editor.item ? t('org.positionPlacementHint') : undefined}><SelectField id="organization-placement" label={t(editor.kind==='department' ? 'org.parentDepartment' : editor.item ? 'org.departmentForAll' : 'org.assignPositionsTo')} value={placement} disabled={isSubmitting} onChange={setPlacement} picker={editor.kind==='department'&&!editor.item ? { tree:true,searchLabel:t('org.searchDepartments'),clearLabel:t('org.clearPickerSearch'),emptyLabel:t('org.pickerNoResults'),expandLabel:t('org.expandDepartment'),collapseLabel:t('org.collapseDepartment') } : undefined} options={[{ value:'',label:t(editor.kind==='department'&&!editor.item ? 'org.noneCompanyLevel' : editor.kind==='department' ? 'org.companyLevel' : 'org.chooseDepartment') },...departments.filter(d=>!editor.item||d.id!==editor.item.id&&!isDescendant(d,editor.item.id)).map(d=>({ value:d.id,parentValue:d.parentId,label:d.name+(!departmentActive(d) ? ' ('+t(inactiveParent(d)&&d.status==='active' ? 'org.inactiveParent' : 'org.statusInactive',{ name:inactiveParent(d)?.name })+')' : ''),disabled:editor.kind==='position'&&!departmentActive(d) }))]} /></FormField> : null}
-        {editor.kind==='department'&&(editor.item||departmentPlacementTab==='manager') ? <FormField label={t('org.managedByPosition')} htmlFor="organization-manager" hint={placement ? t('org.inheritsManagement') : undefined}><SelectField id="organization-manager" label={t('org.managedByPosition')} value={managerId} disabled={Boolean(placement)||isSubmitting} onChange={setManagerId} picker={!editor.item ? { hideGroupHeadings:true,searchLabel:t('org.searchManagingPositions'),clearLabel:t('org.clearPickerSearch'),emptyLabel:t('org.pickerNoResults'),expandLabel:t('org.expandDepartment'),collapseLabel:t('org.collapseDepartment') } : undefined} options={[{ value:'',label:t(!editor.item ? 'org.pickerNoManagingPosition' : 'org.companyLevel') },...leaders.map(p=>({ value:p.id,label:p.name,groups:roots.some(d=>d.managerPositionId===p.id) ? roots.filter(d=>d.managerPositionId===p.id).map(d=>d.name) : [t('org.companyLevel')] }))]} /></FormField> : null}
+        {placement!=='company'&&(editor.kind!=='department'||departmentPlacementTab==='parent') ? <FormField label={t(editor.kind==='department' ? 'org.parentDepartment' : editor.item ? 'org.departmentForAll' : 'org.department')} htmlFor="organization-placement" hint={editor.kind==='position'&&!editor.item ? t('org.positionPlacementHint') : undefined}><SelectField id="organization-placement" label={t(editor.kind==='department' ? 'org.parentDepartment' : editor.item ? 'org.departmentForAll' : 'org.assignPositionsTo')} value={placement} disabled={isSubmitting} onChange={setPlacement} picker={editor.kind==='department' ? { tree:true,searchLabel:t('org.searchDepartments'),clearLabel:t('org.clearPickerSearch'),emptyLabel:t('org.pickerNoResults'),expandLabel:t('org.expandDepartment'),collapseLabel:t('org.collapseDepartment') } : undefined} options={[{ value:'',label:t(editor.kind==='department' ? 'org.noneCompanyLevel' : 'org.chooseDepartment') },...departments.filter(d=>!editor.item||d.id!==editor.item.id&&!isDescendant(d,editor.item.id)).map(d=>({ value:d.id,parentValue:d.parentId,label:d.name+(!departmentActive(d) ? ' ('+t(inactiveParent(d)&&d.status==='active' ? 'org.inactiveParent' : 'org.statusInactive',{ name:inactiveParent(d)?.name })+')' : ''),disabled:editor.kind==='position'&&!departmentActive(d) }))]} /></FormField> : null}
+        {editor.kind==='department'&&departmentPlacementTab==='manager' ? <FormField label={t('org.managedByPosition')} htmlFor="organization-manager" hint={placement ? t('org.inheritsManagement') : undefined}><SelectField id="organization-manager" label={t('org.managedByPosition')} value={managerId} disabled={Boolean(placement)||isSubmitting} onChange={setManagerId} picker={{ hideGroupHeadings:true,searchLabel:t('org.searchManagingPositions'),clearLabel:t('org.clearPickerSearch'),emptyLabel:t('org.pickerNoResults'),expandLabel:t('org.expandDepartment'),collapseLabel:t('org.collapseDepartment') }} options={[{ value:'',label:t('org.pickerNoManagingPosition') },...leaders.map(p=>({ value:p.id,label:p.name,groups:roots.some(d=>d.managerPositionId===p.id) ? roots.filter(d=>d.managerPositionId===p.id).map(d=>d.name) : [t('org.companyLevel')] }))]} /></FormField> : null}
         </div>
         {editor.kind!=='position'||editor.item ? <p className="organization-batch-context">{placement==='company' ? t('org.companyWide') : departments.find(d=>d.id===placement)?.name||t('org.companyLevel')}</p> : null}
         {editor.kind==='department' ? renderQueuedNames() : null}
         {editor.kind==='position'&&!editor.item ? renderQueuedNames() : null}
-        {editorRows.map((row,index)=>!editor.item&&(editor.kind==='department'||placement!=='company') ? null : <div className="organization-batch-row" key={row.id}><div className={'organization-batch-fields'+(editor.kind==='position' ? ' organization-batch-fields--position' : '')}>{editor.item ? <><FormField label={t(editor.kind==='position' ? 'org.positionName' : 'org.departmentName')+' '+(index+1)} htmlFor={'organization-name-'+row.id}><TextField id={'organization-name-'+row.id} autoFocus={index===0&&(editor.kind!=='department'||Boolean(editor.item))} value={row.name} placeholder={t(editor.kind==='position' ? 'org.positionNamePlaceholder' : 'org.departmentNamePlaceholder')} onChange={event=>updateDraft(row.id,{ name:event.target.value })} required /></FormField>{editor.kind==='department' ? <FormField label={t('org.status')} htmlFor={'organization-status-'+row.id}><select id={'organization-status-'+row.id} className="ui-text-field" value={row.status} onChange={event=>updateDraft(row.id,{ status:event.target.value as Draft['status'] })}><option value="active">{t('org.statusActive')}</option><option value="inactive">{t('org.statusInactive')}</option></select></FormField> : null}{!editor.item ? <Button variant="ghost" className="organization-remove-row" aria-label={t('org.removeRow',{ count:index+1 })} disabled={editor.kind!=='department'&&drafts.length===1} onClick={()=>setDrafts(current=>current.filter(d=>d.id!==row.id))}>×</Button> : null}</> : <h3 className="organization-queued-position-name">{row.name}</h3>}</div>
+        {editorRows.map((row,index)=>!editor.item&&(editor.kind==='department'||placement!=='company') ? null : <div className="organization-batch-row" key={row.id}><div className={'organization-batch-fields'+(editor.kind==='position' ? ' organization-batch-fields--position' : '')}>{editor.item ? <><FormField label={t(editor.kind==='position' ? 'org.positionName' : 'org.departmentName')+' '+(index+1)} htmlFor={'organization-name-'+row.id}><TextField id={'organization-name-'+row.id} autoFocus={index===0&&(editor.kind!=='department'||Boolean(editor.item))} value={row.name} placeholder={t(editor.kind==='position' ? 'org.positionNamePlaceholder' : 'org.departmentNamePlaceholder')} onChange={event=>updateDraft(row.id,{ name:event.target.value })} required /></FormField>{editor.kind==='department' ? <FormField label={t('org.status')} htmlFor={'organization-status-'+row.id}><SelectField id={'organization-status-'+row.id} label={t('org.status')} value={row.status} onChange={value=>updateDraft(row.id,{ status:value as Draft['status'] })} options={[{value:'active',label:t('org.statusActive')},{value:'inactive',label:t('org.statusInactive')}]} /></FormField> : null}{!editor.item ? <Button variant="ghost" className="organization-remove-row" aria-label={t('org.removeRow',{ count:index+1 })} disabled={editor.kind!=='department'&&drafts.length===1} onClick={()=>setDrafts(current=>current.filter(d=>d.id!==row.id))}>×</Button> : null}</> : <h3 className="organization-queued-position-name">{row.name}</h3>}</div>
           {editor.kind==='position'&&placement==='company' ? <fieldset className="organization-managed-choices"><legend>{t('org.managesDepartments')}</legend>{roots.map(d=><label key={d.id}><input type="checkbox" checked={row.managedIds.includes(d.id)} disabled={editorRows.some(other=>other.id!==row.id&&other.managedIds.includes(d.id))} onChange={()=>updateDraft(row.id,{ managedIds:row.managedIds.includes(d.id) ? row.managedIds.filter(id=>id!==d.id) : [...row.managedIds,d.id] })} /><span>{d.name}</span>{d.managerPositionId&&d.managerPositionId!==editor.item?.id ? <small>{t('org.reassignFrom',{ name:positions.find(p=>p.id===d.managerPositionId)?.name||'' })}</small> : null}</label>)}</fieldset> : null}
         </div>)}
       </fieldset>
@@ -531,7 +572,7 @@ export function OrganizationPage() {
       <div className="organization-create-dialog__actions">{editor.kind==='position'&&!editor.item&&totalToAdd ? <span className="organization-placement-summary">{t('org.positionCount',{ count:totalToAdd })} · {placement==='company' ? t('org.companyWide') : departments.find(d=>d.id===placement)?.name||t('org.chooseDepartment')}</span> : null}<Button variant="secondary" onClick={()=>setEditor(null)} disabled={isSubmitting}>{t('users.cancel')}</Button><Button type="submit" disabled={isSubmitting||!totalToAdd||drafts.some(row=>!row.name.trim())||editor.kind==='position'&&!placement}>{t(isSubmitting ? 'users.saving' : editor.item ? 'users.saveChanges' : editor.kind==='position' ? 'org.addPositionBatch' : 'org.addDepartmentBatch',{ count:totalToAdd })}</Button></div>
     </form></dialog> : null}
     <ConfirmDialog className="organization-deactivate-dialog" open={Boolean(pendingDeactivate&&canManage)} title={t('org.deactivateDepartmentTitle',{ name:pendingDeactivate?.department.name })} description={<><span className="organization-deactivate-count">{t('org.deactivateDepartmentImpact',{ count:pendingDeactivate ? departments.filter(d=>isDescendant(d,pendingDeactivate.department.id)).length : 0 })}</span><p>{t('org.deactivateDepartmentAvailability')}</p>{error&&pendingDeactivate?.source==='toggle' ? <p className="organization-create-dialog__error" role="alert">{error}</p> : null}</>} warning={t('org.deactivateDepartmentRestore')} confirmLabel={t('org.setInactive')} cancelLabel={t('users.cancel')} busyLabel={t('org.updatingStatus')} busy={isSubmitting} onConfirm={()=>{if(!pendingDeactivate) return; if(pendingDeactivate.source==='editor') void save(undefined,true); else void toggleStatus(pendingDeactivate.department)}} onCancel={()=>{if(!isSubmitting) setPendingDeactivate(null)}} />
-    <ConfirmDialog open={Boolean(pendingBulkDeleteIds.length&&canManage)} title={t('org.deletePositionsTitle',{ count:bulkPositions.length })} description={<div className="organization-bulk-delete-copy">{deleteError ? <p className="organization-create-dialog__error" role="alert">{deleteError}</p> : null}<p>{t('org.deletePositionsImpact',{ count:bulkPositions.length })}</p><ul className="organization-bulk-delete-list">{bulkPositions.map(position=><li key={position.id}>{position.name}</li>)}</ul>{bulkManaged ? <p>{t('org.managedDepartmentDependency',{ count:bulkManaged })}</p> : null}{bulkAssignments ? <p>{t('org.deleteAssignmentDependency',{ count:bulkAssignments })}</p> : null}</div>} warning={t(bulkDeleteBlocked ? 'org.deleteBlocked' : 'org.deleteDatabaseWarning')} confirmDisabled={bulkDeleteBlocked} confirmLabel={t('users.actionDelete')} cancelLabel={t('users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={()=>void removeSelectedPositions()} onCancel={()=>setPendingBulkDeleteIds([])} />
-    <ConfirmDialog open={Boolean(pendingDelete&&canManage)} title={t(pendingDelete?.kind==='department' ? 'org.deleteDepartmentTitle' : 'org.deletePositionTitle',{ name:pendingDelete?.item.name })} description={<>{deleteError ? <p className="organization-create-dialog__error" role="alert">{deleteError}</p> : null}<p>{t(pendingDelete?.kind==='department' ? 'org.deleteDepartmentImpact' : 'org.deletePositionImpact',{ name:pendingDelete?.item.name })}</p>{dependentPositions ? <p>{t('org.deletePositionDependency',{ count:dependentPositions })}</p> : null}{childDepartments ? <p>{t('org.deleteChildDependency',{ count:childDepartments })}</p> : null}{managedDepartments ? <p>{t('org.managedDepartmentDependency',{ count:managedDepartments })}</p> : null}{activeAssignments ? <p>{t('org.deleteAssignmentDependency',{ count:activeAssignments })}</p> : null}</>} warning={t(deleteBlocked ? 'org.deleteBlocked' : 'org.deleteDatabaseWarning')} confirmDisabled={deleteBlocked} confirmLabel={t('users.actionDelete')} cancelLabel={t('users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={()=>void remove()} onCancel={()=>setPendingDelete(null)} />
+    <ConfirmDialog variant="deletion" open={Boolean(pendingBulkDeleteIds.length&&canManage)} title={t('org.deletePositionsTitle',{ count:bulkPositions.length })} items={bulkPositions.map(position=>({id:position.id,name:position.name,details:departments.find(department=>department.id===position.organizationId)?.name||t('org.companyLevel')}))} description={<><p>{t('org.deletePositionsShort')}</p>{bulkManaged ? <p>{t('org.managedDepartmentDependency',{ count:bulkManaged })}</p> : null}</>} error={deleteError} warning={bulkDeleteBlocked||deleteConflict ? t('org.deleteBlocked') : undefined} confirmDisabled={deleteConflict||bulkDeleteBlocked||!bulkPositions.length} confirmLabel={t('org.deletePositionsAction')} cancelLabel={t('users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={removeSelectedPositions} onCancel={()=>setPendingBulkDeleteIds([])} />
+    <ConfirmDialog variant="deletion" open={Boolean(pendingDelete&&canManage)} title={t(deleteBlocked||deleteConflict||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? pendingDelete?.kind==='department' ? 'org.cannotDeleteDepartment' : 'org.cannotDeletePosition' : pendingDelete?.kind==='department' ? 'org.deleteDepartmentTitle' : 'org.deletePositionTitle')} items={pendingDelete ? [{id:pendingDelete.item.id,name:pendingDelete.item.name}] : []} description={<><p>{t(deleteConflict ? 'org.deleteRefreshShort' : managedDepartments ? 'org.deleteManagerShort' : pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? 'org.deleteInactiveFirst' : pendingDelete?.kind==='department' ? 'org.deleteDepartmentQuestion' : 'org.deletePositionShort',{ departments:childDepartments,positions:dependentPositions })}</p>{removalEmployeeControls}</>} warningTitle={pendingDelete?.kind==='department'&&Boolean(cascadeItems)&&!deleteBlocked&&!deleteConflict ? t('org.deleteWarningHeading') : undefined} warning={pendingDelete?.kind==='department'&&cascadeItems&&!deleteBlocked&&!deleteConflict ? t('org.deleteDepartmentCascadeWarning',{ items:cascadeItems }) : undefined} error={deleteError} hideConfirm={deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive'} confirmDisabled={Boolean(removalIncomplete)||deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive'} confirmLabel={t(pendingDelete?.kind==='department' ? 'org.deleteDepartmentAction' : 'org.deletePositionAction')} cancelLabel={t(deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? 'org.deleteClose' : 'users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={remove} onCancel={()=>setPendingDelete(null)} />
   </div>
 }
