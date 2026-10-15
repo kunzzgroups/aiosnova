@@ -1,6 +1,119 @@
+## Inactive placement labels
+
+Directory memberships expose `departmentInactive` and `positionInactive` for existing placements, including inactivity inherited from ancestor departments. Employee view/edit fields append the existing localized Inactive label to the selected department/position; removed labels retain precedence. Selection values, assignment eligibility and account status are unchanged. No migration is needed. Frontend/Maven builds and rolled-back database checks passed for active placements, inactive positions, inactive ancestors and reactivation; rendered browser verification remains pending.
+
+## Assignment reconciliation (V13)
+
+V13 reconciles missing current assignment rows from company-scoped saved placements and effective company memberships. It excludes invited/removed employees and removed catalog records, retains inactive placements, starts repaired assignments on the current UTC date and records reconciliation audit events. Existing effective assignment rows are unchanged; reruns do not duplicate assignments or audit entries. Apply the SQL with application writes stopped. The local application through V12 has no V7 triggers; environments with those optional legacy triggers installed must review their inactive-placement restrictions before applying this repair.
+
+V13 has been applied locally under merchant write locks; zero rows required repair because the current placements were already synchronized. No account/access changes were made. Runtime synchronization now checks assignment effective dates and repairs retained inactive placements on unrelated employee edits, using the membership/position snapshot taken before the edit. New placements and newly granted memberships retain active-department/position validation. Activation, employee edits and department reassignment continue to synchronize in their existing transactions.
+
+Verification: Maven package and rolled-back MySQL fixtures passed for missing-row count recovery, reconciliation auditing/idempotency, unchanged inactive-placement edits, expired assignment recovery and rejection of new inactive placements. Browser flows remain unverified; the original Demo2 mismatch predates its profile-save repair and its precise trigger remains unconfirmed.
+
+## Employee edit concurrency
+
+Employee directory responses include `users.version`. Profile edits and status changes must submit the loaded version; missing versions return 400 and stale versions return 409 with `users.profileConflict`. The conditional profile update and settings, company access, placement, assignment and audit changes share one transaction. Company placement writes also advance the employee version so bulk reassignment invalidates open editors. The frontend keeps the editor open on conflict and asks the user to reload. No schema migration is required.
+
+Verification: frontend build and Maven package passed. Rolled-back MySQL checks verified fresh saves, stale-version rejection without profile/access changes, missing-version rejection and placement version invalidation. Two-tab browser interaction remains unverified.
+
+## Company-scoped Organization permissions (V9)
+
+V9 has been applied to the configured development database. It adds the shared identity table `company_user_permission_grants` (merchant, company, user, permission). No existing employee-management grants or company memberships are copied into Organization grants. Existing owner access is preserved; other users default to no Organization access until explicitly granted `organization.read` or `organization.manage` for that company. Manage implies read, but neither permission grants company membership or access to another company.
+
+All Organization reads and writes enforce these grants server-side, including batch replays. `GET /api/identity/organization-companies` keeps accessible companies and adds `canRead`/`canManage` for navigation; `GET /organizations` also returns these capabilities. Company switching remains independent. The frontend hides Organization navigation without read access and existing mutation controls without management access; direct URLs still enforce backend denial. Navigation capability failures default to hidden; opening the page uses the existing translated error/retry state.
+
+The existing role/access pages remain mocked: this extends the backend's direct-grant model, not a database-backed role assignment system. Permission administration UI/API and audited grant delegation remain pending; do not assign grants from employee position names or employee-management toggles. No non-owner grants were provisioned. Restart the backend after updating. V7 remains pending and is not required by V9.
+
+Verification: frontend build, Maven package and rolled-back database checks passed for owner access, default denial, independence from employee management, read-only mutation denial, manage-implies-read, company/membership scope and revoked batch retries. Browser interactions have not been verified; existing Vite chunk/import warnings remain.
+
 # Backend development
 
+## Department removal with employee reassignment (V12)
+
+V12 has been applied to the configured local database after V11. It creates company-scoped employee placement records and backfills valid existing department/position references with their original IDs, including removed placements. Company access remains independent. New environments must apply V12 before using this backend. Employee placement edits now require `placementCompanyId`; the frontend adapter resolves the sidebar company to its database UUID. Clearing or changing placement affects that company only.
+
+Department removal loads `GET /api/identity/organizations/{id}/removal-impact`, showing distinct affected employees (including pending/inactive accounts with effective company access), grouped by source position or department-only placement. Users may map those groups to active positions in an available department outside the subtree, or remove without reassignment. `POST /organizations/{id}/remove` rechecks company/Organization management permission, root version and the complete impact snapshot. Reassignment additionally requires owner or employee-management permission. Target validation, company-scoped placement updates, ended/new assignment history, audits and subtree soft removal commit in one transaction; stale impact and invalid/foreign destinations reject the whole operation. Company membership/access and other-company placements are preserved.
+
+Retained removed placements show their actual names with a localized removed suffix, and employee listings provide a Needs reassignment placement filter and badge scoped to the selected company. The filter includes all account statuses when selected. Already removed departments are found through this employee filter and may be corrected using employee edit; the pre-removal batch mapping flow applies to departments still visible in Organization. No restore or post-removal batch reassignment flow is added.
+
+Verification: frontend/Maven builds and rolled-back local MySQL checks passed for 50-person reassignment, two source-position mappings, other-company placement/access/assignment preservation, scoped employee saves, retain-mode markers/names, stale impact, foreign-destination rollback and permission separation. Browser interaction remains unverified. Email/Google and other directory capabilities retain their existing local/mock limitations.
+
+## Organization soft deletion (V11)
+
+V11 has been applied to the configured local database after V10. It adds nullable `deleted_at` and `deleted_by` to departments and positions, without changing existing rows. New environments must apply `V11__organization_soft_deletion.sql` before running this backend; no triggers or SUPER privilege are required. The schema reference is updated.
+
+Department removal marks the department subtree and its positions in one transaction. Position removal also marks its row. Employee placement and assignment history remain linked to the original IDs; references/history no longer prevent removal. Executive positions managing a removed department are retained. Removing an executive still requires reassigning its visible managed departments; department positions still require their own inactive status for individual/bulk removal. Permissions, versions, transaction rollback and per-record audits remain enforced.
+
+Normal catalog/structure/selection reads exclude removed rows. New assignments and placement changes cannot target them. Existing assignments and unchanged employee placement remain valid for historical display; employee reads retain the original references and expose removed markers, translated as Removed department/Removed position. No assignment history is transferred to newly created records. Uniqueness excludes removed records, so a reused name creates a new UUID and an empty department. The UI says Remove, retains cascade warnings, and omits irreversible-deletion claims. There is no restore UI or API.
+
+Verification: frontend/Maven builds and rolled-back local database checks passed for retained subtree rows, employee placement and history, executive preservation, catalog/picker exclusion, removed markers, unchanged employee saves, name reuse/new IDs, new-assignment denial and stale-version rejection. Browser interaction remains unverified. Direct database writes remain an administrative responsibility; the previously deferred V7 trigger migration is still unapplied.
+
+## Persistent employee deletion (V10)
+
+V10 has been applied to the configured local database. It adds merchant-scoped `deleted_at`/`deleted_by` to `user_directory_settings`; existing rows remain unchanged. New environments must apply `V10__employee_directory_deletion.sql` after V9 before running this backend. It does not require the deferred V7 triggers or SUPER privileges.
+
+`DELETE /api/identity/users/{userId}` and `POST /api/identity/users/bulk-delete` with `{userIds:[...]}` require a real backend session and current owner access. Only disabled employees in the owner's merchant can be deleted; the owner/self cannot be deleted. Bulk deletion prechecks all targets and commits atomically. Deletion persists a directory marker, clears placement, ends assignments/memberships, revokes merchant permissions/sessions and pending invitations, and audits each employee. Account and membership/assignment/audit history are retained; deleted records are excluded from directory reads and actor lookup. There is no restore/reinvitation flow for deleted accounts.
+
+MSW passes deletion through to the backend; bulk deletion uses one request instead of sequential browser deletes. Confirmation copy explains retention in English and Chinese. Mock-only accounts cannot be deleted through this backend. Restart backend and Vite after updating. Other employee flows still use the existing local backend/MSW integration; this does not fix the separately identified employee-edit isolation gaps.
+
+Verification: frontend build, Maven package and rolled-back local database checks passed for persistence, owner/inactive enforcement, protected accounts, merchant scope, bulk atomicity, ended assignment history, revoked sessions/grants and audits. Rendered browser interaction remains unverified.
+
+## Employee position assignment synchronization
+
+Employee edits and invitation activation now synchronize real position assignments with the saved placement and effective company membership. Pending invitations do not increase employee counts. Reassignment, clearing placement and removing company access end old assignments; repeated saves retain the current assignment. Availability is checked before creating assignments, using the same company lock as Organization writes. Assignment changes are audited and share the calling transaction. Membership activation uses the database UTC clock, matching membership eligibility checks.
+
+Department/position deletion is blocked by saved employee placement references, including pending invitations, as well as assignment history. Moving a referenced position to another department is blocked. Employee edit pickers use the active company's real invitation catalog for authorized managers and preserve the existing selection when it is no longer selectable. No schema migration is required; existing saved placements synchronize on the next manager save, and no historical assignments are inferred automatically. The existing schema uses day-level assignment dates, so returning to the same position on the same day reuses that day's assignment row.
+
+Verification: frontend build, Maven package and rolled-back local database checks passed for counts, duplicate-save prevention, reassignment/history, clearing, activation, company-access removal and inactive placement. Browser interaction remains unverified. Invitation delivery and several directory features remain local/mocked.
+
+## Organization catalog (V4)
+
+`src/main/resources/db/migration/mysql/V4__create_organization_catalog.sql` was applied to the configured MySQL development database on 2026-10-12. Do not rerun it. It creates `organization_departments`, `organization_positions`, and `organization_position_assignments`, and adds the scoped membership unique key. Department executive links use `executive_position_id`.
+
+All three tables are initially empty. The schema was verified with 13 foreign keys and 8 check constraints; no existing data was backfilled.
+
+### Organization codes removed (V5)
+
+`src/main/resources/db/migration/mysql/V5__remove_organization_codes.sql` was applied on 2026-10-12. It removes department/position `code` columns and their unique indexes. All other values in 9 departments and 12 positions, and all 13 foreign keys, were preserved. Do not rerun V5. For a new database, apply V1 through V5 in order; preserve the already-applied V4. Company codes remain unchanged.
+
+### Organization APIs
+
+`V8__organization_batch_idempotency.sql` was applied on 2026-10-12 after V6; it does not require the deferred V7 triggers. Batch creation now requires a UUID `requestId`. The request key is scoped to merchant/company/actor, checked after current authorization, and recorded atomically with created IDs and audits. Identical retries reuse the created IDs and return current catalog data; using a key with different content returns 409. Failed transactions leave no completed-request record.
+
+OrganizationPage keeps the same key when retrying an unchanged queued batch; changed content or a newly opened dialog starts a new request. Closing/reloading the page does not retain its queue or retry key. Successful position edits update the local record/version and close the dialog before refreshing related data. A refresh failure shows a saved-but-refresh-failed notice; its Retry button only reads data, and stale-data mutations stay disabled until refresh succeeds. Authentication/access errors clear cached catalog data.
+
+Backend/frontend builds, rolled-back MySQL replay/scope/conflict checks and simulated frontend save/refresh failures passed. Browser rendering has not been verified. Restart the backend after updating; deployments must apply V8 before using the new batch contract.
+
+Department availability now includes every ancestor's status. Deactivating a department preserves saved child statuses; children display inherited inactivity and previously active children become available again on reactivation. OrganizationPage confirms deactivation of departments with descendants from both the status toggle and edit dialog. New/moved positions are rejected if any department in their ancestor chain is inactive. Executive headers omit status controls; position status remains available in the Positions tab.
+
+`V7__guard_inactive_department_assignments.sql` is prepared but **not applied**: the configured database account cannot create triggers while binary logging requires SUPER privileges. A database administrator must apply V7; server settings were not changed. It serializes assignment insertion/reassignment with company updates and blocks new active assignments under inactive branches, while preserving existing assignments and allowing them to end. Assignment CRUD remains unconnected to the UI. V1–V6 remain the applied schema baseline.
+
+`src/main/resources/db/migration/mysql/V6__remove_position_description.sql` was applied on 2026-10-12. It removes the unused position `description` column; all other values in 12 positions and all 13 foreign keys were preserved. Do not rerun V6. New database setup must apply V1 through V6 in order. Department/position API records no longer expose codes or descriptions.
+
+OrganizationPage now uses Spring JDBC APIs under `/api/identity`. Reads and writes require a real backend session; mock Google/password tokens are rejected. Reads require active company access and `organization.read` or `organization.manage`; writes require `organization.manage`. Existing owner access is preserved. Database company IDs are resolved by company code at the frontend adapter boundary while the existing company switcher remains mocked.
+
+- `GET /organization-companies`: accessible active database companies.
+- `GET /organizations?companyId=UUID`: departments and current management capability.
+- `GET /positions?companyId=UUID&date=YYYY-MM-DD`: positions, distinct active employee counts and assignment-history counts.
+- `POST /organizations`, `POST /positions`: create a department or position.
+- `PATCH /organizations/{id}`, `PATCH /positions/{id}`: update using the current `version` in the request body.
+- `DELETE /organizations/{id}?version=N`, `DELETE /positions/{id}?version=N`: delete an unreferenced record.
+- `POST /organization-batches`: atomically create queued departments or positions for a company; executive position creation can include `managedDepartmentIds`.
+- `POST /positions/bulk-delete`: atomically delete inactive positions using `{companyId, items:[{id,version}]}`.
+
+The API preserves the frontend field `managerPositionId`, mapped to `executive_position_id` in MySQL. Company/merchant scope, hierarchy cycles, executive management, active department placement, stale versions and deletion dependencies are enforced server-side. Writes and their audit records share a transaction. Department and position records use UUID IDs; they do not expose separate codes.
+
+Employee counts use `organization_position_assignments`, active effective company memberships and active users. Assignment CRUD, invitation/edit picker integration and migration of existing mock `department_ref`/`position_ref` values remain pending. Historical assignments prevent hard deletion; keep referenced positions inactive. No sample departments or positions are seeded automatically.
+
+Development Vite proxies these organization routes to port 8080; MSW passes them through. Restart the backend and Vite after updating. Deployment must route these API paths to the backend; frontend build success does not establish production hosting or database connectivity.
+
+Verification: Maven package, frontend build, rolled-back MySQL service checks for CRUD/hierarchy/counts/permissions/batch failures, and isolated HTTP checks rejecting mock sessions passed. Browser interaction with a real OTP/MFA session has not been verified.
+
 ## Saved user edits and sessions (V3)
+
+Audit `changes` now stores JSON for new user profile, department/position CRUD, executive-management and invitation lifecycle events. Only changed fields are included as `{field:{before:...,after:...}}`; creation/deletion uses null for the absent side. Profile email, names, phone and avatar changes use `{changed:true,redacted:true}` instead of copying personal values. Authentication tokens, OTPs, MFA credentials and invitation messages are never included. Updates without business-field changes store `{}`.
+
+Company changes include active memberships and pending invitation assignments. Audit inserts participate in their operation's existing transaction. Historical null entries cannot be backfilled reliably and are preserved. No schema migration is required. Maven package and rolled-back MySQL checks verified JSON persistence, before/after values, related management updates, pending company changes, redaction and no-op updates.
 
 `src/main/resources/db/migration/mysql/V3__user_edit_permissions_and_sessions.sql` has been applied to the configured development database. Do not rerun it. It adds session merchant/CSRF hashes, merchant-scoped permission grants and directory settings.
 
@@ -89,3 +202,45 @@ Endpoints:
 Invitation, activation, enrollment and MFA state persists across backend restarts. TOTP secrets use AES-256-GCM with a random nonce and account-bound authenticated data; OTP verifiers use server-keyed HMAC-SHA256 bound to the challenge UUID; high-entropy invitation and ticket tokens use SHA-256 hashes. Activation, membership creation and invitation consumption run in one transaction; user row locks serialize OTP and MFA consumption. Failed MFA attempts commit even when the API returns a rejection. Secrets are not sent to any external QR service.
 
 This remains a local integration: email delivery, unsent drafts, organization/role catalogs, password login and Google login remain mocked. OTP/MFA sessions, profile edits, company selection and the user-management permission are backend/database-backed. MFA recovery and real Google OAuth are not implemented. A mock Google/password session cannot authorize database edits; activate the owner and use OTP/MFA login. Existing demo-account MFA and authenticated MFA settings screens still use their original frontend mocks. Previously issued in-memory invitations/accounts cannot be recovered into MySQL; create new invitations using the updated backend.
+
+## Local Google-button test login
+
+This is a localhost test shortcut, not Google OAuth. In this workspace, ignored `server/.env.local` has `LOCAL_TEST_LOGIN_ENABLED=true`, and ignored root `.env.local` has `VITE_LOCAL_TEST_LOGIN=true`. Restart both backend and Vite, then click Google sign-in. It issues an ordinary database-backed session for the existing active `demo@aios.dev` account without OTP/MFA; no user is created or activated, and permissions/company access are unchanged. To use another existing test account, set `LOCAL_TEST_LOGIN_EMAIL` in the backend local configuration. Non-owners need explicit company-scoped Organization grants.
+
+`POST /api/auth/local-test-login` exists only in the local profile, with prod/production profiles excluded, and only when explicitly enabled (default false). It requires a loopback peer and host, a loopback configured frontend URL, an exact matching Origin, and no forwarding headers. Session creation and the `identity.session.local_test_login` audit event share a transaction. Do not expose the development server through a public proxy/tunnel or deploy the ignored opt-in settings. Production frontend builds never use the shortcut. This does not enable Google CRUD on the deployed website.
+
+Mock sessions now skip Organization navigation capability requests, avoiding the 401/refresh cycle; database-backed Organization still requires a real session. Employees continues to combine database profiles/memberships with mock features.
+
+Verification: frontend build and Maven package passed; local HTTP checks verified endpoint disabled by default, rejection of missing/external Origin, a real session and CSRF cookies, and an authenticated Organization database read. The verification session was revoked. Browser interaction and deployed authentication were not verified.
+
+## Department subtree deletion
+
+Deleting a department now deletes all descendant departments and their attached positions in one company-scoped transaction. The backend prechecks every affected position for any assignment history (active or ended), blocks the whole operation on dependencies, deletes positions before departments and departments from leaves upward, and audits each deletion. Executive positions managing the department remain intact. Confirmation counts include the entire subtree, with matching English/Chinese copy; the frontend removes the affected rows and refreshes the catalog separately. No schema migration is required.
+
+Frontend build, Maven package and rolled-back database checks passed for nested deletion, historical-assignment blocking without partial removal, unrelated executive preservation and per-record audits. Restart the backend; browser interaction remains unverified.
+
+## Employee directory read isolation
+
+`GET /api/mock/invitations/directory` now requires the selected company's database UUID as `companyId`; optional `userId` requests an employee detail. The service rechecks the active actor and effective company membership (or existing owner access), selects employees assigned to that company, and filters memberships to companies accessible to the actor before serialization. Owners receive all active-company assignments for those employees; non-owners receive only shared-company assignments. Existing owner-profile and phone visibility rules remain. Own-profile details remain available within an authorized company context for existing account flows. Inaccessible companies return 403; unrelated employee details return 404. Responses use private/no-store caching. No schema migration is needed.
+
+The existing MSW identity adapters resolve company codes to authorized database UUIDs. Users, user details, memberships and company-member reads return only records present in their authorized directory response; cached records from previous scopes are not returned. Employee pages reload on company/session changes and discard stale results. Local owner drafts remain browser mocks. Company/role catalogs and other directory features still use mocks; this does not establish production RBAC or replace existing merchant-scoped employee mutation permissions.
+
+Verification: frontend build, Maven package and rolled-back database checks passed for company-scoped lists/details, viewer shared-company counts, owner full assignments, cross-company denial, revoked memberships, inactive accounts and existing phone redaction. Restart backend and reload the frontend. Browser interactions and deployed integration were not verified; existing build warnings remain.
+
+## Directory loading efficiency
+
+Concurrent employee list/membership/options loads share one in-flight backend directory request, keyed by session, resolved database company ID and optional detail user ID. Directory responses are not cached after completion: each reload still reaches backend authorization. Only company UUID/code mapping is reused within the session; permission flags are discarded, and the mapping is cleared on account/token changes. Authenticated user-detail loads no longer fetch the employee list just to infer permissions already present in the session.
+
+The HTTP client and identity/Organization adapters accept AbortSignal. Employee list/detail and Organization loads cancel obsolete requests; scoped directory requests are also cancelled on company/session changes before merging into mock adapter state. Mapping failures are not retained. Backend permissions and isolation checks are unchanged.
+
+Frontend build and source-based simulations passed for concurrent read sharing, fresh reloads, mapping reuse, cancellation and session cache reset. No latency benchmark or rendered browser interaction was performed; existing build warnings remain. The employee directory still uses the existing mixed backend/MSW integration.
+
+## Organization-backed invitation placement
+
+Company selections control account access and support multiple authorized companies. Department and position pickers independently use the sidebar company and load its real Organization catalog through `GET /api/identity/invitation-organization?companyId=<database UUID>`. That purpose-specific endpoint requires existing invitation/user-management/owner access and company access; it does not require or grant general Organization read permission. Only active departments with active ancestors and active department positions are returned. Company-level executives are not department position options.
+
+The send API accepts multiple accessible companies, a separate `placementCompanyId` context and optional `departmentId`/`positionId`, validates their company/department relationship and current availability, and persists the selected UUIDs in existing directory settings. Invitation audits include the placement references. Local drafts remain browser mocks. This stores profile placement; creating historical `organization_position_assignments` and updating employee counts through assignment enrollment remains separate work. No migration is required.
+
+Frontend/Maven builds and rolled-back database checks passed for real catalog linkage, invitation-only access, cross-company rejection, inherited inactivity and placement persistence. Restart backend/Vite; browser interaction remains unverified, and email delivery still uses the local mock inbox.
+
+Multi-company access selection is restored. Placement context is independent of selected access companies; department/position UUIDs are validated against the sidebar company. Returned memberships include placement only where its real Organization company matches that membership, so choosing an Acme Retail position does not copy it into other companies. Frontend/Maven builds and rolled-back multi-company invitation checks passed; browser interaction remains unverified.

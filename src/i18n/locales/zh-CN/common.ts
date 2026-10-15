@@ -1,4 +1,7 @@
 export const common: Record<string, string> = {
+  'confirmation.cancel': '取消',
+  'confirmation.delete': '删除',
+  'confirmation.deleting': '正在删除…',
   // app shell
   "shell.workspace": "工作区",
   "shell.manageMfa": "管理 MFA",

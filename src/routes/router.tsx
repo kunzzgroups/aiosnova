@@ -18,6 +18,7 @@ import { TemplatesPage } from '@/modules/ai/knowledge/pages/TemplatesPage'   // 
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
+import { OrganizationRoute } from '@/modules/core/identity/OrganizationRoute'
 import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
 
 export function AppRouter() {
@@ -51,7 +52,9 @@ export function AppRouter() {
 
             <Route path="/system/core/employees" element={<UsersPage />} />
             <Route path="/system/core/employees/:userId" element={<UserDetailPage />} />
-            <Route path="/system/core/organization" element={<OrganizationPage />} />
+            <Route element={<OrganizationRoute />}>
+              <Route path="/system/core/organization" element={<OrganizationPage />} />
+            </Route>
             <Route path="/system/core/roles-and-access" element={<ModulePlaceholderPage />} />
             <Route path="/system/core/activity" element={<ModulePlaceholderPage />} />
             <Route path="*" element={<ModulePlaceholderPage />} />

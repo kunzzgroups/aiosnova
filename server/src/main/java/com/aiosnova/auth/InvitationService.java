@@ -7,6 +7,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import com.aiosnova.audit.AuditChanges;
 import com.aiosnova.mail.EmailService;
 import com.google.zxing.WriterException;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,10 +30,12 @@ public class InvitationService {
     private final TotpService totpService;
     private final AuthRepository repository;
     private final AuthSecretService secrets;
+    private final com.aiosnova.organization.OrganizationService organization;
+    private final com.aiosnova.organization.OrganizationAssignmentService assignments;
     private final SecureRandom random = new SecureRandom();
 
     public InvitationService(EmailService emailService, TotpService totpService,
-                             AuthRepository repository, AuthSecretService secrets,
+                             AuthRepository repository, AuthSecretService secrets, com.aiosnova.organization.OrganizationService organization, com.aiosnova.organization.OrganizationAssignmentService assignments,
                              @Value("${app.frontend-url}") String frontendUrl,
                              @Value("${app.local-merchant-id}") String merchantId) {
         this.emailService = emailService;
@@ -38,6 +43,8 @@ public class InvitationService {
         this.merchantId = merchantId;
         this.totpService = totpService;
         this.repository = repository;
+        this.organization = organization;
+        this.assignments = assignments;
         this.secrets = secrets;
     }
 
@@ -48,10 +55,18 @@ public class InvitationService {
         if (actor == null || !"active".equals(actor.status()) || (!actor.owner() && !actor.manageUsers() && !actor.canInvite())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        List<AuthRepository.Company> companies = repository.companies(merchantId).stream()
+        List<AuthRepository.Company> companies = repository.accessibleCompanies(actor).stream()
                 .filter(company -> request.companyCodes().contains(company.code())).toList();
         if (companies.isEmpty() || companies.size() != request.companyCodes().size()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT);
+        }
+        String departmentId = request.departmentId() == null ? "" : request.departmentId();
+        String positionId = request.positionId() == null ? "" : request.positionId();
+        var catalog = organization.invitationCatalog(actor, request.placementCompanyId() == null ? companies.getFirst().id() : request.placementCompanyId());
+        var department = catalog.departments().stream().filter(item -> item.id().equals(departmentId)).findFirst().orElse(null);
+        if ((!departmentId.isEmpty() && department == null) || (!positionId.isEmpty()
+                && (department == null || department.positions().stream().noneMatch(item -> item.id().equals(positionId))))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
         String email = normalize(request.email());
         AuthRepository.User user = repository.user(email, true);
@@ -59,6 +74,7 @@ public class InvitationService {
         if (user != null && !"invited".equals(user.status())) throw new ResponseStatusException(HttpStatus.CONFLICT);
         String userId = user == null ? UUID.randomUUID().toString() : user.id();
         if (user == null) repository.createUser(userId, email, request.fullName(), request.language());
+        repository.saveInvitationPlacement(merchantId, userId, departmentId, positionId, request.requireMfa());
         repository.revokeInvitations(merchantId, userId);
         String token = randomToken("");
         String id = UUID.randomUUID().toString();
@@ -68,7 +84,9 @@ public class InvitationService {
         for (AuthRepository.Company company : companies) {
             repository.assignCompany(UUID.randomUUID().toString(), merchantId, id, company.id());
         }
-        repository.audit(merchantId, actor.id(), "invitation.sent", "invitation", id);
+        repository.audit(merchantId, actor.id(), "invitation.sent", "invitation", id,
+                AuditChanges.between(Map.of(), Map.of("status", "sent", "companyCodes", companies.stream().map(AuthRepository.Company::code).sorted().toList(),
+                        "requireMfa", request.requireMfa(), "departmentId", departmentId, "positionId", positionId)));
         String link = frontendUrl + "/activate?token=" + token;
         boolean chinese = "zh-CN".equals(request.language());
         String body = request.personalMessage() + "\n\n"
@@ -106,11 +124,13 @@ public class InvitationService {
     }
 
     public Account activate(String token, String code) throws GeneralSecurityException {
+        repository.merchantOwner(merchantId);
         AuthRepository.Invite invite = requireInvitation(token, true);
         List<AuthRepository.Company> companies = repository.invitationCompanies(invite.merchantId(), invite.id());
         if (companies.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT);
         boolean requireMfa = requiresMfa(invite, companies);
         Instant now = Instant.now();
+        String previousUserStatus = repository.userById(invite.userId()).status();
         if (requireMfa) {
             AuthRepository.Mfa enrollment = repository.enrollment(invite.id());
             if (enrollment == null) throw new ResponseStatusException(HttpStatus.CONFLICT);
@@ -124,7 +144,11 @@ public class InvitationService {
             repository.enableMfa(enrollment.id(), counter, now);
         }
         repository.activate(invite, companies, now);
-        repository.audit(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation", invite.id());
+        assignments.synchronize(invite.merchantId(), invite.userId(), invite.userId());
+        Map<String, Object> changes = new LinkedHashMap<>();
+        AuditChanges.add(changes, "status", invite.status(), "accepted");
+        AuditChanges.add(changes, "userStatus", previousUserStatus, repository.userById(invite.userId()).status());
+        repository.audit(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation", invite.id(), changes);
         return account(invite.email());
     }
 
@@ -214,7 +238,7 @@ public class InvitationService {
     public record Directory(List<AuthRepository.DirectoryUser> users,
                             List<AuthRepository.DirectoryMembership> memberships) { }
     public record InvitationRequest(String userId, String email, String fullName, List<String> companyCodes,
-                                    boolean requireMfa, String language, String personalMessage) { }
+                                    boolean requireMfa, String language, String personalMessage, String departmentId, String positionId, String placementCompanyId) { }
     public record Invitation(String userId, String email, String fullName, List<String> companies,
                              boolean requireMfa, Instant expiresAt) { }
 }

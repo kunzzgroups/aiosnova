@@ -40,14 +40,20 @@ public class InvitationController {
     }
 
     @GetMapping("/directory")
-    public InvitationService.Directory directory(HttpServletRequest request) {
-        return directoryService.directory(sessions.authenticate(request));
+    public org.springframework.http.ResponseEntity<InvitationService.Directory> directory(@RequestParam String companyId, @RequestParam(required = false) String userId, HttpServletRequest request) {
+        return org.springframework.http.ResponseEntity.ok().header("Cache-Control", "private, no-store")
+                .body(directoryService.directory(sessions.authenticate(request), companyId, userId));
     }
 
     @PatchMapping("/users/{userId}")
-    public AuthRepository.DirectoryUser update(@PathVariable String userId,
+    public org.springframework.http.ResponseEntity<?> update(@PathVariable String userId,
             @RequestBody DirectoryService.Profile profile, HttpServletRequest request) {
-        return directoryService.update(sessions.authenticate(request), userId, profile);
+        try {
+            return org.springframework.http.ResponseEntity.ok(directoryService.update(sessions.authenticate(request), userId, profile));
+        } catch (org.springframework.web.server.ResponseStatusException error) {
+            if (!"users.profileConflict".equals(error.getReason()) && !"users.profileVersionRequired".equals(error.getReason())) throw error;
+            return org.springframework.http.ResponseEntity.status(error.getStatusCode()).body(java.util.Map.of("message", error.getReason()));
+        }
     }
 
     @PostMapping("/{token}/mfa/start")

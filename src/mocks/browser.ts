@@ -6,6 +6,18 @@ import { agentHandlers } from '@/mocks/handlers/agentHandlers'
 import { knowledgeHandlers } from '@/mocks/handlers/knowledgeHandlers'
 
 const backendTacHandlers = [
+  http.get('/api/identity/organizations/:id/removal-impact', () => passthrough()),
+  http.post('/api/identity/organizations/:id/remove', () => passthrough()),
+  http.delete('/api/identity/users/:id', () => passthrough()),
+  http.post('/api/identity/users/bulk-delete', () => passthrough()),
+  http.get('/api/identity/invitation-organization', () => passthrough()),
+  http.post('/api/auth/local-test-login', () => passthrough()),
+  http.all('/api/identity/organizations', () => passthrough()),
+  http.all('/api/identity/organizations/:id', () => passthrough()),
+  http.all('/api/identity/positions', () => passthrough()),
+  http.all('/api/identity/positions/:id', () => passthrough()),
+  http.all('/api/identity/organization-companies', () => passthrough()),
+  http.all('/api/identity/organization-batches', () => passthrough()),
   http.post('/api/auth/login/tac/send', () => passthrough()),
   http.get('/api/mock/inbox', () => passthrough()),
   http.post('/api/mock/invitations', () => passthrough()),

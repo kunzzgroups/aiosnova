@@ -98,7 +98,8 @@ export async function startOAuth(provider: OAuthProvider): Promise<string> {
 }
 
 export async function completeOAuth(provider: OAuthProvider): Promise<LoginSuccessResponse> {
-  const data = await apiRequest<LoginSuccessResponse>(`/api/auth/oauth/${provider}/callback`)
+  const localTest=provider==='google'&&import.meta.env.DEV&&import.meta.env.VITE_LOCAL_TEST_LOGIN==='true'&&['localhost','127.0.0.1','[::1]'].includes(window.location.hostname)
+  const data = await apiRequest<LoginSuccessResponse>(localTest ? '/api/auth/local-test-login' : `/api/auth/oauth/${provider}/callback`,localTest ? { method:'POST' } : {})
   useAuthStore.getState().setSession(data.accessToken, data.user)
   return data
 }

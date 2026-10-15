@@ -5,6 +5,7 @@ export type UserStatus = 'active' | 'disabled' | 'invited' | 'draft'
 export type SignInMethod = 'password' | 'otp' | 'google' | 'facebook' | 'apple'
 
 export type IdentityUser = {
+  version?: number
   id: string
   email: string
   displayName: string
@@ -32,7 +33,7 @@ export type IdentityUser = {
 
 export type IdentityProfilePayload = Partial<
   Pick<IdentityUser, 'email' | 'displayName' | 'fullName' | 'phone' | 'avatarUrl' | 'language' | 'timezone' | 'status' | 'departmentId' | 'positionId' | 'requireMfa' | 'canInvite' | 'canManageUsers'>
-> & { assignments?: InvitationAssignment[] }
+> & { version?: number; assignments?: InvitationAssignment[] }
 
 export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 'phone'>): boolean {
   return user.fullName.trim().length > 0 && user.phone.trim().length > 0
@@ -147,6 +148,12 @@ export type PositionRecord = {
 export type MembershipStatus = 'active' | 'ended' | 'invited'
 
 export type MembershipRecord = {
+  organizationName?: string | null
+  positionName?: string | null
+  organizationInactive?: boolean
+  positionInactive?: boolean
+  organizationDeleted?: boolean
+  positionDeleted?: boolean
   id: string
   merchantId: string
   userId: string
@@ -175,6 +182,7 @@ export type CompanyOption = CompanyRecord
 
 export type InvitationAssignment = { companyId: string; organizationId: string; positionId: string; roleIds: string[] }
 export type InvitationPayload = {
+  placementCompanyId?: string
   email: string; fullName: string; phone: string; assignments: InvitationAssignment[]; departmentId: string; positionId: string
 
   requireMfa: boolean; canInvite: boolean
