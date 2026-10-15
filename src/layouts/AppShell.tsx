@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { ModuleTabs } from './ModuleTabs'
 import { CompanyTabs } from './CompanyTabs'
 import './AppShell.css'
+import { OrganizationAccessProvider } from '@/modules/core/identity/OrganizationAccess'
 
 type PageHeader = { titleKey: string; titleValues?: Record<string,string>; descriptionKey?: string; titleAside?: ReactNode } | null
 export const AppShellHeaderContext = createContext<(header: PageHeader) => void>(() => {})
@@ -35,7 +36,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [location.pathname, navLabel, t])
 
   return (
-    <AppShellHeaderContext.Provider value={setHeader}>
+    <OrganizationAccessProvider><AppShellHeaderContext.Provider value={setHeader}>
     <div className="app-shell">
       <Sidebar />
       <div className="app-shell__workspace">
@@ -57,6 +58,6 @@ export function AppShell({ children }: AppShellProps) {
         <main className="app-shell__main">{children ?? <Outlet />}</main>
       </div>
     </div>
-    </AppShellHeaderContext.Provider>
+    </AppShellHeaderContext.Provider></OrganizationAccessProvider>
   )
 }

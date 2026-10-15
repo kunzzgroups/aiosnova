@@ -13,3 +13,14 @@ app:
 auth:
   tac:
     resend-cooldown-seconds: 60
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

@@ -56,8 +56,11 @@ export function TemplatesPage() {
     const [editVisibility, setEditVisibility] = useState<string[]>([])
     const [editSearch, setEditSearch] = useState('')
     const [isSaving, setIsSaving] = useState(false)
-    const [pendingDelete, setPendingDelete] = useState<TemplateListItem | null>(null)
+    const [pendingDelete, setPendingDelete] =
+        useState<TemplateListItem | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [deleteError, setDeleteError] = useState<string | null>(null)
+
     const load = useCallback(async () => {
         setIsLoading(true)
         setError(null)
@@ -78,8 +81,8 @@ export function TemplatesPage() {
         const needle = searchQuery.trim().toLowerCase()
         const list = needle
             ? templates.filter((template) =>
-                  template.name.toLowerCase().includes(needle),
-              )
+                template.name.toLowerCase().includes(needle),
+            )
             : templates
         return list
             .slice()
@@ -238,13 +241,14 @@ export function TemplatesPage() {
     async function handleDelete() {
         if (!pendingDelete || isDeleting) return
         setIsDeleting(true)
+        setDeleteError(null)
         try {
             await deleteKnowledgeTemplate(pendingDelete.id)
             setMessage(t('ai.knowledge.msgTemplateDeleted', 'Template deleted.'))
             setPendingDelete(null)
             await load()
         } catch (caught) {
-            setError(
+            setDeleteError(
                 caught instanceof ApiError
                     ? caught.message
                     : t('ai.knowledge.errTemplateDelete', 'Could not delete this template.'),
@@ -340,206 +344,205 @@ export function TemplatesPage() {
                     >
                         {templates.length === 0
                             ? t(
-                                  'ai.knowledge.templatesEmptyForCompany',
-                                  'No templates are visible to this company yet.',
-                              )
+                                'ai.knowledge.templatesEmptyForCompany',
+                                'No templates are visible to this company yet.',
+                            )
                             : t(
-                                  'ai.knowledge.templatesEmptyFiltered',
-                                  'No templates match your search.',
-                              )}
+                                'ai.knowledge.templatesEmptyFiltered',
+                                'No templates match your search.',
+                            )}
                     </p>
                 ) : (
                     <>
-                    <div className="console-table-wrap" ref={tableRef}>
-                        <table className="console-table console-table--fixed console-table--templates">
-                            <colgroup>
-                                <col style={{ width: '18%' }} />
-                                <col style={{ width: '12%' }} />
-                                <col style={{ width: '24%' }} />
-                                <col style={{ width: '20%' }} />
-                                <col style={{ width: '14%' }} />
-                                <col style={{ width: '12%' }} />
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>{t('ai.knowledge.colName', 'Name')}</th>
-                                    <th>{t('ai.knowledge.colKind', 'Kind')}</th>
-                                    <th>
-                                        {t(
-                                            'ai.knowledge.colDescription',
-                                            'Description',
-                                        )}
-                                    </th>
-                                    <th>
-                                        {t(
-                                            'ai.knowledge.colVisibility',
-                                            'Visible to',
-                                        )}
-                                    </th>
-                                    <th>{t('ai.knowledge.colOwner', 'Owner')}</th>
-                                    <th className="console-table__actions identity-table__actions">
-                                        {t(
-                                            'ai.knowledge.colActions',
-                                            'Actions',
-                                        )}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedTemplates.map((template) => {
-                                    const canEdit = userCanEditTemplate(
-                                        template.id,
-                                        companyId,
-                                    )
-                                    const canDelete = userCanDeleteTemplate(
-                                        template.id,
-                                        companyId,
-                                    )
-                                    const ownerLabel =
-                                        companies.find(
-                                            (company) =>
-                                                company.value ===
-                                                template.ownerCompanyId,
-                                        )?.label ?? template.ownerCompanyId
-                                    return (
-                                        <tr key={template.id}>
-                                            <td>
-                                                <span className="console-table__name">
-                                                    <span>{template.name}</span>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span className="console-chip console-chip--muted templates-table__kind-chip">
-                                                    {t(
-                                                        KIND_LABEL_KEY[
-                                                            template.kind
-                                                        ],
-                                                    )}
-                                                </span>
-                                            </td>
-                                            <td className="console-table__muted">
-                                                <span
-                                                    className="templates-table__description"
-                                                    title={
-                                                        template.description ||
-                                                        undefined
-                                                    }
-                                                >
-                                                    {template.description || '—'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span
-                                                    className="console-chips templates-table__visibility"
-                                                    title={template.allowedCompanyIds
-                                                        .map(
-                                                            (id) =>
-                                                                companies.find(
-                                                                    (company) =>
-                                                                        company.value ===
-                                                                        id,
-                                                                )?.label ?? id,
-                                                        )
-                                                        .join(', ')}
-                                                >
-                                                    {template.allowedCompanyIds
-                                                        .slice(0, 2)
-                                                        .map((id) => {
-                                                            const label =
-                                                                companies.find(
-                                                                    (company) =>
-                                                                        company.value ===
-                                                                        id,
-                                                                )?.label ?? id
-                                                            return (
-                                                                <span
-                                                                    className="console-chip console-chip--muted templates-table__company-chip"
-                                                                    key={id}
-                                                                    title={label}
-                                                                >
-                                                                    {label}
-                                                                </span>
-                                                            )
-                                                        })}
-                                                    {template.allowedCompanyIds
-                                                        .length > 2 ? (
-                                                        <span className="console-chip console-chip--muted templates-table__overflow-chip">
-                                                            +
-                                                            {template
-                                                                .allowedCompanyIds
-                                                                .length - 2}
-                                                        </span>
-                                                    ) : null}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span className="console-chip templates-table__owner-chip" title={ownerLabel}>
-                                                    {ownerLabel}
-                                                </span>
-                                            </td>
-                                            <td className="console-table__actions identity-table__actions">
-                                                {canEdit || canDelete ? (
-                                                    <div className="identity-inline-actions identity-directory-actions">
-                                                        {canEdit ? (
-                                                            <IconButton
-                                                                label={t(
-                                                                    'ai.knowledge.edit',
-                                                                    'Edit',
-                                                                )}
-                                                                variant="secondary"
-                                                                onClick={() =>
-                                                                    openEdit(
-                                                                        template,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <IconPencil />
-                                                            </IconButton>
-                                                        ) : null}
-                                                        {canDelete ? (
-                                                            <IconButton
-                                                                label={t(
-                                                                    'ai.knowledge.delete',
-                                                                    'Delete',
-                                                                )}
-                                                                variant="danger"
-                                                                onClick={() =>
-                                                                    setPendingDelete(
-                                                                        template,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <IconTrash />
-                                                            </IconButton>
-                                                        ) : null}
-                                                    </div>
-                                                ) : (
-                                                    <span className="console-readonly">
+                        <div className="console-table-wrap" ref={tableRef}>
+                            <table className="console-table console-table--fixed console-table--templates">
+                                <colgroup>
+                                    <col style={{ width: '18%' }} />
+                                    <col style={{ width: '12%' }} />
+                                    <col style={{ width: '24%' }} />
+                                    <col style={{ width: '20%' }} />
+                                    <col style={{ width: '14%' }} />
+                                    <col style={{ width: '12%' }} />
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>{t('ai.knowledge.colName', 'Name')}</th>
+                                        <th>{t('ai.knowledge.colKind', 'Kind')}</th>
+                                        <th>
+                                            {t(
+                                                'ai.knowledge.colDescription',
+                                                'Description',
+                                            )}
+                                        </th>
+                                        <th>
+                                            {t(
+                                                'ai.knowledge.colVisibility',
+                                                'Visible to',
+                                            )}
+                                        </th>
+                                        <th>{t('ai.knowledge.colOwner', 'Owner')}</th>
+                                        <th className="console-table__actions identity-table__actions">
+                                            {t(
+                                                'ai.knowledge.colActions',
+                                                'Actions',
+                                            )}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginatedTemplates.map((template) => {
+                                        const canEdit = userCanEditTemplate(
+                                            template.id,
+                                            companyId,
+                                        )
+                                        const canDelete = userCanDeleteTemplate(
+                                            template.id,
+                                            companyId,
+                                        )
+                                        const ownerLabel =
+                                            companies.find(
+                                                (company) =>
+                                                    company.value ===
+                                                    template.ownerCompanyId,
+                                            )?.label ?? template.ownerCompanyId
+                                        return (
+                                            <tr key={template.id}>
+                                                <td>
+                                                    <span className="console-table__name">
+                                                        <span>{template.name}</span>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span className="console-chip console-chip--muted templates-table__kind-chip">
                                                         {t(
-                                                            'ai.knowledge.readOnly',
-                                                            'Read only',
+                                                            KIND_LABEL_KEY[
+                                                            template.kind
+                                                            ],
                                                         )}
                                                     </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                    <TablePagination
-                        id="templates-pagination"
-                        total={visibleTemplates.length}
-                        pageSize={pageSize}
-                        autoPageSize={autoPageSize}
-                        effectivePageSize={effectivePageSize}
-                        currentPage={currentPage}
-                        pageCount={pageCount}
-                        pagesLabel={t('users.directoryPages')}
-                        onPageSizeChange={setPageSize}
-                        onPageChange={setPage}
-                    />
+                                                </td>
+                                                <td className="console-table__muted">
+                                                    <span
+                                                        className="templates-table__description"
+                                                        title={
+                                                            template.description ||
+                                                            undefined
+                                                        }
+                                                    >
+                                                        {template.description || '—'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span
+                                                        className="console-chips templates-table__visibility"
+                                                        title={template.allowedCompanyIds
+                                                            .map(
+                                                                (id) =>
+                                                                    companies.find(
+                                                                        (company) =>
+                                                                            company.value ===
+                                                                            id,
+                                                                    )?.label ?? id,
+                                                            )
+                                                            .join(', ')}
+                                                    >
+                                                        {template.allowedCompanyIds
+                                                            .slice(0, 2)
+                                                            .map((id) => {
+                                                                const label =
+                                                                    companies.find(
+                                                                        (company) =>
+                                                                            company.value ===
+                                                                            id,
+                                                                    )?.label ?? id
+                                                                return (
+                                                                    <span
+                                                                        className="console-chip console-chip--muted templates-table__company-chip"
+                                                                        key={id}
+                                                                        title={label}
+                                                                    >
+                                                                        {label}
+                                                                    </span>
+                                                                )
+                                                            })}
+                                                        {template.allowedCompanyIds
+                                                            .length > 2 ? (
+                                                            <span className="console-chip console-chip--muted templates-table__overflow-chip">
+                                                                +
+                                                                {template
+                                                                    .allowedCompanyIds
+                                                                    .length - 2}
+                                                            </span>
+                                                        ) : null}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span className="console-chip templates-table__owner-chip" title={ownerLabel}>
+                                                        {ownerLabel}
+                                                    </span>
+                                                </td>
+                                                <td className="console-table__actions identity-table__actions">
+                                                    {canEdit || canDelete ? (
+                                                        <div className="identity-inline-actions identity-directory-actions">
+                                                            {canEdit ? (
+                                                                <IconButton
+                                                                    label={t(
+                                                                        'ai.knowledge.edit',
+                                                                        'Edit',
+                                                                    )}
+                                                                    variant="secondary"
+                                                                    onClick={() =>
+                                                                        openEdit(
+                                                                            template,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <IconPencil />
+                                                                </IconButton>
+                                                            ) : null}
+                                                            {canDelete ? (
+                                                                <IconButton
+                                                                    label={t(
+                                                                        'ai.knowledge.delete',
+                                                                        'Delete',
+                                                                    )}
+                                                                    variant="danger"
+                                                                    onClick={() => {
+                                                                        setDeleteError(null)
+                                                                        setPendingDelete(template)
+                                                                    }}
+                                                                >
+                                                                    <IconTrash />
+                                                                </IconButton>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="console-readonly">
+                                                            {t(
+                                                                'ai.knowledge.readOnly',
+                                                                'Read only',
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        <TablePagination
+                            id="templates-pagination"
+                            total={visibleTemplates.length}
+                            pageSize={pageSize}
+                            autoPageSize={autoPageSize}
+                            effectivePageSize={effectivePageSize}
+                            currentPage={currentPage}
+                            pageCount={pageCount}
+                            pagesLabel={t('users.directoryPages')}
+                            onPageSizeChange={setPageSize}
+                            onPageChange={setPage}
+                        />
                     </>
                 )}
             </TablePanel>
@@ -705,20 +708,18 @@ export function TemplatesPage() {
                 </form>
             </Drawer>
             <ConfirmDialog
+                variant="deletion"
                 open={pendingDelete !== null}
-                title={t('ai.knowledge.deleteTemplateTitle', 'Delete "{{name}}"?', {
-                    name: pendingDelete?.name ?? '',
-                })}
-                description={t(
-                    'ai.knowledge.deleteTemplateBody',
-                    'Existing adoptions are not affected. The template will no longer be available.',
-                )}
-                warning={t('ai.knowledge.deleteWarning', 'This cannot be undone.')}
-                confirmLabel={t('ai.knowledge.delete')}
+                title={t('ai.knowledge.deleteTemplateHeading')}
+                items={pendingDelete ? [{ id: pendingDelete.id, name: pendingDelete.name }] : []}
+                description={<p>{t('ai.knowledge.deleteTemplateShort')}</p>}
+
+                error={deleteError}
+                confirmLabel={t('ai.knowledge.deleteTemplateAction')}
                 cancelLabel={t('ai.knowledge.cancel')}
                 busyLabel={t('ai.knowledge.deleting')}
                 busy={isDeleting}
-                onConfirm={() => void handleDelete()}
+                onConfirm={handleDelete}
                 onCancel={() => setPendingDelete(null)}
             />
         </div>

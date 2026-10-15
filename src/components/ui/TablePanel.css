@@ -12,3 +12,25 @@
   --directory-content-inset:0px;
 }
 .ui-table-panel[hidden] { display:none; }
+.ui-table-panel .identity-directory-scroll::-webkit-scrollbar {
+  width:8px;
+  height:8px;
+}
+.ui-table-panel .identity-directory-scroll::-webkit-scrollbar-track {
+  background:transparent;
+}
+.ui-table-panel .identity-directory-scroll::-webkit-scrollbar-thumb {
+  background:var(--color-border);
+  border-radius:var(--radius-md);
+}
+.ui-table-panel .identity-directory-scroll::-webkit-scrollbar-button {
+  display:none;
+  width:0;
+  height:0;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .ui-table-panel .identity-directory-scroll {
+    scrollbar-width:thin;
+    scrollbar-color:var(--color-border) transparent;
+  }
+}

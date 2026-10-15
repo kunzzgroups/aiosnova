@@ -13,4 +13,7 @@ auth:
   storage-key: ${AUTH_STORAGE_KEY}
 
 app:
+  local-test-login:
+    enabled: ${LOCAL_TEST_LOGIN_ENABLED:false}
+    email: ${LOCAL_TEST_LOGIN_EMAIL:demo@aios.dev}
   local-merchant-id: ${LOCAL_MERCHANT_ID:00000000-0000-4000-8000-000000000002}

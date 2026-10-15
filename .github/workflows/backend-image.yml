@@ -1,0 +1,38 @@
+name: Backend ARM64 Image Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - ".github/workflows/backend-image.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-arm64:
+    name: Build ARM64 Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ARM64 Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          platforms: linux/arm64
+          push: false
+          tags: aiosnova-backend:arm64-test

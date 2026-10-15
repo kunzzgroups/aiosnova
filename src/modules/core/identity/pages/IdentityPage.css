@@ -1149,3 +1149,14 @@
 .identity-invite-sections .identity-delivery-heading { margin-bottom: .75rem; }
 .identity-invite--page textarea { min-height: 4rem; }
 .identity-invite-sections .identity-delivery-actions { margin-top: .75rem; }
+
+.identity-profile-skeleton__heading, .identity-profile-skeleton__hint, .identity-profile-skeleton__field > span, .identity-profile-skeleton__field > div, .identity-profile-skeleton__company, .identity-profile-skeleton__button { background:var(--color-bg-muted); border-radius:var(--radius-sm); animation:identity-profile-loading 1.4s ease-in-out infinite alternate; }
+.identity-profile-skeleton__heading { width:9rem; height:1.25rem; margin-bottom:var(--space-4); }
+.identity-profile-skeleton__hint { width:min(24rem,80%); height:.875rem; margin-bottom:var(--space-4); }
+.identity-profile-skeleton__field { display:grid; gap:var(--space-2); }
+.identity-profile-skeleton__field > span { width:7rem; height:.875rem; }
+.identity-profile-skeleton__field > div { height:2.75rem; border:1px solid var(--color-border); border-radius:var(--radius-md); }
+.identity-profile-skeleton__company { width:9rem; max-width:100%; height:2.5rem; }
+.identity-profile-skeleton__button { width:8rem; height:2.5rem; }
+@keyframes identity-profile-loading { from { opacity:.45; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .identity-profile-skeleton * { animation:none; } }

@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import './SelectField.css'
+import { SearchableSelectField } from './SearchableSelectField'
 
-type SelectFieldProps = {
+export type SelectFieldProps = {
   id: string
   label: string
   value: string
-  options: { value: string; label: string; disabled?: boolean }[]
+  options: { value: string; label: string; disabled?: boolean; parentValue?: string | null; groups?: string[] }[]
+  picker?: { tree?: boolean; hideGroupHeadings?: boolean; searchLabel: string; clearLabel: string; emptyLabel: string; expandLabel: string; collapseLabel: string }
   disabled?: boolean
   onChange: (value: string) => void
 }
 
-export function SelectField({ id, label, value, options, disabled, onChange }: SelectFieldProps) {
+export function SelectField(props: SelectFieldProps) {
+  return props.picker ? <SearchableSelectField {...props} /> : <PlainSelectField {...props} />
+}
+
+function PlainSelectField({ id, label, value, options, disabled, onChange }: SelectFieldProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)

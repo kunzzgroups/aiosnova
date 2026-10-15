@@ -396,3 +396,14 @@
 .directory-design-table--auto-fit tbody tr:last-child td {
   border-bottom: 0;
 }
+
+.directory-design-skeleton__avatar, .directory-design-skeleton__line, .directory-design-skeleton__name span { display:block; background:var(--color-bg-muted); animation:directory-design-loading 1.4s ease-in-out infinite alternate; }
+.directory-design-skeleton__avatar { flex-shrink:0; width:2.5rem; height:2.5rem; border-radius:50%; }
+.directory-design-skeleton__name { display:grid; gap:var(--space-2); width:65%; }
+.directory-design-skeleton__name span, .directory-design-skeleton__line { height:.75rem; border-radius:var(--radius-sm); }
+.directory-design-skeleton__name span + span { width:75%; }
+.directory-design-skeleton__line { width:70%; max-width:8rem; }
+.directory-design-skeleton__status { width:5.25rem; max-width:100%; height:1.5rem; border-radius:999px; }
+@keyframes directory-design-loading { from { opacity:.45; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .directory-design-skeleton * { animation:none; } }
+.directory-design-identity .directory-needs-reassignment { color:var(--color-warning); font-size:var(--text-xs); }

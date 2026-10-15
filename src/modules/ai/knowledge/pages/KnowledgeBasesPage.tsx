@@ -101,6 +101,7 @@ export function KnowledgeBasesPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<KnowledgeBaseListItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateListItem[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
@@ -528,14 +529,15 @@ export function KnowledgeBasesPage() {
   async function handleDelete() {
     if (!pendingDelete || isDeleting) return
     setIsDeleting(true)
-    setError(null)
+    setDeleteError(null)
     try {
       await deleteKnowledgeBase(pendingDelete.id)
       setMessage(t('ai.knowledge.msgDeleted'))
       setPendingDelete(null)
+      setDeleteError(null)
       await load()
     } catch (caught) {
-      setError(
+      setDeleteError(
         caught instanceof ApiError ? caught.message : t('ai.knowledge.errDelete'),
       )
     } finally {
@@ -809,7 +811,10 @@ export function KnowledgeBasesPage() {
                               id: 'delete',
                               label: t('ai.knowledge.delete'),
                               destructive: true,
-                              onSelect: () => setPendingDelete(base),
+                              onSelect: () => {
+                                setDeleteError(null)
+                                setPendingDelete(base)
+                              },
                             },
                           ]}
                         />
@@ -1576,6 +1581,7 @@ export function KnowledgeBasesPage() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title={t('ai.knowledge.deleteTitle', { name: pendingDelete?.name ?? '' })}
+        error={deleteError}
         description={t('ai.knowledge.deleteBody', {
           count: pendingDelete?.documentCount ?? 0,
         })}
@@ -1585,7 +1591,11 @@ export function KnowledgeBasesPage() {
         busyLabel={t('ai.knowledge.deleting')}
         busy={isDeleting}
         onConfirm={() => void handleDelete()}
-        onCancel={() => setPendingDelete(null)}
+        onCancel={() => {
+          if (isDeleting) return
+          setDeleteError(null)
+          setPendingDelete(null)
+        }}
       />
     </div>
   )

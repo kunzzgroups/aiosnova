@@ -1,0 +1,180 @@
+
+name: Backend ARM64 Image Delivery
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - ".github/workflows/backend-delivery.yml"
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - ".github/workflows/backend-delivery.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aiosnova-backend-delivery
+  cancel-in-progress: false
+
+jobs:
+  build-and-deliver:
+    name: Build and Deliver ARM64 Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ARM64 Docker archive
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          platforms: linux/arm64
+          tags: aiosnova-backend:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/backend-image.tar
+
+      - name: Compress image and create checksum
+        run: |
+          set -euo pipefail
+
+          gzip -1 /tmp/backend-image.tar
+
+          mv /tmp/backend-image.tar.gz \
+            "backend-${GITHUB_SHA}.tar.gz"
+
+          sha256sum "backend-${GITHUB_SHA}.tar.gz" \
+            > "backend-${GITHUB_SHA}.sha256"
+
+          ls -lh "backend-${GITHUB_SHA}.tar.gz"
+
+      - name: Sign Backend archive
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          BACKEND_DELIVERY_HMAC_KEY: ${{ secrets.BACKEND_DELIVERY_HMAC_KEY }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import hashlib
+          import hmac
+          import os
+          import pathlib
+          import re
+
+          sha = os.environ["GITHUB_SHA"]
+          keyhex = os.environ["BACKEND_DELIVERY_HMAC_KEY"]
+
+          if not re.fullmatch(r"[0-9a-f]{64}", keyhex):
+              raise SystemExit("ERROR: invalid signing key")
+
+          archive = pathlib.Path(f"backend-{sha}.tar.gz")
+
+          with archive.open("rb") as f:
+              digest = hashlib.file_digest(f, "sha256").hexdigest()
+
+          payload = f"{sha}\n{digest}\n".encode()
+          signature = hmac.new(
+              bytes.fromhex(keyhex),
+              payload,
+              hashlib.sha256,
+          ).hexdigest()
+
+          pathlib.Path(f"backend-{sha}.sig").write_text(
+              signature + "\n"
+          )
+
+          print("BACKEND_SIGNATURE_CREATED")
+          PY
+
+      - name: Configure SSH
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          test -n "$EC2_SSH_KEY"
+          test -n "$EC2_KNOWN_HOSTS"
+
+          install -m 700 -d "$HOME/.ssh"
+
+          printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Upload signed image to EC2
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          test -n "$EC2_HOST"
+          test -n "$EC2_USER"
+
+          scp \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "backend-${GITHUB_SHA}.tar.gz" \
+            "backend-${GITHUB_SHA}.sha256" \
+            "backend-${GITHUB_SHA}.sig" \
+            "$EC2_USER@$EC2_HOST:/home/deploy/uploads/"
+
+      - name: Verify uploaded image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$EC2_USER@$EC2_HOST" \
+            "cd /home/deploy/uploads && sha256sum -c backend-${GITHUB_SHA}.sha256"
+
+          echo "Backend archive uploaded and checksum verified."
+
+      - name: Publish Backend on EC2
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$EC2_USER@$EC2_HOST" \
+            "sudo -n /usr/local/sbin/aiosnova-backend-ci ${GITHUB_SHA}"
+
+          echo "Backend deployment completed."

@@ -1,73 +1,246 @@
-name: Deploy to EC2
+name: Deploy Frontend to EC2
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - "tsconfig*.json"
+      - "postcss.config.*"
+      - "tailwind.config.*"
+      - ".npmrc"
+      - ".github/workflows/deploy.yml"
+
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: deploy-ec2
-  cancel-in-progress: true
+  group: aiosnova-frontend-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    name: Deploy Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
-      - name: Deploy to /var/www/aiosnova
-        uses: appleboy/ssh-action@v1.2.2
+      # -----------------------------------------
+      # 1. Checkout repository
+      # -----------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------
+      # 2. Setup Node.js
+      # -----------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script_stop: true
-          command_timeout: 10m
-          script: |
-            set -euo pipefail
-            DEPLOY_DIR=/var/www/aiosnova
-            REPO_URL=https://github.com/kunzzgroups/aiosnova.git
+          node-version: "22"
+          cache: npm
 
-            if ! command -v git >/dev/null 2>&1; then
-              sudo dnf install -y git
-            fi
+      # -----------------------------------------
+      # 3. Install dependencies
+      # -----------------------------------------
+      - name: Install dependencies
+        run: npm ci
 
-            if ! command -v node >/dev/null 2>&1; then
-              sudo dnf install -y nodejs npm
-            fi
+      # -----------------------------------------
+      # 4. Build Frontend
+      # -----------------------------------------
+      - name: Build frontend
+        env:
+          VITE_ENABLE_MOCK: "true"
+        run: npm run build
 
-            sudo mkdir -p /var/www
+      # -----------------------------------------
+      # 5. Validate Build
+      # -----------------------------------------
+      - name: Validate build
+        run: |
+          set -euo pipefail
 
-            if [ ! -d "$DEPLOY_DIR/.git" ]; then
-              sudo rm -rf "$DEPLOY_DIR"
-              sudo mkdir -p "$DEPLOY_DIR"
-              sudo chown "${USER}:${USER}" "$DEPLOY_DIR"
-              git clone --branch main "$REPO_URL" "$DEPLOY_DIR"
-            else
-              sudo chown -R "${USER}:${USER}" "$DEPLOY_DIR"
-              git -C "$DEPLOY_DIR" remote set-url origin "$REPO_URL"
-              git -C "$DEPLOY_DIR" fetch origin main
-              git -C "$DEPLOY_DIR" checkout -B main origin/main
-            fi
+          test -s dist/index.html
+          test -d dist/assets
 
-            cd "$DEPLOY_DIR"
-            npm ci
-            VITE_ENABLE_MOCK=true npm run build
+          echo "Frontend build validated."
 
-            sudo tee /etc/nginx/conf.d/aiosnova.conf >/dev/null <<'EOF'
-            server {
-              listen 80 default_server;
-              listen [::]:80 default_server;
-              server_name _;
+      # -----------------------------------------
+      # 6. Create Release Archive
+      # -----------------------------------------
+      - name: Create release archive
+        run: |
+          set -euo pipefail
 
-              root /var/www/aiosnova/dist;
-              index index.html;
+          tar -czf frontend-release.tar.gz -C dist .
 
-              location / {
-                try_files $uri $uri/ /index.html;
-              }
-            }
-            EOF
+          test -s frontend-release.tar.gz
 
-            sudo nginx -t
-            sudo systemctl reload nginx
-            echo "Deployed $(git -C "$DEPLOY_DIR" rev-parse --short HEAD)"
+          echo "Frontend release archive created."
+
+      # -----------------------------------------
+      # 7. Configure SSH
+      # -----------------------------------------
+      - name: Configure SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          install -m 700 -d "$HOME/.ssh"
+
+          printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+          if [ -z "$EC2_KNOWN_HOSTS" ]; then
+            echo "ERROR: EC2_KNOWN_HOSTS secret is missing."
+            exit 1
+          fi
+
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          echo "SSH configured."
+
+
+      # -----------------------------------------
+      # Diagnose SSH upload permissions
+      # -----------------------------------------
+      - name: Diagnose SSH upload
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            'set -e
+             echo "=== Remote Identity ==="
+             id
+
+             echo "=== Upload Directory ==="
+             ls -ld /home/deploy/uploads
+
+             echo "=== Remote Write Test ==="
+             touch /home/deploy/uploads/github-actions-write-test
+             rm /home/deploy/uploads/github-actions-write-test
+             echo "Remote write successful"
+
+             echo "=== Target File ==="
+             ls -l /home/deploy/uploads/frontend-release.tar.gz 2>/dev/null || true'
+
+
+
+      # -----------------------------------------
+      # 8. Upload Frontend
+      # -----------------------------------------
+      - name: Upload release
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          set -euo pipefail
+
+          scp \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            frontend-release.tar.gz \
+            "$EC2_USER@$EC2_HOST:/home/deploy/uploads/frontend-release.tar.gz"
+
+          echo "Frontend release uploaded."
+
+      # -----------------------------------------
+      # 9. Publish Frontend
+      # -----------------------------------------
+      - name: Publish frontend
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$EC2_USER@$EC2_HOST" \
+            "bash -s -- '$RELEASE_SHA'" <<'REMOTE'
+          set -euo pipefail
+
+          RELEASE_SHA="$1"
+          BASE="/var/www/aiosnova-releases"
+          TARGET="$BASE/$RELEASE_SHA"
+          ARCHIVE="/home/deploy/uploads/frontend-release.tar.gz"
+
+          if [[ ! "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "ERROR: Invalid commit SHA."
+            exit 1
+          fi
+
+          test -f "$ARCHIVE"
+
+          if [ -e "$TARGET" ]; then
+            echo "ERROR: Release already exists."
+            exit 1
+          fi
+
+          mkdir -m 2750 "$TARGET"
+
+          tar -xzf "$ARCHIVE" -C "$TARGET"
+
+          test -s "$TARGET/index.html"
+          test -d "$TARGET/assets"
+
+          find "$TARGET" -type d -exec chmod 2750 {} \;
+          find "$TARGET" -type f -exec chmod 640 {} \;
+
+          /usr/local/bin/aiosnova-frontend-release "$RELEASE_SHA"
+
+          rm -f "$ARCHIVE"
+
+          echo "Frontend deployed successfully: $RELEASE_SHA"
+          REMOTE
+
+      # -----------------------------------------
+      # 10. Verify Deployment
+      # -----------------------------------------
+      - name: Verify deployment
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          CURRENT=$(ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "readlink /var/www/aiosnova-releases/current")
+
+          if [ "$CURRENT" != "$RELEASE_SHA" ]; then
+            echo "ERROR: Deployed version does not match commit."
+            exit 1
+          fi
+
+          echo "Deployment verified: $CURRENT"
