@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,7 +34,7 @@ public class AuthController {
 
     @PostMapping("/login/tac/send")
     public ResponseEntity<TacSendResponse> sendTac(
-            @RequestBody TacSendRequest request,
+            @Valid @RequestBody TacSendRequest request,
             HttpServletRequest httpRequest) {
 
         if (!invitationService.canRequestOtp(request.email())) {
@@ -65,7 +69,7 @@ public class AuthController {
 
     @PostMapping("/login/tac/verify")
     @Transactional
-    public ResponseEntity<?> verifyTac(@RequestBody TacVerifyRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> verifyTac(@Valid @RequestBody TacVerifyRequest request, HttpServletRequest httpRequest) {
         if (!invitationService.canRequestOtp(request.email())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(new MessageResponse("Complete invitation activation before signing in."));
@@ -102,7 +106,7 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<SessionService.Login> verifyMfa(@RequestBody MfaVerifyRequest request, HttpServletRequest httpRequest)
+    public ResponseEntity<SessionService.Login> verifyMfa(@Valid @RequestBody MfaVerifyRequest request, HttpServletRequest httpRequest)
             throws GeneralSecurityException {
         return sessions.issue(invitationService.verifyLoginMfa(request.mfaTicket(), request.code()).userId(), httpRequest);
     }
@@ -120,16 +124,31 @@ public class AuthController {
     public record MfaRequiredResponse(String status, String mfaTicket) {
     }
 
-    public record MfaVerifyRequest(String mfaTicket, String code) {
-    }
+    public record MfaVerifyRequest(
+        @NotBlank(message = "MFA ticket is required.")
+        String mfaTicket,
 
-public record TacVerifyRequest(String email, String code) {
+        @NotBlank(message = "MFA code is required.")
+        @Pattern(regexp = "[0-9]{6}", message = "MFA code must be 6 digits.")
+        String code
+) {}
+
+    public record TacVerifyRequest(
+        @NotBlank(message = "Email is required.")
+        @Email(message = "Invalid email format.")
+        String email,
+
+        @NotBlank(message = "OTP is required.")
+        @Pattern(regexp = "[0-9]{6}", message = "OTP must be 6 digits.")
+        String code
+) {}
+
+    public record MessageResponse(String message) {
 }
 
-public record MessageResponse(String message) {
-}
-
-    public record TacSendRequest(String email) {
+    public record TacSendRequest(@NotBlank(message = "Email is required.")
+        @Email(message = "Invalid email format.")
+        String email) {
     }
 
     public record TacSendResponse(String message, int resendCooldown) {
