@@ -430,7 +430,7 @@ export function UsersPage() {
     setMessage(null)
     setStatusUpdatingId(user.id)
     try {
-      const updated=await updateUser(user.id,{ status: nextStatus })
+      const updated=await updateUser(user.id,{ status: nextStatus, version: user.version })
       setUsers((current) => current.map((item) => (item.id===updated.id? { ...item,...updated }:item)))
     } catch(err) {
       setError(err instanceof ApiError? err.message:t('users.errUpdate'))

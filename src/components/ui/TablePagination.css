@@ -80,6 +80,20 @@
   border-radius: calc(var(--radius-md) - 3px);
   box-sizing: border-box;
 }
+.identity-pagination-select .sidebar-select__menu::-webkit-scrollbar {
+  width: 6px;
+}
+.identity-pagination-select .sidebar-select__menu::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .identity-pagination-select .sidebar-select__menu {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+}
 .identity-pagination-select .sidebar-select__option:hover {
   background: var(--color-bg-muted);
 }

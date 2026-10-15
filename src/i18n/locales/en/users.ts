@@ -1,4 +1,6 @@
 export const users: Record<string, string> = {
+  'users.profileConflict': 'This employee was updated elsewhere. Reload the page before saving again.',
+  'users.profileVersionRequired': 'Reload the employee profile before saving.',
   'users.filterPlacement': 'Placement',
   'users.allPlacements': 'All placements',
   'users.needsReassignment': 'Needs reassignment',

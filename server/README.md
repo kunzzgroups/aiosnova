@@ -1,3 +1,21 @@
+## Inactive placement labels
+
+Directory memberships expose `departmentInactive` and `positionInactive` for existing placements, including inactivity inherited from ancestor departments. Employee view/edit fields append the existing localized Inactive label to the selected department/position; removed labels retain precedence. Selection values, assignment eligibility and account status are unchanged. No migration is needed. Frontend/Maven builds and rolled-back database checks passed for active placements, inactive positions, inactive ancestors and reactivation; rendered browser verification remains pending.
+
+## Assignment reconciliation (V13)
+
+V13 reconciles missing current assignment rows from company-scoped saved placements and effective company memberships. It excludes invited/removed employees and removed catalog records, retains inactive placements, starts repaired assignments on the current UTC date and records reconciliation audit events. Existing effective assignment rows are unchanged; reruns do not duplicate assignments or audit entries. Apply the SQL with application writes stopped. The local application through V12 has no V7 triggers; environments with those optional legacy triggers installed must review their inactive-placement restrictions before applying this repair.
+
+V13 has been applied locally under merchant write locks; zero rows required repair because the current placements were already synchronized. No account/access changes were made. Runtime synchronization now checks assignment effective dates and repairs retained inactive placements on unrelated employee edits, using the membership/position snapshot taken before the edit. New placements and newly granted memberships retain active-department/position validation. Activation, employee edits and department reassignment continue to synchronize in their existing transactions.
+
+Verification: Maven package and rolled-back MySQL fixtures passed for missing-row count recovery, reconciliation auditing/idempotency, unchanged inactive-placement edits, expired assignment recovery and rejection of new inactive placements. Browser flows remain unverified; the original Demo2 mismatch predates its profile-save repair and its precise trigger remains unconfirmed.
+
+## Employee edit concurrency
+
+Employee directory responses include `users.version`. Profile edits and status changes must submit the loaded version; missing versions return 400 and stale versions return 409 with `users.profileConflict`. The conditional profile update and settings, company access, placement, assignment and audit changes share one transaction. Company placement writes also advance the employee version so bulk reassignment invalidates open editors. The frontend keeps the editor open on conflict and asks the user to reload. No schema migration is required.
+
+Verification: frontend build and Maven package passed. Rolled-back MySQL checks verified fresh saves, stale-version rejection without profile/access changes, missing-version rejection and placement version invalidation. Two-tab browser interaction remains unverified.
+
 ## Company-scoped Organization permissions (V9)
 
 V9 has been applied to the configured development database. It adds the shared identity table `company_user_permission_grants` (merchant, company, user, permission). No existing employee-management grants or company memberships are copied into Organization grants. Existing owner access is preserved; other users default to no Organization access until explicitly granted `organization.read` or `organization.manage` for that company. Manage implies read, but neither permission grants company membership or access to another company.

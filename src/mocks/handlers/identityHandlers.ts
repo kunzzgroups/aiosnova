@@ -73,7 +73,7 @@ type SavedDirectory = {
   users: IdentityUser[]
   memberships: {
     id: string; userId: string; companyCode: string; status: MembershipRecord['status']
-    validFrom: string; validTo: string | null; departmentId:string|null; positionId:string|null; departmentName:string|null; positionName:string|null; departmentDeleted:boolean; positionDeleted:boolean
+    validFrom: string; validTo: string | null; departmentId:string|null; positionId:string|null; departmentName:string|null; positionName:string|null; departmentDeleted:boolean; positionDeleted:boolean; departmentInactive:boolean; positionInactive:boolean
   }[]
 }
 
@@ -134,7 +134,7 @@ async function loadSavedDirectory(requestedCompanyId?:string,userId?:string):Pro
         if (company) identityMemberships.push({
           id: membership.id, merchantId: DEMO_MERCHANT_ID, userId: membership.userId,
           companyId: company.id, organizationId: membership.departmentId || null, positionId: membership.positionId || null, roleIds: [],
-          organizationName:membership.departmentName,positionName:membership.positionName,organizationDeleted:membership.departmentDeleted,positionDeleted:membership.positionDeleted,
+          organizationName:membership.departmentName,positionName:membership.positionName,organizationDeleted:membership.departmentDeleted,positionDeleted:membership.positionDeleted,organizationInactive:membership.departmentInactive,positionInactive:membership.positionInactive,
           isPrimary: false, status: membership.status,
           validFrom: membership.validFrom.slice(0, 10), validTo: membership.validTo?.slice(0, 10) ?? null,
         })
@@ -362,9 +362,13 @@ export const identityHandlers = [
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: request.headers.get('Authorization') || '' },
       body: JSON.stringify({ ...profile, ...(assignments ? { companyCodes } : {}),...(profile.departmentId!==undefined||profile.positionId!==undefined ? {placementCompanyId} : {}) }),
     }))
-    if (!response.ok) return HttpResponse.json({ message: response.status === 403
+    if (!response.ok) {
+      const failure=await response.json().catch(()=>null) as {message?:string}|null
+      if(failure?.message==='users.profileConflict'||failure?.message==='users.profileVersionRequired') return HttpResponse.json({message:String(i18n.t(failure.message))},{status:response.status})
+      return HttpResponse.json({ message: response.status === 403
       ? 'You do not have permission to edit this account or its access.'
       : response.status === 401 ? 'Sign in with email OTP before editing.' : 'Unable to save profile.' }, { status: response.status })
+    }
     const user = await response.json() as IdentityUser
     const existing = identityUsers.find(item => item.id === user.id)
     if (existing) Object.assign(existing, user)

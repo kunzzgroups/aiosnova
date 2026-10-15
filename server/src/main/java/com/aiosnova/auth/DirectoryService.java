@@ -69,6 +69,8 @@ public class DirectoryService {
         }
         repository.lockUser(userId);
         AuthRepository.DirectoryUser before = repository.directoryUser(actor.merchantId(), userId);
+        if (request.version() == null || request.version() < 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "users.profileVersionRequired");
+        if (before.version() != request.version()) throw new ResponseStatusException(HttpStatus.CONFLICT, "users.profileConflict");
         List<String> previousCompanies = repository.userCompanyCodes(actor.merchantId(), userId);
         if ((request.departmentId() != null || request.positionId() != null) && request.placementCompanyId() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         var scoped = request.placementCompanyId() == null ? null : repository.companyPlacement(actor.merchantId(), request.placementCompanyId(), userId);
@@ -82,10 +84,11 @@ public class DirectoryService {
             if (placementCompanyId != null && (request.placementCompanyId() != null && !request.placementCompanyId().equals(placementCompanyId)
                     || repository.accessibleCompanies(actor).stream().noneMatch(company -> company.id().equals(placementCompanyId)))) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        var retainedPlacements = manager ? assignments.retainedPlacements(actor.merchantId(), userId) : java.util.Set.<String>of();
         repository.updateProfile(actor.merchantId(), userId, request);
         if (manager && request.placementCompanyId() != null && (request.departmentId() != null || request.positionId() != null)) repository.saveCompanyPlacement(actor.merchantId(), request.placementCompanyId(), userId, departmentId, positionId);
         if (selected != null) repository.replaceCompanies(actor.merchantId(), userId, selected);
-        if (manager) assignments.synchronize(actor.merchantId(), userId, actor.id());
+        if (manager) assignments.synchronize(actor.merchantId(), userId, actor.id(), retainedPlacements);
         AuthRepository.DirectoryUser after = repository.directoryUser(actor.merchantId(), userId);
         Map<String, Object> changes = AuditChanges.between(auditFields(before), auditFields(after));
         AuditChanges.add(changes, "companyCodes", previousCompanies, repository.userCompanyCodes(actor.merchantId(), userId));
@@ -140,7 +143,7 @@ public class DirectoryService {
 
     public record Profile(String email, String fullName, String displayName, String phone, String avatarUrl,
                           String language, String timezone, String status, String departmentId, String positionId,
-                          Boolean requireMfa, Boolean canInvite, Boolean canManageUsers, List<String> companyCodes, String placementCompanyId) {
+                          Boolean requireMfa, Boolean canInvite, Boolean canManageUsers, List<String> companyCodes, String placementCompanyId, Long version) {
         public Profile {
             if (email != null) email = email.trim().toLowerCase(Locale.ROOT);
             if (fullName != null) fullName = fullName.trim();

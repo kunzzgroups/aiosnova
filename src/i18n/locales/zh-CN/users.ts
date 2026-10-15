@@ -1,4 +1,6 @@
 export const users: Record<string, string> = {
+  'users.profileConflict': '此员工资料已在其他位置更新。请刷新页面后重新保存。',
+  'users.profileVersionRequired': '请刷新员工资料后再保存。',
   'users.filterPlacement': '部门与职位',
   'users.allPlacements': '全部分配',
   'users.needsReassignment': '需要重新分配',

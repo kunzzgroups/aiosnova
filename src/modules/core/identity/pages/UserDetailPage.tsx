@@ -48,6 +48,9 @@ export function UserDetailPage() {
   const canManage = isOwner || isAdmin
   const canEdit = canManage || sessionUser?.id === userId
   const department = options?.departments.find(item => item.id === departmentId)
+  const currentPlacement = memberships.find(item=>item.companyId===companyId)
+  const departmentInactive = currentPlacement?.organizationId===departmentId && currentPlacement.organizationInactive && !currentPlacement.organizationDeleted
+  const positionInactive = currentPlacement?.positionId===positionId && currentPlacement.positionInactive && !currentPlacement.positionDeleted
   const policyMfa = companyIds.some(id => options?.companies.find(company => company.id === id)?.requireMfa)
 
   function applyProfileForm(nextUser: IdentityUser, assignments: MembershipWithLabels[]) {
@@ -123,6 +126,7 @@ export function UserDetailPage() {
     setError(null)
     try {
       const updated = await updateUser(user.id,{
+        version: user.version,
         email: email.trim(), fullName: fullName.trim(), displayName: fullName.trim(), phone: phone.trim(),
         ...(canManage ? { requireMfa, canInvite } : {}),
         ...(canManage ? { departmentId, positionId,
@@ -155,8 +159,8 @@ export function UserDetailPage() {
               <FormField label={t('users.workEmail')} htmlFor="profile-email"><TextField id="profile-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} /></FormField>
               <FormField label={t('users.fieldFullName')} htmlFor="profile-name"><TextField id="profile-name" required value={fullName} onChange={event => setFullName(event.target.value)} /></FormField>
               <FormField label={t('users.optionalPhone')} htmlFor="profile-phone"><TextField id="profile-phone" type="tel" value={phone && !canEdit ? '••••••••' : phone} onChange={event => setPhone(event.target.value)} /></FormField>
-              <FormField label={t('users.optionalDepartment')} htmlFor="profile-department" hint={memberships.some(item=>item.organizationId===departmentId&&item.organizationDeleted) ? t('users.removedDepartment') : undefined}><SidebarSelect id="profile-department" hideLabel label={t('users.department')} value={departmentId} disabled={!canManage} options={[{value:'',label:t('users.selectDepartment')},...(options?.departments.map(item => ({value:item.id,label:item.name})) ?? [])]} onChange={id => {setDepartmentId(id); const positions = options?.departments.find(item => item.id === id)?.positions ?? []; setPositionId(positions.length === 1 ? positions[0]!.id : '')}} /></FormField>
-              <FormField label={t('users.optionalPosition')} htmlFor="profile-position" hint={memberships.some(item=>item.positionId===positionId&&item.positionDeleted) ? t('users.removedPosition') : undefined}><SidebarSelect id="profile-position" hideLabel label={t('users.colPosition')} value={positionId} disabled={!canManage || !department} options={[{value:'',label:t('users.selectPosition')},...(department?.positions.map(item => ({value:item.id,label:item.name})) ?? [])]} onChange={setPositionId} /></FormField>
+              <FormField label={t('users.optionalDepartment')} htmlFor="profile-department" hint={memberships.some(item=>item.organizationId===departmentId&&item.organizationDeleted) ? t('users.removedDepartment') : undefined}><SidebarSelect id="profile-department" hideLabel label={t('users.department')} value={departmentId} disabled={!canManage} options={[{value:'',label:t('users.selectDepartment')},...(options?.departments.map(item => ({value:item.id,label:item.name+(item.id===departmentId&&departmentInactive ? ' · '+t('users.statusInactive') : '')})) ?? [])]} onChange={id => {setDepartmentId(id); const positions = options?.departments.find(item => item.id === id)?.positions ?? []; setPositionId(positions.length === 1 ? positions[0]!.id : '')}} /></FormField>
+              <FormField label={t('users.optionalPosition')} htmlFor="profile-position" hint={memberships.some(item=>item.positionId===positionId&&item.positionDeleted) ? t('users.removedPosition') : undefined}><SidebarSelect id="profile-position" hideLabel label={t('users.colPosition')} value={positionId} disabled={!canManage || !department} options={[{value:'',label:t('users.selectPosition')},...(department?.positions.map(item => ({value:item.id,label:item.name+(item.id===positionId&&positionInactive ? ' · '+t('users.statusInactive') : '')})) ?? [])]} onChange={setPositionId} /></FormField>
             </div>
             {canManage ? <>
               <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={requireMfa || policyMfa} disabled={policyMfa} onChange={event => setRequireMfa(event.target.checked)} />{t('users.actionRequireMfa')}</label>
