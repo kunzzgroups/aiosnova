@@ -35,15 +35,24 @@
   position: absolute;
   top: calc(100% + 0.25rem);
   right: 0;
+  bottom: auto;
   z-index: 20;
+
   min-width: 10rem;
   padding: 0.25rem;
+
   display: flex;
   flex-direction: column;
+
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-md);
+}
+
+.row-menu__list--up {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
 }
 
 .row-menu__item {

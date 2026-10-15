@@ -123,6 +123,25 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     let message = 'Request failed.'
+    let retryAfter: number | null = null
+
+    const retryAfterHeader = response.headers.get('Retry-After')?.trim()
+
+    if (retryAfterHeader) {
+      if (/^\d+$/.test(retryAfterHeader)) {
+        retryAfter = Number(retryAfterHeader)
+      } else {
+        const retryDate = Date.parse(retryAfterHeader)
+        if (Number.isFinite(retryDate)) {
+          retryAfter = Math.max(0, Math.ceil((retryDate - Date.now()) / 1000))
+        }
+      }
+
+      if (retryAfter !== null && !Number.isFinite(retryAfter)) {
+        retryAfter = null
+      }
+    }
+
     try {
       const errorBody = (await response.json()) as { message?: string }
       if (errorBody.message) {
@@ -131,15 +150,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } catch {
       // ignore JSON parse errors
     }
-    const retryAfterHeader = response.headers.get('Retry-After')?.trim()
-    const retryAfter = retryAfterHeader && /^\d+$/.test(retryAfterHeader)
-      ? Number(retryAfterHeader)
-      : null
-    throw new ApiError(
-      message,
-      response.status,
-      retryAfter !== null && Number.isFinite(retryAfter) ? retryAfter : null,
-    )
+
+    throw new ApiError(message, response.status, retryAfter)
   }
 
   if (response.status === 204) {

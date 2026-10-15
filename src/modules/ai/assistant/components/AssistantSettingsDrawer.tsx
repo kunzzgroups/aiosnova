@@ -48,9 +48,14 @@ export function AssistantSettingsDrawer({
             'What happens when you click "Open source" on an evidence card.',
           )}
         </p>
+
         <SidebarSelect
           id="evidence-action"
-          label={t('ai.assistant.settingsEvidenceAction', 'Evidence click action')}
+          className="console-form-select--down"
+          label={t(
+            'ai.assistant.settingsEvidenceAction',
+            'Evidence click action',
+          )}
           value={prefs.evidenceAction}
           options={[
             {
@@ -62,11 +67,17 @@ export function AssistantSettingsDrawer({
             },
             {
               value: 'newTab',
-              label: t('ai.assistant.settingsEvidenceNewTab', 'Open in a new tab'),
+              label: t(
+                'ai.assistant.settingsEvidenceNewTab',
+                'Open in a new tab',
+              ),
             },
           ]}
           onChange={(value) =>
-            onChange({ ...prefs, evidenceAction: value as EvidenceAction })
+            onChange({
+              ...prefs,
+              evidenceAction: value as EvidenceAction,
+            })
           }
         />
       </div>

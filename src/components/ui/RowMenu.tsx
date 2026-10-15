@@ -1,4 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { IconMore } from '@/components/icons/Icons'
 import './RowMenu.css'
 
@@ -17,30 +23,120 @@ type RowMenuProps = {
   disabled?: boolean
 }
 
+type MenuPlacement = 'up' | 'down'
+
+const MENU_GAP = 4
+const VIEWPORT_PAD = 8
+
+function nearestVerticalClipParent(element: HTMLElement): HTMLElement | null {
+  let parent = element.parentElement
+
+  while (parent) {
+    const style = window.getComputedStyle(parent)
+    const overflowY = style.overflowY
+
+    if (
+      overflowY === 'auto' ||
+      overflowY === 'scroll' ||
+      overflowY === 'hidden' ||
+      overflowY === 'clip'
+    ) {
+      return parent
+    }
+
+    parent = parent.parentElement
+  }
+
+  return null
+}
+
 /**
  * A row's "more actions" menu: a vertical-ellipsis trigger plus a dropdown.
  *
- * Kept separate from the row's link on purpose - a `<button>` nested inside an
- * `<a>` is invalid and would make the link swallow the click. Callers render this
- * as a SIBLING of the link.
+ * The menu automatically flips upward when there is not enough visible space
+ * below the trigger. This is based on the nearest scrolling/clipping container,
+ * not merely on whether the row happens to be one of the last rows.
  */
-export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
+export function RowMenu({
+  items,
+  label,
+  disabled = false,
+}: RowMenuProps) {
   const [open, setOpen] = useState(false)
+  const [placement, setPlacement] = useState<MenuPlacement>('down')
+
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
 
-  useEffect(() => {
-    if (!open) {
-      return
+  useLayoutEffect(() => {
+    if (!open) return
+
+    let frame = 0
+
+    function updatePlacement() {
+      cancelAnimationFrame(frame)
+
+      frame = requestAnimationFrame(() => {
+        const root = rootRef.current
+        const menu = menuRef.current
+        if (!root || !menu) return
+
+        const rootRect = root.getBoundingClientRect()
+        const menuHeight = menu.offsetHeight
+        const clipParent = nearestVerticalClipParent(root)
+        const clipRect = clipParent?.getBoundingClientRect()
+
+        const visibleTop = Math.max(
+          VIEWPORT_PAD,
+          clipRect?.top ?? VIEWPORT_PAD,
+        )
+        const visibleBottom = Math.min(
+          window.innerHeight - VIEWPORT_PAD,
+          clipRect?.bottom ?? window.innerHeight - VIEWPORT_PAD,
+        )
+
+        const spaceAbove = rootRect.top - visibleTop - MENU_GAP
+        const spaceBelow = visibleBottom - rootRect.bottom - MENU_GAP
+
+        setPlacement(
+          spaceBelow < menuHeight && spaceAbove > spaceBelow
+            ? 'up'
+            : 'down',
+        )
+      })
     }
-    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+
+    updatePlacement()
+
+    window.addEventListener('resize', updatePlacement)
+    window.addEventListener('scroll', updatePlacement, true)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', updatePlacement)
+      window.removeEventListener('scroll', updatePlacement, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+
+    // Placement is measured during layout; focus after paint so the first item
+    // is ready without causing a scroll jump in the parent list.
+    const frame = requestAnimationFrame(() => {
+      menuRef.current
+        ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
+        ?.focus({ preventScroll: true })
+    })
+
     function handlePointerDown(event: MouseEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
         setOpen(false)
       }
     }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -48,9 +144,12 @@ export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
         triggerRef.current?.focus()
       }
     }
+
     document.addEventListener('mousedown', handlePointerDown)
     document.addEventListener('keydown', handleKeyDown)
+
     return () => {
+      cancelAnimationFrame(frame)
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
@@ -72,8 +171,8 @@ export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
         aria-controls={open ? menuId : undefined}
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
-        onKeyDown={event => {
-          if (event.key==='ArrowDown'||event.key==='ArrowUp') {
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
             setOpen(true)
           }
@@ -83,22 +182,60 @@ export function RowMenu({ items, label, disabled = false }: RowMenuProps) {
       </button>
 
       {open ? (
-        <div ref={menuRef} className="row-menu__list" role="menu" id={menuId} aria-label={label}
-          onKeyDown={event => {
-            const buttons=Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')||[])
-            const index=buttons.indexOf(document.activeElement as HTMLButtonElement)
-            if (event.key==='ArrowDown'||event.key==='ArrowUp'||event.key==='Home'||event.key==='End') {
+        <div
+          ref={menuRef}
+          className={[
+            'row-menu__list',
+            placement === 'up' ? 'row-menu__list--up' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          role="menu"
+          id={menuId}
+          aria-label={label}
+          onKeyDown={(event) => {
+            const buttons = Array.from(
+              menuRef.current?.querySelectorAll<HTMLButtonElement>(
+                '[role="menuitem"]',
+              ) ?? [],
+            )
+            const index = buttons.indexOf(
+              document.activeElement as HTMLButtonElement,
+            )
+
+            if (
+              event.key === 'ArrowDown' ||
+              event.key === 'ArrowUp' ||
+              event.key === 'Home' ||
+              event.key === 'End'
+            ) {
               event.preventDefault()
-              const next=event.key==='Home' ? 0 : event.key==='End' ? buttons.length-1 : (index+(event.key==='ArrowDown' ? 1 : -1)+buttons.length)%buttons.length
+
+              const next =
+                event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? buttons.length - 1
+                    : (index +
+                        (event.key === 'ArrowDown' ? 1 : -1) +
+                        buttons.length) %
+                      buttons.length
+
               buttons[next]?.focus()
-            } else if (event.key==='Tab') setOpen(false)
-          }}>
+            } else if (event.key === 'Tab') {
+              setOpen(false)
+            }
+          }}
+        >
           {items.map((item) => (
             <button
               key={item.id}
               type="button"
               role="menuitem"
-              className={['row-menu__item', item.destructive ? 'row-menu__item--danger' : '']
+              className={[
+                'row-menu__item',
+                item.destructive ? 'row-menu__item--danger' : '',
+              ]
                 .filter(Boolean)
                 .join(' ')}
               onClick={() => {

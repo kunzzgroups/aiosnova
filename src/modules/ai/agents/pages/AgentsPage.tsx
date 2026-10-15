@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SearchableCheckList } from '@/components/ui/SearchableCheckList'
 import { FormField } from '@/components/ui/FormField'
 import { Drawer } from '@/components/ui/Drawer'
@@ -12,8 +14,11 @@ import { useCompanyStore } from '@/stores/companyStore'
 import { fetchKnowledgeBases } from '@/modules/ai/knowledge/services/knowledgeService'
 import type { KnowledgeBaseListItem } from '@/modules/ai/knowledge/types/knowledge'
 import { ApiError } from '@/services/httpClient'
-import { createAgent, fetchAgent, fetchAgents, updateAgent } from '../services/agentService'
-import { IconPlus, IconPencil } from '@/components/icons/Icons'
+import { createAgent, deleteAgent, fetchAgent, fetchAgents, updateAgent } from '../services/agentService'
+import { IconPlus, IconPencil, IconTrash } from '@/components/icons/Icons'
+import { TablePanel } from '@/components/ui/TablePanel'
+import { TablePagination } from '@/components/ui/TablePagination'
+import { TableToolbar } from '@/components/ui/TableToolbar'
 import {
   DEFAULT_AGENT_MODEL,
   type AgentListItem,
@@ -22,6 +27,7 @@ import {
   type AgentStatus,
 } from '../types/agent'
 import '@/modules/ai/shared/AiConsole.css'
+import './AgentsPage.css'
 
 const AGENT_FORM_ID = 'agent-form'
 
@@ -47,13 +53,6 @@ const MODELS_BY_PROVIDER: Record<AgentModelProvider, string[]> = {
   azure: ['gpt-4o-azure', 'gpt-4-turbo-azure'],
 }
 
-/**
- * The Agent screen.
- *
- * Flat, A–Z list. No category grouping: the category is metadata, not a
- * navigation aid — a search box replaces it. Status is clickable so the
- * operator can cycle active → draft → disabled.
- */
 export function AgentsPage() {
   const { t } = useTranslation()
   const companyId = useCompanyStore((state) => state.companyId)
@@ -73,13 +72,35 @@ export function AgentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [createStatus, setCreateStatus] = useState<Extract<AgentStatus, 'active' | 'draft'>>('active')
   const [selectedBaseIds, setSelectedBaseIds] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [pendingDeleteAgent, setPendingDeleteAgent] = useState<AgentListItem | null>(null)
+  const [isDeletingAgent, setIsDeletingAgent] = useState(false)
+
+  const editingAgent = useMemo(
+    () =>
+      editingId
+        ? agents.find((agent) => agent.id === editingId) ?? null
+        : null,
+    [agents, editingId],
+  )
+  const canAssignKnowledge =
+    editingAgent !== null
+      ? editingAgent.status === 'active'
+      : createStatus === 'active'
 
   const [provider, setProvider] = useState<AgentModelProvider>('auto')
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState(0.3)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  // ---- 分页状态 (完全对齐 Employees) ----
+  const [pageSize, setPageSize] = useState(0) // 0 代表自动适应
+  const [autoPageSize, setAutoPageSize] = useState(10)
+  const [page, setPage] = useState(1)
+  const tableRef = useRef<HTMLDivElement>(null)
+  const autoFitRowMeasurement = useRef({ width: 0, height: 0 })
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -122,7 +143,6 @@ export function AgentsPage() {
     [baseIdFilter, knowledgeBases],
   )
 
-  /** Flat, filtered, A→Z sorted list. */
   const visibleAgents = useMemo(() => {
     let list = agents
     if (baseIdFilter) {
@@ -138,6 +158,81 @@ export function AgentsPage() {
     }
     return list.slice().sort((a, b) => a.name.localeCompare(b.name))
   }, [agents, baseIdFilter, query])
+
+  // ---- 分页计算逻辑 (完全对齐 Employees) ----
+  const effectivePageSize = pageSize || autoPageSize
+  const pageCount = Math.max(1, Math.ceil(visibleAgents.length / effectivePageSize))
+  const currentPage = Math.min(page, pageCount)
+  const paginatedAgents = visibleAgents.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize)
+
+  // 条件变化时重置页码
+  useEffect(() => {
+    setPage(1)
+  }, [query, baseIdFilter, effectivePageSize])
+
+  // 自动高度测量逻辑 (完全对齐 Employees)
+  useEffect(() => {
+    if (isLoading || !visibleAgents.length) return
+    const container = tableRef.current
+    const table = container?.querySelector('table')
+    if (!container || !table) return
+    let frame = 0
+
+    function measureRows() {
+      if (!container || !table) return
+      const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr'))
+      if (!rows.length) return
+      rows.forEach(row => row.style.removeProperty('height'))
+
+      const availableHeight = container.clientHeight - (table.querySelector('thead')?.getBoundingClientRect().height ?? 0)
+      if (availableHeight <= 0) return
+
+      const width = container.clientWidth
+      if (autoFitRowMeasurement.current.width !== width) {
+        autoFitRowMeasurement.current = { width, height: 0 }
+      }
+
+      if (currentPage === 1 || !autoFitRowMeasurement.current.height) {
+        const naturalHeight = Math.max(1, ...rows.map(row => row.getBoundingClientRect().height))
+        autoFitRowMeasurement.current.height = Math.max(autoFitRowMeasurement.current.height, naturalHeight)
+      }
+
+      const naturalHeight = autoFitRowMeasurement.current.height
+      if (pageSize === 0) {
+        const limit = Math.max(1, Math.floor(availableHeight / naturalHeight))
+        setAutoPageSize(current => current === limit ? current : limit)
+
+        const uniformHeight = Math.max(naturalHeight, availableHeight / limit)
+        rows.forEach(row => { row.style.height = uniformHeight + 'px' })
+        return
+      }
+
+      // Explicit page sizes (10 / 25 / ...):
+      // when the current page is full, distribute the small amount of spare
+      // height across those rows so the footer sits directly under the table.
+      // Do not stretch a short final page into giant rows.
+      if (rows.length === pageSize) {
+        const uniformHeight = Math.max(naturalHeight, availableHeight / rows.length)
+        rows.forEach(row => { row.style.height = uniformHeight + 'px' })
+      }
+    }
+
+    function scheduleMeasure() {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measureRows)
+    }
+
+    const observer = new ResizeObserver(scheduleMeasure)
+    observer.observe(container)
+    observer.observe(table)
+    scheduleMeasure()
+
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+      table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => row.style.removeProperty('height'))
+    }
+  }, [isLoading, visibleAgents.length, pageSize, currentPage, effectivePageSize])
 
   function clearBaseFilter() {
     const next = new URLSearchParams(searchParams)
@@ -158,6 +253,7 @@ export function AgentsPage() {
     setEditingId(null)
     setName('')
     setDescription('')
+    setCreateStatus('active')
     setSelectedBaseIds([])
     resetModelFields()
     setError(null)
@@ -168,6 +264,7 @@ export function AgentsPage() {
     setEditingId(agent.id)
     setName(agent.name)
     setDescription(agent.description)
+    setCreateStatus('active')
     setSelectedBaseIds([])
     resetModelFields(agent.model)
     setError(null)
@@ -187,6 +284,7 @@ export function AgentsPage() {
   }
 
   function toggleBase(baseId: string) {
+    if (!canAssignKnowledge) return
     setSelectedBaseIds((current) =>
       current.includes(baseId)
         ? current.filter((id) => id !== baseId)
@@ -201,12 +299,51 @@ export function AgentsPage() {
 
   async function cycleAgentStatus(agentId: string, current: AgentStatus) {
     const next: AgentStatus =
-      current === 'active' ? 'draft' : current === 'draft' ? 'disabled' : 'active'
+      current === 'active'
+        ? 'draft'
+        : current === 'draft'
+          ? 'disabled'
+          : 'active'
+
     try {
-      await updateAgent(agentId, { status: next })
+      await updateAgent(agentId, {
+        status: next,
+        ...(next === 'active' ? {} : { knowledgeBaseIds: [] }),
+      })
       await load()
     } catch {
       setError(t('ai.agents.errSave'))
+    }
+  }
+
+  async function handleDeleteAgent() {
+    if (!pendingDeleteAgent || isDeletingAgent) return
+
+    setIsDeletingAgent(true)
+    setError(null)
+
+    try {
+      const deletedAgentId = pendingDeleteAgent.id
+
+      await deleteAgent(deletedAgentId)
+      setPendingDeleteAgent(null)
+      setMessage(t('ai.agents.msgDeleted', 'Agent deleted.'))
+
+      if (highlightAgentId === deletedAgentId) {
+        const next = new URLSearchParams(searchParams)
+        next.delete('agentId')
+        setSearchParams(next, { replace: true })
+      }
+
+      await load()
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : t('ai.agents.errDelete', 'Unable to delete this agent.'),
+      )
+    } finally {
+      setIsDeletingAgent(false)
     }
   }
 
@@ -233,7 +370,7 @@ export function AgentsPage() {
         await updateAgent(editingId, {
           name,
           description,
-          knowledgeBaseIds: selectedBaseIds,
+          knowledgeBaseIds: canAssignKnowledge ? selectedBaseIds : [],
           model: modelPayload,
         })
         setMessage(t('ai.agents.msgUpdated'))
@@ -242,7 +379,8 @@ export function AgentsPage() {
           name,
           description,
           companyId,
-          knowledgeBaseIds: selectedBaseIds,
+          status: createStatus,
+          knowledgeBaseIds: createStatus === 'active' ? selectedBaseIds : [],
           model: modelPayload,
         })
         setMessage(t('ai.agents.msgCreated'))
@@ -259,7 +397,7 @@ export function AgentsPage() {
   const isEmpty = !isLoading && visibleAgents.length === 0
 
   return (
-    <div className="console-page">
+    <div className="console-page console-page--internal-table-scroll ai-agents-page">
       <FlashToasts
         error={error}
         message={message}
@@ -267,26 +405,28 @@ export function AgentsPage() {
         onClearMessage={() => setMessage(null)}
       />
 
-      <section className="console-panel">
-        <div className="console-panel__title-row">
-          <TextField
-            className="console-panel__search console-panel__search--lead"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('ai.agents.searchPlaceholder', 'Search agents…')}
-            aria-label={t('ai.agents.searchAria', 'Search agents')}
-          />
-          <div className="console-panel__actions">
+      <TablePanel>
+        <TableToolbar
+          search={
+            <TextField
+              className="ui-table-toolbar__search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('ai.agents.searchPlaceholder', 'Search agents…')}
+              aria-label={t('ai.agents.searchAria', 'Search agents')}
+            />
+          }
+          actions={
             <Button onClick={openCreate}>
               <IconPlus />
               {t('ai.agents.newAgent')}
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {activeBase ? (
-          <div className="console-filter-chip">
+          <div className="console-filter-chip" style={{ margin: '0 24px 12px' }}>
             <span>{t('ai.agents.filteredByKnowledge', { name: activeBase.name })}</span>
             <button
               type="button"
@@ -299,98 +439,160 @@ export function AgentsPage() {
           </div>
         ) : null}
 
+        {/* 表格区域：绑定 ref 用于自动高度测量 */}
         {isLoading ? (
-          <p className="console-empty">{t('ai.agents.loading')}</p>
+          <p className="console-empty" style={{ padding: '0 24px 24px' }}>{t('ai.agents.loading')}</p>
         ) : isEmpty ? (
-          <p className="console-empty">
-            {agents.length === 0
-              ? t('ai.agents.empty')
-              : t('ai.agents.emptyFiltered')}
+          <p className="console-empty" style={{ padding: '0 24px 24px' }}>
+            {agents.length === 0 ? t('ai.agents.empty') : t('ai.agents.emptyFiltered')}
           </p>
         ) : (
-          <div className="console-table-wrap">
-            <table className="console-table">
-              <thead>
-                <tr>
-                  <th>{t('ai.agents.colName')}</th>
-                  <th>{t('ai.agents.colDescription')}</th>
-                  <th>{t('ai.agents.colModel')}</th>
-                  <th>{t('ai.agents.colKnowledge')}</th>
-                  <th>{t('ai.agents.colStatus')}</th>
-                  <th className="console-table__actions">{t('ai.agents.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleAgents.map((agent) => (
-                  <tr
-                    key={agent.id}
-                    className={
-                      agent.id === highlightAgentId
-                        ? 'console-table__row--highlight'
-                        : undefined
-                    }
-                  >
-                    <td>
-                      <span className="console-table__name">
-                        <span>{agent.name}</span>
-                      </span>
-                    </td>
-                    <td className="console-table__muted">{agent.description || '—'}</td>
-                    <td>
-                      {agent.model && agent.model.provider !== 'auto' ? (
-                        <span className="console-chip">
-                          {agent.model.provider} · {agent.model.model || '—'}
-                        </span>
-                      ) : (
-                        <span className="console-chip console-chip--muted">
-                          {t('ai.agents.modelAuto', 'Auto')}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {agent.knowledgeBaseCount > 0 ? (
-                        <Link
-                          className="console-chip console-chip--link"
-                          to={`/ai/ai/knowledge?agentId=${encodeURIComponent(agent.id)}`}
-                        >
-                          {t('ai.agents.knowledgeCount', {
-                            count: agent.knowledgeBaseCount,
-                          })}
-                        </Link>
-                      ) : (
-                        <span className="console-chip console-chip--muted">
-                          {t('ai.agents.knowledgeCountNone')}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={`console-status console-status--${agent.status} console-status--clickable`}
-                        onClick={() => void cycleAgentStatus(agent.id, agent.status)}
-                        title={t('ai.agents.statusClickHint', 'Click to change status')}
-                      >
-                        {t(STATUS_LABEL_KEY[agent.status])}
-                      </button>
-                    </td>
-                    <td className="console-table__actions">
-                      <button
-                        type="button"
-                        className="console-icon-button"
-                        aria-label={t('ai.agents.edit')}
-                        title={t('ai.agents.edit')}
-                        onClick={() => void openEdit(agent)}
-                      >
-                        <IconPencil />
-                      </button>
-                    </td>
+          <>
+            <div className="console-table-wrap" ref={tableRef}>
+              <table className="console-table console-table--fixed console-table--agents">
+                <colgroup>
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '14%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>{t('ai.agents.colName')}</th>
+                    <th>{t('ai.agents.colDescription')}</th>
+                    <th>{t('ai.agents.colModel')}</th>
+                    <th>{t('ai.agents.colKnowledge')}</th>
+                    <th>{t('ai.agents.colStatus')}</th>
+                    <th className="console-table__actions identity-table__actions">{t('ai.agents.colActions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedAgents.map((agent) => (
+                    <tr
+                      key={agent.id}
+                      className={
+                        agent.id === highlightAgentId
+                          ? 'console-table__row--highlight'
+                          : undefined
+                      }
+                    >
+                      <td>
+                        <span className="console-table__name">
+                          <span>{agent.name}</span>
+                        </span>
+                      </td>
+                      <td className="console-table__muted">{agent.description || '—'}</td>
+                      <td>
+                        {agent.model && agent.model.provider !== 'auto' ? (
+                          <span className="console-chip">
+                            {agent.model.provider} · {agent.model.model || '—'}
+                          </span>
+                        ) : (
+                          <span className="console-chip console-chip--muted">
+                            {t('ai.agents.modelAuto', 'Auto')}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {agent.knowledgeBaseCount > 0 ? (
+                          <Link
+                            className="console-chip console-chip--link"
+                            to={`/ai/ai/knowledge?agentId=${encodeURIComponent(agent.id)}`}
+                          >
+                            {t('ai.agents.knowledgeCount', {
+                              count: agent.knowledgeBaseCount,
+                            })}
+                          </Link>
+                        ) : (
+                          <span className="console-chip console-chip--muted">
+                            {t('ai.agents.knowledgeCountNone')}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`console-status console-status--${agent.status} console-status--clickable`}
+                          onClick={() => void cycleAgentStatus(agent.id, agent.status)}
+                          title={t('ai.agents.statusClickHint', 'Click to change status')}
+                        >
+                          {t(STATUS_LABEL_KEY[agent.status])}
+                        </button>
+                      </td>
+                      <td className="console-table__actions identity-table__actions">
+                        <div className="identity-inline-actions identity-directory-actions">
+                          <IconButton
+                            label={t('ai.agents.edit')}
+                            variant="secondary"
+                            onClick={() => void openEdit(agent)}
+                          >
+                            <IconPencil />
+                          </IconButton>
+                          <IconButton
+                            label={t(
+                              'ai.agents.delete',
+                              'Delete {{name}}',
+                              { name: agent.name },
+                            )}
+                            variant="danger"
+                            disabled={isDeletingAgent}
+                            onClick={() => setPendingDeleteAgent(agent)}
+                          >
+                            <IconTrash />
+                          </IconButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 分页组件 */}
+            <TablePagination
+              id="agents-pagination"
+              total={visibleAgents.length}
+              pageSize={pageSize}
+              autoPageSize={autoPageSize}
+              effectivePageSize={effectivePageSize}
+              currentPage={currentPage}
+              pageCount={pageCount}
+              pagesLabel={t('users.directoryPages')}
+              onPageSizeChange={setPageSize}
+              onPageChange={setPage}
+            />
+          </>
         )}
-      </section>
+      </TablePanel>
+
+      <ConfirmDialog
+        open={pendingDeleteAgent !== null}
+        title={t(
+          'ai.agents.deleteTitle',
+          'Delete "{{name}}"?',
+          { name: pendingDeleteAgent?.name ?? '' },
+        )}
+        description={t(
+          'ai.agents.deleteBody',
+          'This agent will be removed from AI Assistant and from every knowledge-base and document assignment.',
+        )}
+        warning={t(
+          'ai.agents.deleteWarning',
+          'This cannot be undone.',
+        )}
+        confirmLabel={t('ai.agents.deleteConfirm', 'Delete')}
+        cancelLabel={t('common.cancel', 'Cancel')}
+        busyLabel={t('ai.agents.deleting', 'Deleting…')}
+        busy={isDeletingAgent}
+        onConfirm={() => void handleDeleteAgent()}
+        onCancel={() => {
+          if (!isDeletingAgent) {
+            setPendingDeleteAgent(null)
+          }
+        }}
+      />
 
       <Drawer
         open={formOpen}
@@ -447,6 +649,48 @@ export function AgentsPage() {
             </FormField>
           </div>
 
+          {!editingId ? (
+            <div className="console-form__section">
+              <h4>{t('ai.agents.initialStatus', 'Initial status')}</h4>
+              <p>
+                {t(
+                  'ai.agents.initialStatusHint',
+                  'Active agents can be assigned immediately. Draft agents stay unassigned until activated.',
+                )}
+              </p>
+
+              <div className="console-form__grid">
+                <FormField
+                  label={t('ai.agents.fieldStatus', 'Status')}
+                  htmlFor="agent-create-status"
+                >
+                  <SidebarSelect
+                    id="agent-create-status"
+                    className="console-form-select--down"
+                    label={t('ai.agents.fieldStatus', 'Status')}
+                    value={createStatus}
+                    options={[
+                      {
+                        value: 'active',
+                        label: t('ai.agents.statusActive', 'Active'),
+                      },
+                      {
+                        value: 'draft',
+                        label: t('ai.agents.statusDraft', 'Draft'),
+                      },
+                    ]}
+                    onChange={(value) => {
+                      const next = value as 'active' | 'draft'
+                      setCreateStatus(next)
+                      if (next === 'draft') setSelectedBaseIds([])
+                    }}
+                    disabled={isSaving}
+                  />
+                </FormField>
+              </div>
+            </div>
+          ) : null}
+
           <div className="console-form__section">
             <h4>{t('ai.agents.modelTitle', 'Model')}</h4>
             <p>
@@ -463,6 +707,7 @@ export function AgentsPage() {
               >
                 <SidebarSelect
                   id="agent-provider"
+                  className="console-form-select--down"
                   label={t('ai.agents.fieldProvider', 'Provider')}
                   value={provider}
                   options={MODEL_PROVIDERS}
@@ -530,7 +775,14 @@ export function AgentsPage() {
                 </span>
               ) : null}
             </h4>
-            <p>{t('ai.agents.knowledgeHint')}</p>
+            <p>
+              {!editingId && createStatus === 'draft'
+                ? t(
+                    'ai.agents.draftKnowledgeHint',
+                    'Draft agents cannot be assigned to knowledge bases. Activate the agent first.',
+                  )
+                : t('ai.agents.knowledgeHint')}
+            </p>
             <SearchableCheckList
               items={baseItems}
               selected={selectedBaseIds}
@@ -540,7 +792,7 @@ export function AgentsPage() {
               searchPlaceholder={t('ai.agents.knowledgeSearchPlaceholder')}
               searchAriaLabel={t('ai.agents.knowledgeSearchAria')}
               listAriaLabel={t('ai.agents.knowledgeTitle')}
-              disabled={isSaving}
+              disabled={isSaving || !canAssignKnowledge}
             />
           </div>
         </form>
