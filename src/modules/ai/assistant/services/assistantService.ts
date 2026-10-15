@@ -8,13 +8,19 @@
  * In the mock this is a keyword match; the real backend swaps the body for
  * a vector search while keeping the same signature.
  *
- * Permission: the caller passes the ACTIVE company. Only agents owned by
- * that company are searched, so a company can never see another company's
- * agent results.
+ * Permission: the caller passes the ACTIVE company. Only ACTIVE agents owned
+ * by that company are searched, and only bases visible from that company are
+ * considered.
  */
 
 import type { AssistantSource, SourceType } from '../types/assistant'
-import { getMockState } from '@/modules/ai/mock/mockStore'
+import { documentIsRetrievable } from '@/modules/ai/knowledge/types/knowledge'
+import {
+  effectiveAgentIdsForDocument,
+  getMockState,
+  listBasesVisibleFrom,
+} from '@/modules/ai/mock/mockStore'
+import { MOCK_USER } from '@/modules/ai/mock/permissions'
 
 export type RetrieveEvidencePayload = {
   agentId: string
@@ -32,31 +38,49 @@ export type RetrieveEvidenceResult = {
 export async function retrieveEvidence(
   payload: RetrieveEvidencePayload,
 ): Promise<RetrieveEvidenceResult> {
+  if (!shouldRetrieveEvidence(payload.question)) {
+    return { sources: [], scanned: 0, matched: 0, scope: '' }
+  }
+
   const state = getMockState()
 
+  // Service-level guard: UI filtering is not sufficient.
   const agent = state.agents.find(
-    (a) => a.id === payload.agentId && a.companyId === payload.activeCompanyId,
+    (item) =>
+      item.id === payload.agentId &&
+      item.companyId === payload.activeCompanyId &&
+      item.status === 'active',
   )
+
   if (!agent) {
     return { sources: [], scanned: 0, matched: 0, scope: '' }
   }
 
-  const baseIds = agent.knowledgeBaseIds
-  const bases = state.bases.filter((b) => baseIds.includes(b.id))
+  const assignedBaseIds = new Set(agent.knowledgeBaseIds)
+
+  // Respect the same company-read rule as the Knowledge service.
+  const bases = listBasesVisibleFrom(MOCK_USER, payload.activeCompanyId).filter(
+    (base) => assignedBaseIds.has(base.id),
+  )
+
   if (bases.length === 0) {
     return { sources: [], scanned: 0, matched: 0, scope: '' }
   }
-  const baseById = new Map(bases.map((b) => [b.id, b]))
 
-  // 3. Documents in those bases. Only READY docs are searchable — a doc
-  //    still processing has no chunks yet.
+  const baseIds = new Set(bases.map((base) => base.id))
+  const baseById = new Map(bases.map((base) => [base.id, base]))
+
+  // Only READY + ACTIVE-mode documents are searchable, and the selected agent
+  // must be present in the document's EFFECTIVE assignment (override beats base).
   const documents = state.documents
-    .filter((doc) => baseIds.includes(doc.baseId))
-    .filter((doc) => doc.status === 'ready')
+    .filter((doc) => baseIds.has(doc.baseId))
+    .filter(documentIsRetrievable)
+    .filter((doc) =>
+      effectiveAgentIdsForDocument(doc.id).agentIds.includes(agent.id),
+    )
 
-  // 4. Score by keyword overlap with the question. Match against BOTH the
-  //    document title (weight 2) and the base name (weight 1), so a doc
-  //    whose title doesn't contain the term is still found when its base does.
+  // Score by keyword overlap with the question. Match against BOTH the
+  // document title (weight 2) and the base name (weight 1).
   const tokens = tokenize(payload.question)
   const scored = documents
     .map((doc) => ({
@@ -74,7 +98,7 @@ export async function retrieveEvidence(
       type: toSourceType(doc.type),
       title: doc.title,
       origin: base ? base.name : doc.baseId,
-      snippet: buildSnippet(doc.title, payload.question),
+      snippet: buildSnippet(base?.name),
       kind: doc.kind,
       relevance: Math.min(100, Math.round(score * 20)),
       baseId: doc.baseId,
@@ -86,7 +110,7 @@ export async function retrieveEvidence(
     sources,
     scanned: documents.length,
     matched: scored.length,
-    scope: bases.map((b) => b.name).join(', '),
+    scope: bases.map((base) => base.name).join(', '),
   }
 }
 
@@ -94,18 +118,149 @@ export async function retrieveEvidence(
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9\u4e00-\u9fff]+/g)
-    .filter((token) => token.length >= 2)
-}
+const CASUAL_CHAT = new Set([
+  'hi',
+  'hello',
+  'hey',
+  'thanks',
+  'thank you',
+  '你好',
+  '您好',
+  '嗨',
+  '谢谢',
+])
+
+const RETRIEVAL_STOP_WORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'from',
+  'this',
+  'that',
+  'what',
+  'when',
+  'where',
+  'which',
+  'who',
+  'why',
+  'how',
+  'can',
+  'could',
+  'would',
+  'should',
+  'please',
+
+  // Common code vocabulary. These terms are too generic to be useful
+  // Knowledge matches and are the source of many false-positive citations.
+  'import',
+  'export',
+  'const',
+  'let',
+  'var',
+  'function',
+  'class',
+  'return',
+  'type',
+  'interface',
+  'string',
+  'number',
+  'boolean',
+  'react',
+  'useeffect',
+  'usestate',
+  'usememo',
+  'usecallback',
+  'useref',
+
+  // Generic product nouns should not cause a match by themselves.
+  'knowledge',
+  'document',
+  'documents',
+  'agent',
+  'agents',
+  'source',
+  'sources',
+  'status',
+  'template',
+  'templates',
+])
 
 /**
- * Title match is worth more than a base-name match. This lets a doc called
- * "image (3).png" still be found when the user asks "customer" and its base
- * is "Customer Knowledge".
+ * Keep retrieval content-driven rather than "full question only".
+ *
+ * Examples:
+ *   HR                  -> true
+ *   annual leave        -> true
+ *   invoice             -> true
+ *   import {...} React  -> false
+ *   hello               -> false
  */
+export function shouldRetrieveEvidence(question: string): boolean {
+  const text = question.trim()
+  if (!text) return false
+
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim()
+
+  if (CASUAL_CHAT.has(normalized)) {
+    return false
+  }
+
+  if (looksLikeCode(text)) {
+    return false
+  }
+
+  // Any remaining business/domain text is allowed to search. If it has no
+  // meaningful match, retrieveEvidence simply returns zero sources and the
+  // Assistant turn remains a normal chat turn.
+  return tokenize(text).length > 0
+}
+
+function looksLikeCode(text: string): boolean {
+  const trimmed = text.trim()
+
+  const strongSignals = [
+    /^\s*(import|export)\s+/m,
+    /^\s*(const|let|var)\s+\w+\s*=/m,
+    /^\s*(function|class|interface|type)\s+\w+/m,
+    /from\s+['"][^'"]+['"]/m,
+    /=>/,
+    /<\/?[A-Z][A-Za-z0-9.]*(?:\s|>|\/>)/,
+  ]
+
+  if (strongSignals.some((pattern) => pattern.test(trimmed))) {
+    return true
+  }
+
+  const lines = trimmed.split(/\r?\n/)
+  if (lines.length < 3) {
+    return false
+  }
+
+  // Multi-line text with several programming punctuation markers is almost
+  // certainly pasted code. A short keyword such as "HR" can never hit this.
+  const punctuationHits = [
+    /[{}]/,
+    /;\s*$/m,
+    /\(\s*[^)]*\)\s*[{=>]/,
+    /\[[^\]]*\]/,
+  ].filter((pattern) => pattern.test(trimmed)).length
+
+  return punctuationHits >= 2
+}
+
+function tokenize(text: string): string[] {
+  return Array.from(
+    new Set(
+      text
+        .toLowerCase()
+        .split(/[^a-z0-9\u4e00-\u9fff]+/g)
+        .filter((token) => token.length >= 2)
+        .filter((token) => !RETRIEVAL_STOP_WORDS.has(token)),
+    ),
+  )
+}
+
 function scoreDocument(
   doc: { title: string },
   base: { name: string } | undefined,
@@ -115,6 +270,7 @@ function scoreDocument(
   const title = doc.title.toLowerCase()
   const baseName = base ? base.name.toLowerCase() : ''
   let score = 0
+
   for (const token of tokens) {
     if (title.includes(token)) {
       score += 2
@@ -122,6 +278,7 @@ function scoreDocument(
       score += 1
     }
   }
+
   return score
 }
 
@@ -132,7 +289,8 @@ function toSourceType(value: string): SourceType {
   return 'policy'
 }
 
-function buildSnippet(title: string, question: string): string {
-  return `Matched "${question}" in ${title}.`
+function buildSnippet(baseName?: string): string {
+  return baseName
+    ? `Matched from ${baseName} by document title or knowledge-base metadata.`
+    : 'Matched by document title or knowledge-base metadata.'
 }
-

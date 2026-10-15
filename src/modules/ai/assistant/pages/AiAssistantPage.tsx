@@ -25,6 +25,7 @@ import {
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import { TextField } from '@/components/ui/TextField'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useCompanyStore } from '@/stores/companyStore'
 import { AttachMenu } from '../components/AttachMenu'
 import type {
@@ -190,6 +191,27 @@ function formatThreadTimestamp(iso: string, locale: string): string {
   })
 }
 
+function attachmentKey(file: File): string {
+  return `${file.name}\u0000${file.size}\u0000${file.lastModified}`
+}
+
+function mergeAttachedFiles(current: File[], incoming: File[]): File[] {
+  if (incoming.length === 0) return current
+
+  const seen = new Set(current.map(attachmentKey))
+  const next = [...current]
+
+  for (const file of incoming) {
+    const key = attachmentKey(file)
+    if (seen.has(key)) continue
+
+    seen.add(key)
+    next.push(file)
+  }
+
+  return next
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -274,7 +296,9 @@ function AiModelPicker(props: {
   const needle = query.trim().toLowerCase()
   const items = needle
     ? all.filter((id) => id.toLowerCase().includes(needle))
-    : recommended
+    : recommended.includes(value)
+      ? recommended
+      : [value, ...recommended.filter((id) => id !== value)]
 
   return (
     <div className="ai-model-picker" data-popover>
@@ -288,7 +312,10 @@ function AiModelPicker(props: {
           .join(' ')}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => onOpenChange(!open)}
+        onClick={() => {
+          if (!lockedFromAgent) onOpenChange(!open)
+        }}
+        aria-disabled={lockedFromAgent || undefined}
         title={lockedFromAgent ? lockedFromAgentHint : undefined}
       >
         {lockedFromAgent ? (
@@ -368,6 +395,7 @@ export function AiAssistantPage() {
   const companyLabel = companies.find((item) => item.value === companyId)?.label ?? null
 
   const [threads, setThreads] = useState<AssistantThread[]>(readThreads)
+  const [pendingDeleteThread, setPendingDeleteThread] = useState<AssistantThread | null>(null)
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState('')
@@ -433,13 +461,15 @@ export function AiAssistantPage() {
 
   const effectiveModel = useMemo(() => {
     const selected =
-      agentId !== AUTO_AGENT_ID ? agents.find((a) => a.id === agentId) : null
+      agentId !== AUTO_AGENT_ID
+        ? activeAgents.find((agent) => agent.id === agentId) ?? null
+        : null
     const override = resolveAgentModelId(selected?.model)
     return {
       id: override ?? model,
       fromAgent: override !== null,
     }
-  }, [agentId, agents, model])
+  }, [agentId, activeAgents, model])
 
   const announcement =
     pendingQuestion !== null
@@ -536,12 +566,6 @@ export function AiAssistantPage() {
         /* offline: keep the shortlist */
       })
   }, [])
-
-  useEffect(() => {
-    if (recommendedModels.length > 0 && !recommendedModels.includes(model)) {
-      setModel(recommendedModels[0])
-    }
-  }, [recommendedModels, model])
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1180px)')
@@ -704,10 +728,15 @@ export function AiAssistantPage() {
     if (threadId === activeThreadId && pendingQuestion !== null) {
       cancelPendingReply()
     }
-    setThreads((current) => current.filter((thread) => thread.id !== threadId))
+
+    setThreads((current) =>
+      current.filter((thread) => thread.id !== threadId),
+    )
+    setPendingDeleteThread(null)
     setErrorQuestion(null)
     setInterrupted(null)
     setNotConnected(null)
+
     if (threadId === activeThreadId) {
       setActiveThreadId(null)
       setActiveSourceId(null)
@@ -807,7 +836,9 @@ export function AiAssistantPage() {
     const started = performance.now()
 
     const selectedAgent =
-      agentId !== AUTO_AGENT_ID ? agents.find((a) => a.id === agentId) : null
+      agentId !== AUTO_AGENT_ID
+        ? activeAgents.find((agent) => agent.id === agentId) ?? null
+        : null
     const effectiveAgentId =
       selectedAgent?.id ?? pickDefaultAgentId(activeAgents)
 
@@ -1076,7 +1107,7 @@ export function AiAssistantPage() {
           title={t('ai.assistant.deleteThread')}
           onClick={(event) => {
             event.stopPropagation()
-            deleteThread(thread.id)
+            setPendingDeleteThread(thread)
           }}
         >
           <svg
@@ -1610,13 +1641,19 @@ export function AiAssistantPage() {
                 event.stopPropagation()
                 setIsComposerDragging(false)
                 const files = Array.from(event.dataTransfer.files ?? [])
-                if (files.length > 0) setAttachedFiles((prev) => [...prev, ...files])
+                if (files.length > 0) {
+                  setAttachedFiles((current) =>
+                    mergeAttachedFiles(current, files),
+                  )
+                }
               }}
               onPaste={(event) => {
                 const files = Array.from(event.clipboardData?.files ?? [])
                 if (files.length > 0) {
                   event.preventDefault()
-                  setAttachedFiles((prev) => [...prev, ...files])
+                  setAttachedFiles((current) =>
+                    mergeAttachedFiles(current, files),
+                  )
                 }
               }}
             >
@@ -1694,7 +1731,6 @@ export function AiAssistantPage() {
                       ...activeAgents.map((agent) => ({
                         value: agent.id,
                         label: agent.name,
-                        hint: agent.description,
                       })),
                     ]}
                     onChange={setAgentId}
@@ -1706,7 +1742,11 @@ export function AiAssistantPage() {
                 <span className="ai-composer__spacer" />
 
                 <AttachMenu
-                  onAttachToChat={(file) => setAttachedFiles((prev) => [...prev, file])}
+                  onAttachToChat={(file) =>
+                    setAttachedFiles((current) =>
+                      mergeAttachedFiles(current, [file]),
+                    )
+                  }
                   onStored={({ baseName, fileName }) =>
                     setMessage(
                       t('ai.assistant.storedIn', { base: baseName, name: fileName }),
@@ -1800,6 +1840,39 @@ export function AiAssistantPage() {
           </aside>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDeleteThread !== null}
+        title={t(
+          'ai.assistant.deleteThreadTitle',
+          'Delete "{{name}}"?',
+          { name: pendingDeleteThread?.title ?? '' },
+        )}
+        description={t(
+          'ai.assistant.deleteThreadBody',
+          'This chat and its entire conversation history will be permanently deleted.',
+        )}
+        warning={t(
+          'ai.assistant.deleteThreadWarning',
+          'This cannot be undone.',
+        )}
+        confirmLabel={t(
+          'ai.assistant.deleteThreadConfirm',
+          'Delete',
+        )}
+        cancelLabel={t('common.cancel', 'Cancel')}
+        busyLabel={t(
+          'ai.assistant.deletingThread',
+          'Deleting…',
+        )}
+        busy={false}
+        onConfirm={() => {
+          if (pendingDeleteThread) {
+            deleteThread(pendingDeleteThread.id)
+          }
+        }}
+        onCancel={() => setPendingDeleteThread(null)}
+      />
 
       <AssistantSettingsDrawer
         open={settingsOpen}

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AIOS NOVA · Knowledge</title>
+<style>
+:root{--purple:#6554ff;--purple-soft:#efedff;--ink:#14213a;--muted:#8290a6;--line:#e8ebf2;--bg:#f6f7fb}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--purple);outline-offset:3px}
+button{color:inherit}
+svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.app{display:flex;min-height:100vh}
+.sidebar{width:204px;flex-shrink:0;background:#fff;border-right:1px solid var(--line);padding:24px 12px;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:10px;padding:0 10px 24px;font-weight:750;letter-spacing:2px;font-size:12px}
+.logo{font-size:28px;line-height:1;color:var(--purple);font-weight:900;letter-spacing:-6px;margin-right:6px}
+.side-search{display:flex;align-items:center;gap:8px;background:#f2f3f8;border-radius:9px;padding:9px 12px;color:#8993a8;margin-bottom:14px}
+.company{background:var(--purple-soft);border:1px solid #ded8ff;border-radius:9px;padding:11px 12px;margin-bottom:20px}
+.company small{display:block;color:var(--purple);font-size:9px;letter-spacing:1px;font-weight:700;margin-bottom:3px}
+.company strong{font-size:12px}
+.nav{display:flex;flex-direction:column;gap:7px}
+.nav button{border:0;background:none;text-align:left;display:flex;align-items:center;gap:11px;border-radius:9px;padding:11px 12px;font-size:12px}
+.nav svg{color:#7b859b}
+.nav .active{background:var(--purple);color:#fff}
+.nav .active svg{color:#fff}
+.nav .arrow{margin-left:auto;color:#a3acbc}
+.nav button:hover:not(.active){background:#f6f7fb}
+.user{margin-top:auto;padding:22px 5px 0;display:flex;align-items:center;gap:9px}
+.avatar{width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:var(--purple-soft);color:var(--purple);font-size:11px;font-weight:700}
+.user small{display:block;color:var(--muted);font-size:10px}
+.main{flex:1;min-width:0}
+.topbar{height:66px;padding:0 28px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.breadcrumb{color:var(--muted);font-size:12px}
+.breadcrumb b{color:var(--ink);font-weight:550}
+.top-right{display:flex;align-items:center;gap:20px;color:#7b859b}
+.icon-button{background:none;border:0;padding:6px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px}
+.icon-button:hover{background:#f0f1f8}
+.workspace{padding:26px 26px 22px}
+.heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:21px}
+.heading h1{font-size:24px;letter-spacing:-.7px;margin:0 0 4px;font-weight:650}
+.heading p{margin:0;color:var(--muted);font-size:12px}
+.actions{display:flex;gap:8px}
+.btn{border:1px solid #e2e5ee;background:#fff;border-radius:7px;padding:8px 11px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:11px;font-weight:550;white-space:nowrap}
+.btn:hover{background:#f7f7fc}
+.btn.primary{background:var(--purple);border-color:var(--purple);color:white}
+.btn.primary:hover{background:#5543ed}
+.console{background:white;border:1px solid #e1e5ee;border-radius:12px;box-shadow:0 3px 14px #17223d04;overflow:hidden}
+.filters{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.categories{display:flex;gap:4px}
+.category{border:0;background:none;border-radius:6px;padding:7px 11px;color:#758198;font-size:11px;white-space:nowrap}
+.category.active{background:var(--purple-soft);color:var(--purple);font-weight:650}
+.category span{margin-left:5px;font-size:10px;opacity:.75}
+.filter-hint{color:#9ca5b6;font-size:10px}
+.columns{display:grid;grid-template-columns:220px minmax(300px,1fr) 240px;min-height:596px;height:calc(100vh - 265px)}
+.base-pane{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:7px 9px;color:#96a0b1}
+.search input{width:100%;min-width:0;border:0;background:none;outline:none;color:var(--ink);font-size:11px}
+.search input::placeholder{color:#9aa4b5}
+.base-search{padding:15px 13px 11px}
+.pane-label{padding:0 16px 11px;color:#99a3b4;display:flex;align-items:center;justify-content:space-between;font-size:9px;letter-spacing:.7px;text-transform:uppercase}
+.base-list{overflow:auto;flex:1}
+.group-title{padding:13px 17px 5px;font-size:9px;color:#9aa4b4;letter-spacing:1px}
+.base{width:100%;display:flex;gap:10px;text-align:left;border:0;border-left:3px solid transparent;border-bottom:1px solid #f0f2f7;background:white;padding:13px 12px}
+.base:hover{background:#fafaff}
+.base.selected{background:#f0efff;border-left-color:var(--purple)}
+.file-icon{width:31px;height:35px;border-radius:7px;background:#edf3ff;color:#7199eb;display:grid;place-items:center;flex-shrink:0}
+.file-icon.skill{background:#fff3e7;color:#d79645}
+.file-icon.data{background:#e9f8f3;color:#4aaf94}
+.base-copy{min-width:0;flex:1}
+.base strong{display:block;font-size:11px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.base p{margin:3px 0;color:#929caf;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.base small{font-size:9px;color:#9ba4b6}
+.base-count{display:flex;align-items:center;gap:5px}
+.dot{width:5px;height:5px;background:#48bc98;border-radius:50%;display:inline-block}
+.base-foot{border-top:1px solid var(--line);padding:12px 16px;color:#98a2b3;font-size:10px;display:flex;justify-content:space-between}
+.content-pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+.content-head{padding:20px 22px 13px}
+.eyebrow{color:#9aa4b6;font-size:9px;letter-spacing:1px;margin-bottom:5px}
+.content-title{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.content-title h2{font-size:18px;font-weight:650;letter-spacing:-.4px;margin:0}
+.content-head p{color:#96a0b1;font-size:11px;margin:5px 0 0}
+.tabs{display:flex;gap:21px;padding:0 22px;border-bottom:1px solid var(--line)}
+.tab{border:0;border-bottom:2px solid transparent;padding:12px 0 10px;background:none;color:#929caf;font-size:11px}
+.tab.active{border-bottom-color:var(--purple);color:var(--purple);font-weight:650}
+.tab span{font-size:9px;padding:1px 5px;background:#f0f1f7;border-radius:4px;margin-left:5px;color:#8893a8}
+.table-toolbar{padding:14px 20px;display:flex;align-items:center;gap:9px}
+.table-toolbar .search{flex:1}
+.table-toolbar select{max-width:115px;font-size:10px;padding:7px 6px;border:1px solid var(--line);background:white;border-radius:6px;color:#7d899e}
+.table-scroll{overflow:auto;flex:1}
+table{border-collapse:collapse;width:100%;font-size:11px}
+th{background:#fafbfe;color:#9aa4b6;font-size:9px;font-weight:550;text-align:left;padding:10px 12px;border-block:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{padding-left:22px}
+td{padding:13px 12px;border-bottom:1px solid #f0f2f7;color:#8591a6}
+tr.item{cursor:pointer}
+tr.item:hover{background:#fafaff}
+tr.item.chosen{background:#f4f3ff}
+.document-name{display:flex;gap:9px;align-items:center;color:#35435c;font-weight:550}
+.document-name svg{color:#91a7ca;width:16px}
+.doc-sub{color:#a0a8b8;font-weight:400;font-size:9px;margin-top:2px}
+.status{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;background:#eafaf2;color:#3caa85;border-radius:5px;font-size:9px;white-space:nowrap}
+.status.processing{background:#fff7e6;color:#c9963d}
+.status.failed{background:#fff0f0;color:#ce7777}
+.number{font-size:10px;color:#8d98ab}
+.table-foot{padding:13px 22px;display:flex;justify-content:space-between;border-top:1px solid var(--line);font-size:10px;color:#9ba4b4}
+.detail-pane{border-left:1px solid var(--line);padding:22px 20px;overflow:auto}
+.detail-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px}
+.detail-icon{width:43px;height:47px;border-radius:10px;background:#edf0ff;color:var(--purple);display:grid;place-items:center}
+.detail-icon svg{width:24px;height:24px}
+.detail-title{font-size:14px;line-height:1.4;margin:0 0 7px;font-weight:650;overflow-wrap:anywhere}
+.detail-type{font-size:10px;color:#98a2b5;margin:0}
+.detail-section{border-top:1px solid var(--line);margin-top:21px;padding-top:17px}
+.detail-section h3{font-size:10px;margin:0 0 9px;font-weight:650}
+.description{font-size:11px;line-height:1.8;color:#94a0b2;margin:0}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.stat{padding:12px;background:#fafbfe;border:1px solid #eef0f6;border-radius:7px}
+.stat b{display:block;font-size:19px;font-weight:600}
+.stat small{font-size:9px;color:#9aa4b4}
+.agent{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:10px}
+.agent-avatar{width:23px;height:23px;border-radius:6px;display:grid;place-items:center;background:#eeedff;color:#8372e7;font-size:9px}
+.agent em{margin-left:auto;color:#4bb496;font-size:9px;font-style:normal}
+.extra-agents{display:inline-block;padding:3px 7px;border-radius:5px;background:#f3f4f9;color:#8c97aa;font-size:9px;margin-top:10px}
+.meta-row{display:flex;justify-content:space-between;gap:8px;margin-bottom:11px;color:#99a3b4;font-size:10px}
+.meta-row b{color:#6b788e;font-weight:450;text-align:right}
+.detail-link{width:100%;margin-top:17px}
+.preview-note{display:flex;justify-content:space-between;gap:10px;padding-top:12px;font-size:10px;color:#a1a9bb}
+.empty{padding:45px 20px;text-align:center;color:#98a2b4;font-size:12px}
+.modal-mask{position:fixed;inset:0;background:#16213945;display:none;place-items:center;padding:20px;z-index:50;backdrop-filter:blur(3px)}
+.modal-mask.open{display:grid}
+.modal{width:420px;max-width:100%;background:white;border-radius:14px;padding:25px;box-shadow:0 20px 80px #14213a30}
+.modal h2{font-size:19px;margin:0}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.modal label{display:block;margin:13px 0 6px;font-size:11px;color:#708099}
+.modal input,.modal select,.modal textarea{width:100%;border:1px solid #e0e5ef;padding:10px;border-radius:7px;color:var(--ink);background:white}
+.modal textarea{resize:vertical;min-height:70px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+.template{border:1px solid var(--line);padding:12px;border-radius:8px;margin-top:10px;display:flex;align-items:center;gap:12px}
+.template strong{font-size:12px}
+.template small{display:block;color:#94a0b2;font-size:10px;margin-top:3px}
+.template .btn{margin-left:auto}
+.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#24314b;color:#fff;border-radius:9px;padding:11px 18px;font-size:12px;transition:.2s;z-index:80}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(min-width:1500px){.sidebar{width:230px}.columns{grid-template-columns:260px minmax(400px,1fr) 290px}.detail-pane{padding:26px}.base{padding:17px 14px}.base strong{font-size:12px}td{padding-block:17px}}
+@media(max-width:1150px){.sidebar{width:176px}.workspace{padding:20px 16px}.columns{grid-template-columns:195px minmax(260px,1fr) 205px}.detail-pane{padding:20px 14px}.heading h1{font-size:21px}.actions .btn{font-size:10px;padding:8px}.nav button{font-size:11px}}
+@media(max-width:980px){.sidebar{width:62px;padding:22px 8px}.brand{padding:0 0 22px;justify-content:center}.brand-name,.side-search,.company,.nav .nav-label,.nav .arrow,.user .user-copy{display:none}.nav button{justify-content:center;padding:12px}.user{justify-content:center;padding:20px 0 0}.columns{grid-template-columns:185px minmax(240px,1fr) 200px}.heading p{max-width:230px}.topbar{padding:0 20px}.filter-hint{display:none}}
+@media(max-width:760px){.columns{grid-template-columns:175px minmax(0,1fr);height:650px;min-height:0}.detail-pane{display:none}.heading{align-items:flex-start}.actions{flex-wrap:wrap;justify-content:flex-end}.actions .btn:first-child{display:none}.heading p{font-size:10px}.category{padding:7px 8px;font-size:10px}.table-toolbar{padding:12px}.content-head{padding:17px 15px 10px}.content-title h2{font-size:15px}.tabs{padding:0 15px}.top-right{gap:9px}.workspace{padding:17px 10px}.preview-note span:last-child{display:none}}
+@media(max-width:510px){.sidebar{display:none}.heading h1{font-size:19px}.heading p{display:none}.columns{grid-template-columns:135px minmax(0,1fr)}.base{padding:12px 7px;gap:6px}.base .file-icon{display:none}.base strong{font-size:10px}.base-search{padding:10px 7px}.filters{padding:10px 7px}.category span{display:none}.content-title .btn{font-size:0;padding:7px}.table-toolbar select{max-width:74px}.table-toolbar{gap:5px}.content-head p{font-size:10px}.optional-column{display:none}.topbar{height:50px}.base-foot{font-size:9px;padding:10px 8px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><span class="logo">N</span><span class="brand-name">AIOS NOVA</span></div>
+  <div class="side-search"><span data-icon="search"></span><span>Search...</span></div>
+  <div class="company"><small>ACTIVE COMPANY</small><strong>J1 (MIDVALLEY)</strong></div>
+  <nav class="nav" aria-label="Main navigation">
+    <button data-nav="Group companies"><span data-icon="building"></span><span class="nav-label">GROUP COMPANIES</span><span class="arrow">›</span></button>
+    <button data-nav="Dashboard"><span data-icon="grid"></span><span class="nav-label">Dashboard</span></button>
+    <button class="active" data-nav="AI"><span data-icon="spark"></span><span class="nav-label">AI</span></button>
+    <button data-nav="Customer & Revenue"><span data-icon="users"></span><span class="nav-label">Customer & Revenue</span><span class="arrow">›</span></button>
+    <button data-nav="Operations"><span data-icon="box"></span><span class="nav-label">Operations</span><span class="arrow">›</span></button>
+    <button data-nav="Finance & People"><span data-icon="card"></span><span class="nav-label">Finance & People</span><span class="arrow">›</span></button>
+    <button data-nav="Work Management"><span data-icon="briefcase"></span><span class="nav-label">Work Management</span><span class="arrow">›</span></button>
+    <button data-nav="Platform"><span data-icon="grid"></span><span class="nav-label">Platform</span><span class="arrow">›</span></button>
+    <button data-nav="System"><span data-icon="shield"></span><span class="nav-label">System</span><span class="arrow">›</span></button>
+    <button data-nav="Platform Admin"><span data-icon="shield"></span><span class="nav-label">Platform Admin</span></button>
+  </nav>
+  <div class="user"><div class="avatar">DU</div><div class="user-copy"><strong style="font-size:11px">Demo User</strong><small>demo@aios.dev</small></div></div>
+</aside>
+<main class="main">
+  <header class="topbar">
+    <div class="breadcrumb">Workspace <span style="margin:0 10px">/</span> AI <span style="margin:0 10px">/</span> <b>Knowledge</b></div>
+    <div class="top-right"><span style="font-size:10px">J1 (MIDVALLEY)</span><button class="icon-button" id="notifications" aria-label="Notifications"><span data-icon="bell"></span></button><div class="avatar" style="width:27px;height:27px">DU</div></div>
+  </header>
+  <div class="workspace">
+    <div class="heading">
+      <div><h1>Knowledge bases</h1><p>Organize your knowledge. Empower your agents.</p></div>
+      <div class="actions">
+        <button class="btn" id="manage"><span data-icon="settings"></span>Manage templates</button>
+        <button class="btn" id="use"><span data-icon="spark"></span>Use template</button>
+        <button class="btn primary" id="create"><span data-icon="plus"></span>Create</button>
+      </div>
+    </div>
+    <section class="console" aria-label="Knowledge workspace">
+      <div class="filters">
+        <div class="categories" id="categories"></div>
+        <span class="filter-hint">Your team's knowledge, in one place</span>
+      </div>
+      <div class="columns">
+        <aside class="base-pane">
+          <div class="base-search"><div class="search"><span data-icon="search"></span><input id="baseSearch" placeholder="Search knowledge bases..." aria-label="Search knowledge bases"></div></div>
+          <div class="pane-label"><span>Knowledge bases</span><span id="baseTotal"></span></div>
+          <div class="base-list" id="baseList"></div>
+          <div class="base-foot"><span id="baseFoot"></span><span>Company only</span></div>
+        </aside>
+        <section class="content-pane" aria-label="Knowledge base content">
+          <div class="content-head">
+            <div class="eyebrow" id="baseGroup"></div>
+            <div class="content-title"><h2 id="baseName"></h2><button class="btn" id="addItem"><span data-icon="plus"></span><span id="addLabel">Add document</span></button></div>
+            <p id="baseDescription"></p>
+          </div>
+          <div class="tabs" id="tabs"></div>
+          <div class="table-toolbar">
+            <div class="search"><span data-icon="search"></span><input id="itemSearch" placeholder="Search documents..." aria-label="Search content"></div>
+            <select id="statusFilter" aria-label="Filter by status"><option value="all">All statuses</option><option value="Ready">Ready</option><option value="Processing">Processing</option><option value="Failed">Failed</option></select>
+            <button class="icon-button" id="showBase" title="View knowledge base details" aria-label="View knowledge base details"><span data-icon="info"></span></button>
+          </div>
+          <div class="table-scroll" id="tableArea"></div>
+          <div class="table-foot"><span id="resultCount"></span><span>Updated just now</span></div>
+        </section>
+        <aside class="detail-pane" id="detail" aria-label="Details"></aside>
+      </div>
+    </section>
+    <div class="preview-note"><span>Interactive design preview · Sample data</span><span>AIOS NOVA / Knowledge workspace</span></div>
+  </div>
+</main>
+</div>
+<div class="modal-mask" id="mask">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header"><h2 id="modalTitle"></h2><button class="icon-button" id="closeModal" aria-label="Close">✕</button></div>
+    <div id="modalBody"></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const paths={
+ search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ doc:'<path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/>',
+ spark:'<path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4z"/>',
+ grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+ building:'<path d="M4 21h16M6 21V7l6-4 6 4v14M10 21v-5h4v5M10 8h.01M14 8h.01M10 12h.01M14 12h.01"/>',
+ users:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M21 20v-2a6 6 0 0 0-4-5"/>',
+ box:'<path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8"/>',
+ card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/>',
+ briefcase:'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12h18"/>',
+ shield:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/>',
+ settings:'<path d="m9 3-1 3-3 1-2 3 2 2-1 3 2 3 3-1 3 2 3-2 3 1 2-3-1-3 2-2-2-3-3-1-1-3z"/><circle cx="12" cy="12" r="3"/>',
+ bell:'<path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5zM10 21h4"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
+ data:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
+ more:'<circle cx="5" cy="12" r=".7"/><circle cx="12" cy="12" r=".7"/><circle cx="19" cy="12" r=".7"/>'
+};
+const icon=n=>'<svg viewBox="0 0 24 24" aria-hidden="true">'+(paths[n]||paths.doc)+'</svg>';
+document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const agentNames=['Customer Support','Operations Assistant','Finance Copilot','HR Assistant'];
+const mk=(name,type='PDF',status='Ready',agents=2)=>({name,type,status,agents,updated:'Oct 12, 2026'});
+let bases=[
+ {id:1,name:'Customer Knowledge',description:'客户 FAQ、工单、SLA',group:'CUSTOMER',kind:'document',agents:3,items:[mk('Customer FAQ'),mk('Support ticket guidelines'),mk('Service level agreement','DOCX'),mk('Customer escalation policy','PDF','Ready',3)]},
+ {id:2,name:'Finance Knowledge',description:'营收、交易、财务报表',group:'FINANCE',kind:'document',agents:3,items:[mk('Revenue reporting guide'),mk('Transaction procedures'),mk('Financial statement template','XLSX'),mk('Expense reimbursement policy'),mk('Monthly closing checklist','DOCX')]},
+ {id:3,name:'HR Knowledge',description:'员工手册、休假、入职、HR SOP',group:'HR',kind:'document',agents:2,items:[mk('Employee handbook'),mk('Leave & attendance policy','DOCX'),mk('Onboarding checklist','PDF','Ready',2),mk('HR standard operating procedures','PDF','Processing',1)]},
+ {id:4,name:'Training Knowledge',description:'培训材料、考核标准、学习路径',group:'HR',kind:'document',agents:2,items:[mk('New employee training'),mk('Assessment standards'),mk('Learning pathways','DOCX')]},
+ {id:5,name:'IT Knowledge',description:'IT 新人考核、SOP、安全策略',group:'IT',kind:'document',agents:2,items:[mk('IT onboarding guide'),mk('IT support procedures'),mk('Information security policy'),mk('Account access guidelines'),mk('Incident response plan','DOCX'),mk('Device management policy','PDF','Failed',0)]},
+ {id:6,name:'Legal Knowledge',description:'合同、合规、法务意见',group:'LEGAL',kind:'document',agents:3,items:[mk('Contract review guidelines'),mk('Compliance requirements')]},
+ {id:7,name:'Customer Service Skills',description:'客服回复、工单分类、问题升级',group:'CUSTOMER',kind:'skill',agents:2,items:[mk('Draft customer replies','SKILL'),mk('Classify support tickets','SKILL'),mk('Escalate complex issues','SKILL')]},
+ {id:8,name:'Operations Data',description:'运营指标、客户信息、业务数据',group:'OPERATIONS',kind:'data',agents:2,items:[mk('Customer directory','API'),mk('Operations metrics','DATABASE'),mk('Support ticket feed','API','Processing',1)]}
+];
+const typeLabel={document:'Documents',skill:'Skills',data:'Data Sources'};
+const itemLabel={document:'document',skill:'skill',data:'source'};
+let selected=3,category='all',tab='content',selectedItem=-1;
+const $=id=>document.getElementById(id);
+const current=()=>bases.find(b=>b.id===selected);
+function drawCategories(){
+ $('categories').innerHTML=[['all','All'],['document','Documents'],['skill','Skills'],['data','Data Sources']].map(([k,l])=>'<button class="category '+(category===k?'active':'')+'" data-category="'+k+'">'+l+'<span>'+bases.filter(b=>k==='all'||b.kind===k).length+'</span></button>').join('');
+}
+function renderBases(){
+ drawCategories();
+ const q=$('baseSearch').value.toLowerCase();
+ const visible=bases.filter(b=>(category==='all'||b.kind===category)&&(b.name+' '+b.description).toLowerCase().includes(q));
+ if(!visible.some(b=>b.id===selected)){selected=visible[0]?.id??null;selectedItem=-1;tab='content'}
+ let previous='';
+ $('baseList').innerHTML=visible.map(b=>{
+ const group=previous!==b.group?'<div class="group-title">'+b.group+'</div>':'';
+ previous=b.group;
+ return group+'<button class="base '+(b.id===selected?'selected':'')+'" data-base="'+b.id+'" aria-pressed="'+(b.id===selected)+'"><span class="file-icon '+b.kind+'">'+icon(b.kind==='skill'?'spark':b.kind==='data'?'data':'doc')+'</span><span class="base-copy"><strong>'+esc(b.name)+'</strong><p>'+esc(b.description)+'</p><small class="base-count"><span class="dot"></span>'+b.items.length+' '+typeLabel[b.kind].toLowerCase()+' · '+b.agents+' agents</small></span></button>';
+ }).join('')||'<div class="empty">No knowledge bases found.</div>';
+ $('baseTotal').textContent=visible.length;
+ $('baseFoot').textContent=visible.length+' knowledge bases';
+ renderContent();
+}
+function renderContent(){
+ const b=current();
+ $('baseGroup').textContent=b?b.group+' / KNOWLEDGE BASE':'KNOWLEDGE BASE';
+ $('baseName').textContent=b?.name||'No matching results';
+ $('baseDescription').textContent=b?.description||'Try another search or category.';
+ $('addItem').disabled=!b;
+ $('addLabel').textContent='Add '+(b?itemLabel[b.kind]:'document');
+ $('itemSearch').placeholder='Search '+(b?typeLabel[b.kind].toLowerCase():'content')+'...';
+ $('tabs').innerHTML=b?'<button class="tab '+(tab==='content'?'active':'')+'" data-tab="content">'+typeLabel[b.kind]+'<span>'+b.items.length+'</span></button><button class="tab '+(tab==='agents'?'active':'')+'" data-tab="agents">Agents<span>'+b.agents+'</span></button>':'';
+ $('statusFilter').style.display=tab==='agents'?'none':'';
+ renderTable();renderDetail();
+}
+function renderTable(){
+ const b=current();
+ if(!b){$('tableArea').innerHTML='<div class="empty">Select a knowledge base to view its content.</div>';$('resultCount').textContent='0 results';return}
+ const q=$('itemSearch').value.toLowerCase();
+ if(tab==='agents'){
+ const names=agentNames.slice(0,b.agents).filter(n=>n.toLowerCase().includes(q));
+ $('tableArea').innerHTML='<table><thead><tr><th>Agent name</th><th>Status</th></tr></thead><tbody>'+names.map(n=>'<tr><td><div class="document-name"><span class="agent-avatar">'+n.charAt(0)+'</span>'+esc(n)+'</div></td><td><span class="status">Connected</span></td></tr>').join('')+'</tbody></table>'+(names.length?'':'<div class="empty">No matching agents.</div>');
+ $('resultCount').textContent=names.length+' connected agents';return;
+ }
+ const items=b.items.map((d,i)=>({...d,index:i})).filter(d=>d.name.toLowerCase().includes(q)&&($('statusFilter').value==='all'||d.status===$('statusFilter').value));
+ $('tableArea').innerHTML='<table><thead><tr><th>Name</th><th>Status</th><th class="optional-column">Agents</th><th></th></tr></thead><tbody>'+items.map(d=>'<tr class="item '+(selectedItem===d.index?'chosen':'')+'" data-item="'+d.index+'" tabindex="0" aria-label="View '+esc(d.name)+'"><td><div class="document-name">'+icon(b.kind==='data'?'data':b.kind==='skill'?'spark':'doc')+'<div>'+esc(d.name)+'<div class="doc-sub">'+d.type+' · Updated Oct 12</div></div></div></td><td><span class="status '+d.status.toLowerCase()+'"><span class="dot" style="background:currentColor"></span>'+d.status+'</span></td><td class="optional-column number">'+d.agents+'</td><td><button class="icon-button" data-item-menu="'+d.index+'" aria-label="Actions for '+esc(d.name)+'">'+icon('more')+'</button></td></tr>').join('')+'</tbody></table>'+(items.length?'':'<div class="empty">No matching content.</div>');
+ $('resultCount').textContent=items.length+' '+typeLabel[b.kind].toLowerCase();
+}
+function renderDetail(){
+ const b=current();
+ if(!b){$('detail').innerHTML='<div class="empty">Details will appear here.</div>';return}
+ const d=selectedItem>=0?b.items[selectedItem]:null;
+ const name=d?.name||b.name,agentCount=d?d.agents:b.agents;
+ $('detail').innerHTML='<div class="detail-top"><div class="detail-icon">'+icon(b.kind==='skill'?'spark':b.kind==='data'?'data':'doc')+'</div>'+(d?'<button class="icon-button" id="backToBase" title="Back to knowledge base" aria-label="Back to knowledge base">✕</button>':'<span class="status">Ready</span>')+'</div><h2 class="detail-title">'+esc(name)+'</h2><p class="detail-type">'+(d?d.type+' '+itemLabel[b.kind]:'Knowledge base')+'</p><div class="detail-section"><h3>Description</h3><p class="description">'+esc(d?'Part of '+b.name+'. Available to connected agents when ready.':b.description)+'</p>'+(!d?'<div class="stat-grid"><div class="stat"><b>'+b.items.length+'</b><small>'+typeLabel[b.kind]+'</small></div><div class="stat"><b>'+b.agents+'</b><small>Connected agents</small></div></div>':'')+'</div><div class="detail-section"><h3>Connected agents <span style="float:right;color:#a0aabb;font-weight:400">'+agentCount+'</span></h3>'+agentNames.slice(0,Math.min(2,agentCount)).map(n=>'<div class="agent"><span class="agent-avatar">'+n.charAt(0)+'</span><span>'+n+'</span><em>●</em></div>').join('')+(agentCount>2?'<button class="icon-button extra-agents" id="moreAgents">+'+(agentCount-2)+' more agent'+(agentCount>3?'s':'')+'</button>':'')+(agentCount===0?'<p class="description">No connected agents</p>':'')+'</div><div class="detail-section"><h3>Information</h3><div class="meta-row"><span>Status</span><b>'+(d?.status||'Ready')+'</b></div><div class="meta-row"><span>Visibility</span><b>Company only</b></div><div class="meta-row"><span>Company</span><b>J1 (MIDVALLEY)</b></div><div class="meta-row"><span>Last updated</span><b>Oct 12, 2026</b></div><div class="meta-row"><span>Created by</span><b>Demo User</b></div></div><button class="btn detail-link" id="editDetail">'+icon('settings')+'Edit '+(d?itemLabel[b.kind]:'knowledge base')+'</button>';
+}
+function notify(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2600)}
+let modalReturn=null;
+function modal(title,html){modalReturn=document.activeElement;$('modalTitle').textContent=title;$('modalBody').innerHTML=html;$('mask').classList.add('open');setTimeout(()=>$('modalBody').querySelector('input,select,button')?.focus(),20)}
+function closeModal(){$('mask').classList.remove('open');modalReturn?.focus()}
+function openCreate(){
+ modal('Create knowledge base','<form id="createForm"><label for="newName">Name</label><input id="newName" required placeholder="e.g. Product Knowledge"><label for="newKind">Category</label><select id="newKind"><option value="document">Documents</option><option value="skill">Skills</option><option value="data">Data Sources</option></select><label for="newDesc">Description</label><textarea id="newDesc" placeholder="Describe this knowledge base"></textarea><div class="modal-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Create</button></div></form>');
+}
+function templates(manage=false){
+ modal(manage?'Manage templates':'Use a template','<p class="description">Start with a structured knowledge base for your team.</p>'+['Employee Onboarding','Customer Support','Finance Essentials'].map((n,i)=>'<div class="template"><span class="file-icon">'+icon('doc')+'</span><div><strong>'+n+'</strong><small>'+(i===0?'HR':i===1?'Customer':'Finance')+' · Company template</small></div><button class="btn" data-template="'+i+'">'+(manage?'View':'Use')+'</button></div>').join(''));
+}
+$('categories').onclick=e=>{const t=e.target.closest('[data-category]');if(t){category=t.dataset.category;renderBases()}};
+$('baseSearch').oninput=renderBases;
+$('baseList').onclick=e=>{const t=e.target.closest('[data-base]');if(t){selected=Number(t.dataset.base);selectedItem=-1;tab='content';$('itemSearch').value='';$('statusFilter').value='all';renderBases()}};
+$('tabs').onclick=e=>{const t=e.target.closest('[data-tab]');if(t){tab=t.dataset.tab;$('itemSearch').value='';renderContent()}};
+$('itemSearch').oninput=renderTable;
+$('statusFilter').onchange=renderTable;
+$('showBase').onclick=()=>{selectedItem=-1;renderTable();renderDetail()};
+function selectRow(e){
+ const menu=e.target.closest('[data-item-menu]');
+ if(menu){e.stopPropagation();selectedItem=Number(menu.dataset.itemMenu);renderTable();renderDetail();const d=current().items[selectedItem];modal('Content actions','<p class="description">'+esc(d.name)+'</p><div class="modal-actions"><button class="btn" id="renameContent">Rename</button><button class="btn primary" id="viewContent">View details</button></div>');return}
+ const row=e.target.closest('[data-item]');if(row){selectedItem=Number(row.dataset.item);renderTable();renderDetail()}
+}
+$('tableArea').onclick=selectRow;
+$('tableArea').onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr[data-item]')){e.preventDefault();selectRow(e)}};
+$('detail').onclick=e=>{
+ if(e.target.closest('#backToBase')){selectedItem=-1;renderTable();renderDetail()}
+ if(e.target.closest('#moreAgents')){tab='agents';$('itemSearch').value='';renderContent()}
+ if(e.target.closest('#editDetail'))openEdit();
+};
+function openEdit(){
+ const b=current(),d=selectedItem>=0?b.items[selectedItem]:null;
+ modal(d?'Edit '+itemLabel[b.kind]:'Edit knowledge base','<form id="editForm"><label for="editName">Name</label><input id="editName" required value="'+esc(d?.name||b.name)+'">'+(!d?'<label for="editDesc">Description</label><textarea id="editDesc">'+esc(b.description)+'</textarea>':'')+'<div class="modal-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Save changes</button></div></form>');
+}
+$('create').onclick=openCreate;
+$('use').onclick=()=>templates();
+$('manage').onclick=()=>templates(true);
+$('addItem').onclick=()=>{
+ const b=current();if(!b)return;
+ modal('Add '+itemLabel[b.kind],'<form id="addForm"><label for="itemName">Name</label><input id="itemName" required placeholder="Enter a name"><label for="itemType">Type</label><select id="itemType">'+(b.kind==='document'?['PDF','DOCX','XLSX','TXT']:b.kind==='skill'?['SKILL']:['API','DATABASE','CSV']).map(v=>'<option>'+v+'</option>').join('')+'</select><p class="description" style="margin-top:15px">Preview: adds a sample item to this knowledge base.</p><div class="modal-actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Add '+itemLabel[b.kind]+'</button></div></form>');
+};
+$('closeModal').onclick=closeModal;
+$('mask').onclick=e=>{if(e.target===$('mask')||e.target.closest('[data-close]'))closeModal()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+$('modalBody').onsubmit=e=>{
+ e.preventDefault();
+ if(e.target.id==='createForm'){
+ const name=$('newName').value.trim();if(!name){$('newName').focus();return}
+ const b={id:Date.now(),name,description:$('newDesc').value.trim()||'Your team knowledge',group:'CUSTOM',kind:$('newKind').value,agents:0,items:[]};
+ bases.push(b);selected=b.id;category='all';selectedItem=-1;tab='content';$('baseSearch').value='';$('itemSearch').value='';$('statusFilter').value='all';notify('Knowledge base created in preview');
+ }
+ if(e.target.id==='addForm'){
+ const name=$('itemName').value.trim();if(!name){$('itemName').focus();return}
+ current().items.push(mk(name,$('itemType').value,'Ready',current().agents));selectedItem=current().items.length-1;tab='content';$('itemSearch').value='';$('statusFilter').value='all';notify('Sample item added');
+ }
+ if(e.target.id==='editForm'){
+ const name=$('editName').value.trim();if(!name){$('editName').focus();return}
+ if(selectedItem>=0)current().items[selectedItem].name=name;
+ else{current().name=name;current().description=$('editDesc').value}
+ notify('Changes saved in preview');
+ }
+ closeModal();renderBases();
+};
+$('modalBody').onclick=e=>{
+ if(e.target.closest('#renameContent'))openEdit();
+ if(e.target.closest('#viewContent'))closeModal();
+ const t=e.target.closest('[data-template]');
+ if(t){
+ const i=Number(t.dataset.template),names=['Employee Onboarding','Customer Support','Finance Essentials'];
+ if($('modalTitle').textContent==='Manage templates'){modal(names[i],'<p class="description">Includes a handbook, procedures and checklists. Use this template to create a new company knowledge base.</p><div class="modal-actions"><button class="btn primary" data-adopt="'+i+'">Use template</button></div>')}
+ else adoptTemplate(i);
+ }
+ const adopt=e.target.closest('[data-adopt]');if(adopt)adoptTemplate(Number(adopt.dataset.adopt));
+};
+function adoptTemplate(i){
+ const names=['Employee Onboarding','Customer Support','Finance Essentials'];
+ const b={id:Date.now(),name:names[i],description:'Created from a company template',group:['HR','CUSTOMER','FINANCE'][i],kind:'document',agents:0,items:[mk('Overview & guidelines','PDF','Ready',0),mk('Standard procedures','DOCX','Ready',0),mk('Getting started checklist','PDF','Ready',0)]};
+ bases.push(b);selected=b.id;category='all';selectedItem=-1;tab='content';$('baseSearch').value='';$('itemSearch').value='';$('statusFilter').value='all';closeModal();renderBases();notify('Template added in preview');
+}
+document.querySelectorAll('[data-nav]').forEach(el=>el.onclick=()=>notify(el.dataset.nav==='AI'?'You are viewing the AI Knowledge workspace':'This preview focuses on the Knowledge workspace.'));
+$('notifications').onclick=()=>notify('No new notifications');
+renderBases();
+</script>
+</body>
+</html>

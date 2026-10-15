@@ -21,6 +21,7 @@ import type {
   KnowledgeDataSource,
   KnowledgeSkill,
 } from '@/modules/ai/knowledge/types/knowledge'
+import { deriveBaseStatus } from '@/modules/ai/knowledge/types/knowledge'
 import { SEED_TEMPLATES, type SeedTemplate } from './templates'
 import {
   canRead,
@@ -46,7 +47,9 @@ function buildInitialState(): MockState {
   return {
     agents: SEED_AGENTS.map((a) => ({
       ...a,
-      knowledgeBaseIds: [...a.knowledgeBaseIds],
+      // Inactive agents are not assignable. Normalize old seed links away so
+      // draft/disabled agents cannot silently become assigned when re-activated.
+      knowledgeBaseIds: a.status === 'active' ? [...a.knowledgeBaseIds] : [],
       model: { ...a.model },
     })),
     bases: SEED_KNOWLEDGE_BASES.map((b) => ({
@@ -93,6 +96,7 @@ export function agentIdsForBase(
   restrictToCompanyId?: string,
 ): string[] {
   return state.agents
+    .filter((agent) => agent.status === 'active')
     .filter((agent) => agent.knowledgeBaseIds.includes(baseId))
     .filter(
       (agent) => !restrictToCompanyId || agent.companyId === restrictToCompanyId,
@@ -104,11 +108,28 @@ export function effectiveAgentIdsForDocument(documentId: string): {
   agentIds: string[]
   source: 'base' | 'document'
 } {
-  const override = state.documentOverrides.get(documentId)
-  if (override !== undefined) return { agentIds: [...override], source: 'document' }
   const doc = state.documents.find((d) => d.id === documentId)
   if (!doc) return { agentIds: [], source: 'base' }
-  return { agentIds: agentIdsForBase(doc.baseId), source: 'base' }
+  const base = state.bases.find((item) => item.id === doc.baseId)
+  const eligible = (ids: string[]) =>
+    ids.filter((id) =>
+      state.agents.some(
+        (agent) =>
+          agent.id === id &&
+          agent.status === 'active' &&
+          (!base || agent.companyId === base.companyId),
+      ),
+    )
+
+  const override = state.documentOverrides.get(documentId)
+  if (override !== undefined) {
+    return { agentIds: eligible(override), source: 'document' }
+  }
+
+  return {
+    agentIds: agentIdsForBase(doc.baseId, base?.companyId),
+    source: 'base',
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -116,20 +137,55 @@ export function effectiveAgentIdsForDocument(documentId: string): {
 /* ------------------------------------------------------------------ */
 
 export function setBaseAgents(baseId: string, agentIds: string[]): void {
-  const set = new Set(agentIds)
+  const base = state.bases.find((item) => item.id === baseId)
+  if (!base) return
+
+  // Only ACTIVE agents owned by the base's company are assignable.
+  const assignable = new Set(
+    agentIds.filter((id) =>
+      state.agents.some(
+        (agent) =>
+          agent.id === id &&
+          agent.status === 'active' &&
+          agent.companyId === base.companyId,
+      ),
+    ),
+  )
+
   for (const agent of state.agents) {
+    if (agent.companyId !== base.companyId) continue
     const has = agent.knowledgeBaseIds.includes(baseId)
-    if (set.has(agent.id) && !has) {
+    if (assignable.has(agent.id) && !has) {
       agent.knowledgeBaseIds = [...agent.knowledgeBaseIds, baseId]
-    } else if (!set.has(agent.id) && has) {
+    } else if (!assignable.has(agent.id) && has) {
       agent.knowledgeBaseIds = agent.knowledgeBaseIds.filter((id) => id !== baseId)
     }
   }
 }
 
 export function setDocumentOverride(documentId: string, agentIds: string[] | null): void {
-  if (agentIds === null) state.documentOverrides.delete(documentId)
-  else state.documentOverrides.set(documentId, [...agentIds])
+  if (agentIds === null) {
+    state.documentOverrides.delete(documentId)
+    return
+  }
+
+  const document = state.documents.find((item) => item.id === documentId)
+  const base = document
+    ? state.bases.find((item) => item.id === document.baseId)
+    : undefined
+
+  if (!document || !base) return
+
+  const assignable = agentIds.filter((id) =>
+    state.agents.some(
+      (agent) =>
+        agent.id === id &&
+        agent.status === 'active' &&
+        agent.companyId === base.companyId,
+    ),
+  )
+
+  state.documentOverrides.set(documentId, [...new Set(assignable)])
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,28 +203,26 @@ export function toAgentListItem(agent: SeedAgent): AgentListItem {
     status: agent.status,
     createdAt: agent.createdAt,
     model: { ...agent.model },
-    knowledgeBaseCount: agent.knowledgeBaseIds.length,
-    knowledgeBaseIds: [...agent.knowledgeBaseIds],
+    knowledgeBaseCount:
+      agent.status === 'active' ? agent.knowledgeBaseIds.length : 0,
+    knowledgeBaseIds:
+      agent.status === 'active' ? [...agent.knowledgeBaseIds] : [],
   }
 }
 
-export function toBaseListItem(base: SeedKnowledgeBase, restrictToCompanyId?: string,) {
+export function toBaseListItem(
+  base: SeedKnowledgeBase,
+  restrictToCompanyId?: string,
+) {
   const agentIds = agentIdsForBase(base.id, restrictToCompanyId)
   const documents = state.documents.filter((d) => d.baseId === base.id)
-  const skillCount = state.skills.filter((s) => s.baseId === base.id).length
-  const dataSourceCount = state.dataSources.filter((d) => d.baseId === base.id).length
-
-  let status: SeedKnowledgeBase['status'] = base.status
-  if (base.kind === 'document') {
-    if (documents.length === 0) status = 'empty'
-    else if (documents.some((d) => d.status === 'failed')) status = 'failed'
-    else if (documents.some((d) => d.status === 'processing')) status = 'processing'
-    else status = 'ready'
-  } else if (base.kind === 'skill') {
-    status = skillCount === 0 ? 'empty' : 'ready'
-  } else if (base.kind === 'data') {
-    status = dataSourceCount === 0 ? 'empty' : 'ready'
-  }
+  const skills = state.skills.filter((s) => s.baseId === base.id)
+  const dataSources = state.dataSources.filter((d) => d.baseId === base.id)
+  const status = deriveBaseStatus(base.kind ?? 'document', {
+    documents,
+    skills,
+    dataSources,
+  })
 
   return {
     id: base.id,
@@ -222,7 +276,10 @@ export function listTemplatesForCompany(
   activeCompanyId: string,
 ): SeedTemplate[] {
   return state.templates
-    .filter((tpl) => canRead(user, tpl) && tpl.allowedCompanyIds.includes(activeCompanyId))
+    .filter(
+      (tpl) =>
+        canRead(user, tpl) && tpl.allowedCompanyIds.includes(activeCompanyId),
+    )
     .map((tpl) => ({ ...tpl, allowedCompanyIds: [...tpl.allowedCompanyIds] }))
 }
 
