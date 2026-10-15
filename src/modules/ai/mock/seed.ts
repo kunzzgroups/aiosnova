@@ -1,4 +1,5 @@
 import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
+
 /**
  * Mock seed data.
  *
@@ -12,7 +13,9 @@ import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import type { AgentModelConfig } from '@/modules/ai/agents/types/agent'
 import type {
   KnowledgeBaseKind,
+  KnowledgeBaseStatus,
   KnowledgeDataSource,
+  KnowledgeManualMode,
   KnowledgeSkill,
 } from '@/modules/ai/knowledge/types/knowledge'
 
@@ -44,7 +47,7 @@ export type SeedKnowledgeBase = {
   kind: KnowledgeBaseKind
   createdAt: string
   updatedAt: string
-  status: 'ready' | 'processing' | 'failed' | 'empty'
+  status: KnowledgeBaseStatus
 }
 
 export type SeedDocument = {
@@ -54,6 +57,8 @@ export type SeedDocument = {
   kind: 'file' | 'record'
   type: 'contract' | 'invoice' | 'policy' | 'record'
   status: 'ready' | 'processing' | 'failed'
+  /** User-controlled usage mode. Defaults to active when omitted. */
+  mode?: KnowledgeManualMode
   chunkCount: number
   sizeBytes: number
   uploadedAt: string
@@ -256,7 +261,7 @@ const RAW_AGENTS: RawAgent[] = [
     ],
     model: { provider: 'anthropic', model: 'claude-sonnet-4', temperature: 0.3, topP: 1, maxTokens: 8192 },
   },
-    // ---------- J2-owned agents ----------
+  // ---------- J2-owned agents ----------
   {
     id: 'ag-j2-hr',
     name: 'J2 HR Agent',

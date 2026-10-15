@@ -1,0 +1,278 @@
+/* Templates page — intentionally mirrors AgentsPage main-table styling. */
+
+.templates-page .console-table--templates .templates-table__description {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.templates-page .console-table--templates .templates-table__visibility {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.templates-page .console-table--templates .console-table__actions {
+  text-align: center;
+}
+
+.templates-page .console-table--templates td.console-table__actions {
+  white-space: nowrap;
+}
+
+/* Edit-template visibility picker */
+
+.promote-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-bottom: var(--space-2);
+}
+
+.promote-toolbar--bulk {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-bottom: var(--space-3);
+}
+
+.promote-toolbar__search {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.promote-toolbar__count {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.promote-visibility {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
+  gap: 0.35rem;
+  max-height: 20rem;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  list-style: none;
+  min-width: 0;
+}
+
+.promote-visibility__item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.promote-visibility__item:hover {
+  border-color: var(--color-brand);
+}
+
+.promote-visibility__item.is-checked {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.promote-visibility__item.is-locked {
+  cursor: default;
+  opacity: 0.9;
+}
+
+.promote-visibility__item input[type='checkbox'] {
+  flex: 0 0 auto;
+  accent-color: var(--color-brand);
+}
+
+.promote-visibility__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promote-visibility__badge {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.console-readonly {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-style: italic;
+}
+
+@media (max-width: 720px) {
+  .promote-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .promote-toolbar__search {
+    flex: 1 1 100%;
+  }
+
+  .promote-visibility {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* =========================================================
+   Manage Templates — restore complete table presentation
+   ========================================================= */
+
+/* The shared CSS cleanup removed the visual layer for console-chip.
+   Restore it only inside the Templates table. */
+.templates-page .console-table--templates .console-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.templates-page .console-table--templates .console-chip--muted {
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+}
+
+.templates-page .console-table--templates .console-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Preserve the previous compact table proportions. */
+.templates-page .console-table--templates {
+  width: 100%;
+  table-layout: fixed;
+  min-width: 1100px;
+}
+
+.templates-page .console-table--templates th,
+.templates-page .console-table--templates td {
+  box-sizing: border-box;
+}
+
+.templates-page .console-table--templates th:first-child,
+.templates-page .console-table--templates td:first-child {
+  padding-left: 1.25rem;
+}
+
+.templates-page .console-table--templates th:nth-child(5),
+.templates-page .console-table--templates td:nth-child(5) {
+  text-align: center;
+}
+
+.templates-page .console-table--templates th:last-child,
+.templates-page .console-table--templates td:last-child {
+  width: 100px;
+  min-width: 100px;
+  padding-left: 0.75rem;
+  padding-right: 1rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* IMPORTANT: do not resize system IconButton here.
+   Employees/System classes own its dimensions. */
+.templates-page .console-table--templates td:last-child .ui-button {
+  padding: 0;
+}
+
+/* Internal-scroll page: toolbar and pagination stay fixed,
+   only the table area scrolls. */
+.templates-page.console-page--internal-table-scroll > .console-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.templates-page.console-page--internal-table-scroll .console-table-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.templates-page.console-page--internal-table-scroll > .console-panel > .identity-directory-footer {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+
+/* =========================================================
+   P3 — Templates chips: stable long-name handling
+   ========================================================= */
+
+.templates-page .templates-table__kind-chip {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.templates-page .templates-table__visibility {
+  gap: 0.3rem;
+}
+
+.templates-page .templates-table__company-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.templates-page .templates-table__overflow-chip {
+  flex: 0 0 auto;
+}
+
+.templates-page .templates-table__owner-chip {
+  display: inline-flex;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.templates-page .console-table--templates td:nth-child(5) {
+  overflow: hidden;
+}

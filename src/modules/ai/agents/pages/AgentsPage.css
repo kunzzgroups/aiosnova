@@ -1,0 +1,74 @@
+/* ---------------------------------------------------------------------------
+   AI Agents page-specific presentation.
+   Shared table/panel/pagination rules stay in AiConsole.css.
+   --------------------------------------------------------------------------- */
+
+.ai-agents-page .console-table--agents {
+  min-width: 76rem;
+}
+
+.ai-agents-page .console-table--agents thead th {
+  height: 53.5px !important;
+  min-height: 53.5px !important;
+  box-sizing: border-box !important;
+  padding: 16px 24px !important;
+  line-height: 21px !important;
+  vertical-align: middle !important;
+  font-family: "DM Sans", "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  white-space: nowrap !important;
+  background-color: var(--color-bg-muted) !important;
+}
+
+.ai-agents-page .console-table--agents th:nth-child(1) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents th:nth-child(2) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents th:nth-child(3) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents th:nth-child(4) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents th:nth-child(5) {
+  text-align: center !important;
+}
+
+.ai-agents-page .console-table--agents th:nth-child(6) {
+  text-align: center !important;
+}
+
+.ai-agents-page .console-table--agents td:nth-child(1) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents td:nth-child(2) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents td:nth-child(3) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents td:nth-child(4) {
+  text-align: left !important;
+}
+
+.ai-agents-page .console-table--agents td:nth-child(5) {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.ai-agents-page .console-table--agents td:nth-child(6) {
+  text-align: center !important;
+  vertical-align: middle !important;
+}

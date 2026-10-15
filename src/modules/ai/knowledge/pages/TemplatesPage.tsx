@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Drawer } from '@/components/ui/Drawer'
 import { FlashToasts } from '@/components/ui/FlashToasts'
@@ -10,6 +11,9 @@ import { TextField } from '@/components/ui/TextField'
 import { useCompanyStore } from '@/stores/companyStore'
 import { ApiError } from '@/services/httpClient'
 import { IconPencil, IconTrash } from '@/components/icons/Icons'
+import { TablePanel } from '@/components/ui/TablePanel'
+import { TableToolbar } from '@/components/ui/TableToolbar'
+import { TablePagination } from '@/components/ui/TablePagination'
 import {
     deleteKnowledgeTemplate,
     fetchTemplatesForCompany,
@@ -20,36 +24,30 @@ import {
 } from '../services/templateService'
 import type { KnowledgeBaseKind } from '../types/knowledge'
 import '@/modules/ai/shared/AiConsole.css'
-import './KnowledgePage.css'
-
+import './TemplatesPage.css'
 const FORM_ID = 'template-edit-form'
-
 const KIND_LABEL_KEY: Record<KnowledgeBaseKind, string> = {
     document: 'ai.knowledge.kindDocument',
     skill: 'ai.knowledge.kindSkill',
     data: 'ai.knowledge.kindData',
 }
-
-/**
- * Template library for the ACTIVE company.
- *
- * Only templates whose `allowedCompanyIds` includes the active company are
- * listed. Edit is gated to editor+ of the template's OWNER company; Delete
- * is gated to admin of the owner. Other companies that merely see the
- * template show "Read only".
- */
 export function TemplatesPage() {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const companyId = useCompanyStore((state) => state.companyId)
     const companies = useCompanyStore((state) => state.companies)
-
     const [templates, setTemplates] = useState<TemplateListItem[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [message, setMessage] = useState<string | null>(null)
-
-    // ---- Edit drawer
+    const [searchQuery, setSearchQuery] = useState('')
+    // Pagination mirrors AgentsPage / shared TablePagination behaviour.
+    // pageSize === 0 means Auto.
+    const [pageSize, setPageSize] = useState(0)
+    const [autoPageSize, setAutoPageSize] = useState(10)
+    const [page, setPage] = useState(1)
+    const tableRef = useRef<HTMLDivElement>(null)
+    const autoFitRowMeasurement = useRef({ width: 0, height: 0 })
     const [editOpen, setEditOpen] = useState(false)
     const [editing, setEditing] = useState<TemplateListItem | null>(null)
     const [editName, setEditName] = useState('')
@@ -58,13 +56,10 @@ export function TemplatesPage() {
     const [editVisibility, setEditVisibility] = useState<string[]>([])
     const [editSearch, setEditSearch] = useState('')
     const [isSaving, setIsSaving] = useState(false)
-
-    // ---- Delete dialog
-    const [pendingDelete, setPendingDelete] = useState<TemplateListItem | null>(null)
+    const [pendingDelete, setPendingDelete] =
+        useState<TemplateListItem | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
     const [deleteError, setDeleteError] = useState<string | null>(null)
-
-    const companyLabel = companies.find((c) => c.value === companyId)?.label ?? ''
 
     const load = useCallback(async () => {
         setIsLoading(true)
@@ -79,11 +74,123 @@ export function TemplatesPage() {
             setIsLoading(false)
         }
     }, [companyId, t])
-
     useEffect(() => {
         void load()
     }, [load])
-
+    const visibleTemplates = useMemo(() => {
+        const needle = searchQuery.trim().toLowerCase()
+        const list = needle
+            ? templates.filter((template) =>
+                template.name.toLowerCase().includes(needle),
+            )
+            : templates
+        return list
+            .slice()
+            .sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, {
+                    numeric: true,
+                    sensitivity: 'base',
+                }),
+            )
+    }, [templates, searchQuery])
+    const effectivePageSize = pageSize || autoPageSize
+    const pageCount = Math.max(
+        1,
+        Math.ceil(visibleTemplates.length / effectivePageSize),
+    )
+    const currentPage = Math.min(page, pageCount)
+    const paginatedTemplates = visibleTemplates.slice(
+        (currentPage - 1) * effectivePageSize,
+        currentPage * effectivePageSize,
+    )
+    useEffect(() => {
+        setPage(1)
+    }, [searchQuery, effectivePageSize])
+    // Auto page size: fit as many rows as the shared table area can display.
+    useEffect(() => {
+        if (isLoading || !visibleTemplates.length) return
+        const container = tableRef.current
+        const table = container?.querySelector('table')
+        if (!container || !table) return
+        let frame = 0
+        function measureRows() {
+            if (!container || !table) return
+            const rows = Array.from(
+                table.querySelectorAll<HTMLTableRowElement>('tbody tr'),
+            )
+            if (!rows.length) return
+            rows.forEach((row) => row.style.removeProperty('height'))
+            const headerHeight =
+                table.querySelector('thead')?.getBoundingClientRect().height ?? 0
+            const availableHeight = container.clientHeight - headerHeight
+            if (availableHeight <= 0) return
+            const width = container.clientWidth
+            if (autoFitRowMeasurement.current.width !== width) {
+                autoFitRowMeasurement.current = { width, height: 0 }
+            }
+            if (currentPage === 1 || !autoFitRowMeasurement.current.height) {
+                const naturalHeight = Math.max(
+                    1,
+                    ...rows.map((row) => row.getBoundingClientRect().height),
+                )
+                autoFitRowMeasurement.current.height = Math.max(
+                    autoFitRowMeasurement.current.height,
+                    naturalHeight,
+                )
+            }
+            const naturalHeight = autoFitRowMeasurement.current.height
+            if (pageSize === 0) {
+                const limit = Math.max(
+                    1,
+                    Math.floor(availableHeight / naturalHeight),
+                )
+                setAutoPageSize((current) =>
+                    current === limit ? current : limit,
+                )
+                const uniformHeight = Math.max(
+                    naturalHeight,
+                    availableHeight / limit,
+                )
+                rows.forEach((row) => {
+                    row.style.height = `${uniformHeight}px`
+                })
+                return
+            }
+            // Explicit page sizes (10 / 25 / ...):
+            // fill the available body only when this is a full page.
+            // A short last page keeps its natural row height.
+            if (rows.length === pageSize) {
+                const uniformHeight = Math.max(
+                    naturalHeight,
+                    availableHeight / rows.length,
+                )
+                rows.forEach((row) => {
+                    row.style.height = `${uniformHeight}px`
+                })
+            }
+        }
+        function scheduleMeasure() {
+            cancelAnimationFrame(frame)
+            frame = requestAnimationFrame(measureRows)
+        }
+        const observer = new ResizeObserver(scheduleMeasure)
+        observer.observe(container)
+        observer.observe(table)
+        scheduleMeasure()
+        return () => {
+            observer.disconnect()
+            cancelAnimationFrame(frame)
+            table
+                .querySelectorAll<HTMLTableRowElement>('tbody tr')
+                .forEach((row) => row.style.removeProperty('height'))
+        }
+    }, [
+        isLoading,
+        visibleTemplates.length,
+        pageSize,
+        currentPage,
+        effectivePageSize,
+    ])
     function openEdit(template: TemplateListItem) {
         setEditing(template)
         setEditName(template.name)
@@ -94,12 +201,10 @@ export function TemplatesPage() {
         setError(null)
         setEditOpen(true)
     }
-
     function closeEdit() {
         setEditOpen(false)
         setEditing(null)
     }
-
     async function handleSave() {
         if (!editing) return
         if (!editName.trim()) {
@@ -133,7 +238,6 @@ export function TemplatesPage() {
             setIsSaving(false)
         }
     }
-
     async function handleDelete() {
         if (!pendingDelete || isDeleting) return
         setIsDeleting(true)
@@ -153,10 +257,6 @@ export function TemplatesPage() {
             setIsDeleting(false)
         }
     }
-
-    /* ---------------- Visibility picker helpers ---------------- */
-
-    /** Owner company first, then alphabetical. */
     const orderedCompanies = useMemo(() => {
         if (!editing) return companies
         const ownerId = editing.ownerCompanyId
@@ -167,7 +267,6 @@ export function TemplatesPage() {
             .sort((a, b) => a.label.localeCompare(b.label))
         return owner ? [owner, ...rest] : companies
     }, [companies, editing])
-
     const visibleEditCompanies = useMemo(() => {
         const needle = editSearch.trim().toLowerCase()
         if (!needle) return orderedCompanies
@@ -175,17 +274,15 @@ export function TemplatesPage() {
             c.label.toLowerCase().includes(needle),
         )
     }, [orderedCompanies, editSearch])
-
     function toggleEditCompany(id: string) {
         const ownerId = editing?.ownerCompanyId
-        if (id === ownerId) return    // owner is locked
+        if (id === ownerId) return
         setEditVisibility((current) =>
             current.includes(id)
                 ? current.filter((x) => x !== id)
                 : [...current, id],
         )
     }
-
     function editSelectAll() {
         const ownerId = editing?.ownerCompanyId
         const next = new Set(editVisibility)
@@ -193,156 +290,262 @@ export function TemplatesPage() {
         if (ownerId) next.add(ownerId)
         setEditVisibility([...next])
     }
-
     function editSelectNone() {
         const ownerId = editing?.ownerCompanyId
         setEditVisibility(ownerId ? [ownerId] : [])
     }
-
+    const isEmpty = !isLoading && visibleTemplates.length === 0
     return (
-        <div className="console-page">
+        <div className="console-page console-page--internal-table-scroll templates-page">
             <FlashToasts
                 error={error}
                 message={message}
                 onClearError={() => setError(null)}
                 onClearMessage={() => setMessage(null)}
             />
-
-            <section className="console-panel">
-                <div className="console-panel__title-row">
-                    <h2>{t('ai.knowledge.templatesTitle', 'Template library')}</h2>
-                    <Button
-                        variant="secondary"
-                        onClick={() => void navigate('/ai/ai/knowledge')}
-                    >
-                        {t('ai.knowledge.back', 'Back')}
-                    </Button>
-                </div>
-                <p className="console-hint">
-                    {companyLabel
-                        ? t(
-                            'ai.knowledge.templatesScope',
-                            'Templates visible to {{company}}. Only the owning company can edit or delete.',
-                            { company: companyLabel },
-                        )
-                        : t(
-                            'ai.knowledge.templatesHint',
-                            'Templates visible to the active company.',
-                        )}
-                </p>
-
+            <TablePanel>
+                <TableToolbar
+                    search={
+                        <TextField
+                            className="ui-table-toolbar__search"
+                            type="search"
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder={t(
+                                'ai.knowledge.searchTemplates',
+                                'Search templates…',
+                            )}
+                            aria-label={t(
+                                'ai.knowledge.searchTemplates',
+                                'Search templates',
+                            )}
+                        />
+                    }
+                    actions={
+                        <Button
+                            variant="secondary"
+                            onClick={() => void navigate('/ai/ai/knowledge')}
+                        >
+                            {t('ai.knowledge.back', 'Back')}
+                        </Button>
+                    }
+                />
                 {isLoading ? (
-                    <p className="console-empty">{t('ai.knowledge.loading', 'Loading…')}</p>
-                ) : templates.length === 0 ? (
-                    <p className="console-empty">
-                        {t(
-                            'ai.knowledge.templatesEmptyForCompany',
-                            'No templates are visible to this company yet.',
-                        )}
+                    <p
+                        className="console-empty"
+                        style={{ padding: '0 24px 24px' }}
+                    >
+                        {t('ai.knowledge.loading', 'Loading…')}
+                    </p>
+                ) : isEmpty ? (
+                    <p
+                        className="console-empty"
+                        style={{ padding: '0 24px 24px' }}
+                    >
+                        {templates.length === 0
+                            ? t(
+                                'ai.knowledge.templatesEmptyForCompany',
+                                'No templates are visible to this company yet.',
+                            )
+                            : t(
+                                'ai.knowledge.templatesEmptyFiltered',
+                                'No templates match your search.',
+                            )}
                     </p>
                 ) : (
-                    <div className="console-table-wrap">
-                        <table className="console-table">
-                            <thead>
-                                <tr>
-                                    <th>{t('ai.knowledge.colName', 'Name')}</th>
-                                    <th>{t('ai.knowledge.colKind', 'Kind')}</th>
-                                    <th>{t('ai.knowledge.colDescription', 'Description')}</th>
-                                    <th>{t('ai.knowledge.colVisibility', 'Visible to')}</th>
-                                    <th>{t('ai.knowledge.colOwner', 'Owner')}</th>
-                                    <th className="console-table__actions">
-                                        {t('ai.knowledge.colActions', 'Actions')}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {templates.map((template) => {
-                                    const canEdit = userCanEditTemplate(template.id, companyId)
-                                    const canDelete = userCanDeleteTemplate(template.id, companyId)
-                                    const ownerLabel =
-                                        companies.find((c) => c.value === template.ownerCompanyId)
-                                            ?.label ?? template.ownerCompanyId
-
-                                    return (
-                                        <tr key={template.id}>
-                                            {/* NAME */}
-                                            <td>
-                                                <span className="console-table__name">
-                                                    <span>{template.name}</span>
-                                                </span>
-                                            </td>
-
-                                            {/* KIND */}
-                                            <td className="console-table__muted">
-                                                {t(KIND_LABEL_KEY[template.kind])}
-                                            </td>
-
-                                            {/* DESCRIPTION */}
-                                            <td className="console-table__muted">{template.description}</td>
-
-                                            {/* VISIBLE TO */}
-                                            <td>
-                                                <span className="console-chips">
-                                                    {template.allowedCompanyIds.map((id) => {
-                                                        const label =
-                                                            companies.find((c) => c.value === id)?.label ?? id
-                                                        return (
-                                                            <span className="console-chip console-chip--muted" key={id}>
-                                                                {label}
-                                                            </span>
-                                                        )
-                                                    })}
-                                                </span>
-                                            </td>
-
-                                            {/* OWNER */}
-                                            <td>
-                                                <span className="console-chip">{ownerLabel}</span>
-                                            </td>
-
-                                            {/* ACTIONS */}
-                                            <td className="console-table__actions">
-                                                {canEdit || canDelete ? (
-                                                    <>
-                                                        {canEdit ? (
-                                                            <button
-                                                                type="button"
-                                                                className="console-icon-button"
-                                                                aria-label={t('ai.knowledge.edit', 'Edit')}
-                                                                title={t('ai.knowledge.edit', 'Edit')}
-                                                                onClick={() => openEdit(template)}
-                                                            >
-                                                                <IconPencil />
-                                                            </button>
-                                                        ) : null}
-                                                        {canDelete ? (
-                                                            <button
-                                                                type="button"
-                                                                className="console-icon-button console-icon-button--danger"
-                                                                aria-label={t('ai.knowledge.delete', 'Delete')}
-                                                                title={t('ai.knowledge.delete', 'Delete')}
-                                                                onClick={() => { setDeleteError(null); setPendingDelete(template) }}
-                                                            >
-                                                                <IconTrash />
-                                                            </button>
-                                                        ) : null}
-                                                    </>
-                                                ) : (
-                                                    <span className="console-readonly">
-                                                        {t('ai.knowledge.readOnly', 'Read only')}
+                    <>
+                        <div className="console-table-wrap" ref={tableRef}>
+                            <table className="console-table console-table--fixed console-table--templates">
+                                <colgroup>
+                                    <col style={{ width: '18%' }} />
+                                    <col style={{ width: '12%' }} />
+                                    <col style={{ width: '24%' }} />
+                                    <col style={{ width: '20%' }} />
+                                    <col style={{ width: '14%' }} />
+                                    <col style={{ width: '12%' }} />
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>{t('ai.knowledge.colName', 'Name')}</th>
+                                        <th>{t('ai.knowledge.colKind', 'Kind')}</th>
+                                        <th>
+                                            {t(
+                                                'ai.knowledge.colDescription',
+                                                'Description',
+                                            )}
+                                        </th>
+                                        <th>
+                                            {t(
+                                                'ai.knowledge.colVisibility',
+                                                'Visible to',
+                                            )}
+                                        </th>
+                                        <th>{t('ai.knowledge.colOwner', 'Owner')}</th>
+                                        <th className="console-table__actions identity-table__actions">
+                                            {t(
+                                                'ai.knowledge.colActions',
+                                                'Actions',
+                                            )}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginatedTemplates.map((template) => {
+                                        const canEdit = userCanEditTemplate(
+                                            template.id,
+                                            companyId,
+                                        )
+                                        const canDelete = userCanDeleteTemplate(
+                                            template.id,
+                                            companyId,
+                                        )
+                                        const ownerLabel =
+                                            companies.find(
+                                                (company) =>
+                                                    company.value ===
+                                                    template.ownerCompanyId,
+                                            )?.label ?? template.ownerCompanyId
+                                        return (
+                                            <tr key={template.id}>
+                                                <td>
+                                                    <span className="console-table__name">
+                                                        <span>{template.name}</span>
                                                     </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className="console-chip console-chip--muted templates-table__kind-chip">
+                                                        {t(
+                                                            KIND_LABEL_KEY[
+                                                            template.kind
+                                                            ],
+                                                        )}
+                                                    </span>
+                                                </td>
+                                                <td className="console-table__muted">
+                                                    <span
+                                                        className="templates-table__description"
+                                                        title={
+                                                            template.description ||
+                                                            undefined
+                                                        }
+                                                    >
+                                                        {template.description || '—'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span
+                                                        className="console-chips templates-table__visibility"
+                                                        title={template.allowedCompanyIds
+                                                            .map(
+                                                                (id) =>
+                                                                    companies.find(
+                                                                        (company) =>
+                                                                            company.value ===
+                                                                            id,
+                                                                    )?.label ?? id,
+                                                            )
+                                                            .join(', ')}
+                                                    >
+                                                        {template.allowedCompanyIds
+                                                            .slice(0, 2)
+                                                            .map((id) => {
+                                                                const label =
+                                                                    companies.find(
+                                                                        (company) =>
+                                                                            company.value ===
+                                                                            id,
+                                                                    )?.label ?? id
+                                                                return (
+                                                                    <span
+                                                                        className="console-chip console-chip--muted templates-table__company-chip"
+                                                                        key={id}
+                                                                        title={label}
+                                                                    >
+                                                                        {label}
+                                                                    </span>
+                                                                )
+                                                            })}
+                                                        {template.allowedCompanyIds
+                                                            .length > 2 ? (
+                                                            <span className="console-chip console-chip--muted templates-table__overflow-chip">
+                                                                +
+                                                                {template
+                                                                    .allowedCompanyIds
+                                                                    .length - 2}
+                                                            </span>
+                                                        ) : null}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span className="console-chip templates-table__owner-chip" title={ownerLabel}>
+                                                        {ownerLabel}
+                                                    </span>
+                                                </td>
+                                                <td className="console-table__actions identity-table__actions">
+                                                    {canEdit || canDelete ? (
+                                                        <div className="identity-inline-actions identity-directory-actions">
+                                                            {canEdit ? (
+                                                                <IconButton
+                                                                    label={t(
+                                                                        'ai.knowledge.edit',
+                                                                        'Edit',
+                                                                    )}
+                                                                    variant="secondary"
+                                                                    onClick={() =>
+                                                                        openEdit(
+                                                                            template,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <IconPencil />
+                                                                </IconButton>
+                                                            ) : null}
+                                                            {canDelete ? (
+                                                                <IconButton
+                                                                    label={t(
+                                                                        'ai.knowledge.delete',
+                                                                        'Delete',
+                                                                    )}
+                                                                    variant="danger"
+                                                                    onClick={() => {
+                                                                        setDeleteError(null)
+                                                                        setPendingDelete(template)
+                                                                    }}
+                                                                >
+                                                                    <IconTrash />
+                                                                </IconButton>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="console-readonly">
+                                                            {t(
+                                                                'ai.knowledge.readOnly',
+                                                                'Read only',
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        <TablePagination
+                            id="templates-pagination"
+                            total={visibleTemplates.length}
+                            pageSize={pageSize}
+                            autoPageSize={autoPageSize}
+                            effectivePageSize={effectivePageSize}
+                            currentPage={currentPage}
+                            pageCount={pageCount}
+                            pagesLabel={t('users.directoryPages')}
+                            onPageSizeChange={setPageSize}
+                            onPageChange={setPage}
+                        />
+                    </>
                 )}
-            </section>
-
-            {/* ---------- Edit drawer ---------- */}
+            </TablePanel>
             <Drawer
                 open={editOpen}
                 title={t('ai.knowledge.editTemplateTitle', 'Edit template')}
@@ -400,7 +603,6 @@ export function TemplatesPage() {
                             />
                         </FormField>
                     </div>
-
                     <FormField
                         label={t('ai.knowledge.fieldDescription')}
                         htmlFor="tpl-description"
@@ -413,8 +615,6 @@ export function TemplatesPage() {
                             autoComplete="off"
                         />
                     </FormField>
-
-                    {/* Visibility picker */}
                     <div className="console-form__section">
                         <h4>
                             {t('ai.knowledge.promoteVisibility', 'Who can see this template?')}
@@ -425,7 +625,6 @@ export function TemplatesPage() {
                                 'The owner company is always included and cannot be removed.',
                             )}
                         </p>
-
                         <div className="promote-toolbar">
                             <TextField
                                 className="promote-toolbar__search"
@@ -447,7 +646,6 @@ export function TemplatesPage() {
                                 )}
                             </span>
                         </div>
-
                         <div className="promote-toolbar promote-toolbar--bulk">
                             <Button
                                 type="button"
@@ -466,7 +664,6 @@ export function TemplatesPage() {
                                 {t('ai.knowledge.promoteSelectNone', 'Clear')}
                             </Button>
                         </div>
-
                         {visibleEditCompanies.length === 0 ? (
                             <p className="console-empty">
                                 {t('ai.knowledge.promoteNoMatch', 'No company matches that search.')}
@@ -510,22 +707,21 @@ export function TemplatesPage() {
                     </div>
                 </form>
             </Drawer>
-
             <ConfirmDialog
-        variant="deletion"
-        open={pendingDelete !== null}
-        title={t('ai.knowledge.deleteTemplateHeading')}
-        items={pendingDelete ? [{id:pendingDelete.id,name:pendingDelete.name}] : []}
-        description={<p>{t('ai.knowledge.deleteTemplateShort')}</p>}
-        
-        error={deleteError}
-        confirmLabel={t('ai.knowledge.deleteTemplateAction')}
-        cancelLabel={t('ai.knowledge.cancel')}
-        busyLabel={t('ai.knowledge.deleting')}
-        busy={isDeleting}
-        onConfirm={handleDelete}
-        onCancel={() => setPendingDelete(null)}
-    />
+                variant="deletion"
+                open={pendingDelete !== null}
+                title={t('ai.knowledge.deleteTemplateHeading')}
+                items={pendingDelete ? [{ id: pendingDelete.id, name: pendingDelete.name }] : []}
+                description={<p>{t('ai.knowledge.deleteTemplateShort')}</p>}
+
+                error={deleteError}
+                confirmLabel={t('ai.knowledge.deleteTemplateAction')}
+                cancelLabel={t('ai.knowledge.cancel')}
+                busyLabel={t('ai.knowledge.deleting')}
+                busy={isDeleting}
+                onConfirm={handleDelete}
+                onCancel={() => setPendingDelete(null)}
+            />
         </div>
     )
 }

@@ -37,7 +37,9 @@ function toListItem(baseId: string): KnowledgeBaseListItem | null {
       agentKnowledgeLinks,
       agentDocumentLinks,
     ).length,
-    status: deriveBaseStatus(documents),
+    status: deriveBaseStatus(base.kind ?? 'document', {
+      documents,
+    }),
   }
 }
 
