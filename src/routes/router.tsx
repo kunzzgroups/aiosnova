@@ -20,6 +20,7 @@ import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
 import { OrganizationRoute } from '@/modules/core/identity/OrganizationRoute'
 import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
+import { RolesAndAccessPage } from '@/modules/core/identity/pages/RolesAndAccessPage'
 
 export function AppRouter() {
   return (
@@ -55,7 +56,7 @@ export function AppRouter() {
             <Route element={<OrganizationRoute />}>
               <Route path="/system/core/organization" element={<OrganizationPage />} />
             </Route>
-            <Route path="/system/core/roles-and-access" element={<ModulePlaceholderPage />} />
+            <Route path="/system/core/roles-and-access" element={<RolesAndAccessPage />} />
             <Route path="/system/core/activity" element={<ModulePlaceholderPage />} />
             <Route path="*" element={<ModulePlaceholderPage />} />
           </Route>
