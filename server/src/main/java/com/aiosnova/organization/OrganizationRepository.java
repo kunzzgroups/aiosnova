@@ -85,7 +85,7 @@ public class OrganizationRepository {
     public List<java.util.Map<String, Object>> employeePlacements(String merchantId, String companyId) {
         return jdbc.queryForList("""
                 SELECT pl.user_id, pl.department_id, pl.position_id, pl.version AS placement_version,
-                    u.version AS user_version, d.name AS department_name, p.name AS position_name
+                    u.version AS user_version, COALESCE(NULLIF(u.display_name, ''), NULLIF(u.full_name, ''), u.email) AS employee_name, d.name AS department_name, p.name AS position_name
                 FROM company_employee_placements pl JOIN users u ON u.id = pl.user_id
                 JOIN organization_departments d ON d.merchant_id = pl.merchant_id AND d.company_id = pl.company_id AND d.id = pl.department_id
                 LEFT JOIN organization_positions p ON p.merchant_id = pl.merchant_id AND p.company_id = pl.company_id AND p.id = pl.position_id

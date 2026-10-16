@@ -58,13 +58,13 @@ export function createOrganizationBatch(companyId: string, payload: { department
   return request<{ departments: DatabaseDepartment[]; positions: DatabasePosition[]; departmentIds: string[]; positionIds: string[] }>('/api/identity/organization-batches', { method: 'POST', body: { companyId, ...payload, requestId } })
 }
 
-export type DepartmentRemovalImpact = { employeeCount:number; groups:{key:string;departmentId:string;departmentName:string;positionId:string|null;positionName:string|null;employeeCount:number}[];snapshot:string;canReassign:boolean }
+export type DepartmentRemovalImpact = { employeeCount:number; groups:{key:string;departmentId:string;departmentName:string;positionId:string|null;positionName:string|null;employeeCount:number}[];snapshot:string;canReassign:boolean;employees:{userId:string;name:string;departmentId:string;departmentName:string;positionId:string|null;positionName:string|null}[] }
 
 export function fetchDepartmentRemovalImpact(item:DatabaseDepartment,signal?:AbortSignal) {
   return request<DepartmentRemovalImpact>('/api/identity/organizations/'+item.id+'/removal-impact',{signal})
 }
 
-export function removeDepartmentWithEmployees(item:DatabaseDepartment,payload:{mode:'retain'|'reassign';departmentId:string;positionMappings:{sourceKey:string;positionId:string}[];snapshot:string}) {
+export function removeDepartmentWithEmployees(item:DatabaseDepartment,payload:{mode:'retain'|'reassign';employeeMappings:{userId:string;departmentId:string;positionId:string}[];snapshot:string}) {
   return request<void>('/api/identity/organizations/'+item.id+'/remove',{method:'POST',body:{...payload,version:item.version}})
 }
 

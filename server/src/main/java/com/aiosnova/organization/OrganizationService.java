@@ -68,7 +68,11 @@ public class OrganizationService {
         String snapshot = secrets.tokenHash(json.writeValueAsString(List.of(
                 repository.departments(actor.merchantId(), companyId).stream().filter(d -> branch.contains(d.id())).toList(),
                 repository.positions(actor.merchantId(), companyId, LocalDate.now()).stream().filter(p -> branch.contains(p.organizationId())).toList(), affected)));
-        return new RemovalImpact(affected.size(), new ArrayList<>(groups.values()), snapshot, canManage(actor, companyId) && (actor.owner() || actor.manageUsers()));
+        boolean canReassign = canManage(actor, companyId) && (actor.owner() || actor.manageUsers());
+        var employees = canReassign ? affected.stream().map(row -> new ImpactEmployee((String) row.get("user_id"),
+                (String) row.get("employee_name"), (String) row.get("department_id"), (String) row.get("department_name"),
+                (String) row.get("position_id"), (String) row.get("position_name"))).toList() : List.<ImpactEmployee>of();
+        return new RemovalImpact(affected.size(), new ArrayList<>(groups.values()), snapshot, canReassign, employees);
     }
 
     @Transactional
@@ -79,42 +83,65 @@ public class OrganizationService {
         var impact = removalImpactInCompany(actor, companyId, id);
         if (!impact.snapshot().equals(request.snapshot())) fail(HttpStatus.CONFLICT, "org.removalImpactChanged");
         if (!List.of("retain", "reassign").contains(request.mode() == null ? "" : request.mode())) fail(HttpStatus.BAD_REQUEST, "org.invalidRequest");
+        if (impact.employeeCount() == 0 && request.employeeMappings() != null && !request.employeeMappings().isEmpty()) fail(HttpStatus.BAD_REQUEST, "org.invalidRequest");
         if ("reassign".equals(request.mode()) && impact.employeeCount() > 0) {
             if (!impact.canReassign()) fail(HttpStatus.FORBIDDEN, "org.reassignmentPermissionDenied");
             var branch = removalBranch(actor, companyId, id);
-            if (request.departmentId() == null || branch.contains(request.departmentId())) fail(HttpStatus.BAD_REQUEST, "org.invalidPlacement");
-            department(actor, companyId, request.departmentId());
-            var mappings = request.positionMappings();
-            if (mappings == null || mappings.size() != impact.groups().size() || mappings.stream().map(PositionMapping::sourceKey).distinct().count() != mappings.size()) fail(HttpStatus.BAD_REQUEST, "org.invalidRequest");
-            for (var group : impact.groups()) {
-                var mapping = mappings.stream().filter(item -> group.key().equals(item.sourceKey())).findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "org.invalidRequest"));
-                String positionId = mapping.positionId() == null ? "" : mapping.positionId();
-                if (group.positionId() != null && positionId.isEmpty()) fail(HttpStatus.BAD_REQUEST, "org.invalidPlacement");
-                if (!companyId.equals(assignments.validate(actor.merchantId(), request.departmentId(), positionId))) fail(HttpStatus.BAD_REQUEST, "org.invalidPlacement");
+            var affected = repository.employeePlacements(actor.merchantId(), companyId).stream()
+                    .filter(row -> branch.contains(row.get("department_id"))).toList();
+            var mappings = request.employeeMappings();
+            if (mappings == null) {
+                // Keep the existing group-based contract for older clients.
+                if (request.departmentId() == null || request.positionMappings() == null
+                        || request.positionMappings().size() != impact.groups().size() || request.positionMappings().stream().anyMatch(java.util.Objects::isNull)
+                        || request.positionMappings().stream().map(PositionMapping::sourceKey).distinct().count() != impact.groups().size()) fail(HttpStatus.BAD_REQUEST, "org.invalidRequest");
+                mappings = affected.stream().map(row -> {
+                    String key = row.get("position_id") == null ? "department:" + row.get("department_id") : (String) row.get("position_id");
+                    var mapping = request.positionMappings().stream().filter(item -> key.equals(item.sourceKey())).findFirst()
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "org.invalidRequest"));
+                    return new EmployeeMapping((String) row.get("user_id"), request.departmentId(), mapping.positionId());
+                }).toList();
             }
-            for (var row : repository.employeePlacements(actor.merchantId(), companyId)) {
-                if (!branch.contains(row.get("department_id"))) continue;
-                String sourceKey = row.get("position_id") == null ? "department:" + row.get("department_id") : (String) row.get("position_id");
-                var mapping = mappings.stream().filter(item -> sourceKey.equals(item.sourceKey())).findFirst().orElseThrow();
+            if (mappings.stream().anyMatch(java.util.Objects::isNull)
+                    || mappings.stream().map(EmployeeMapping::userId).distinct().count() != mappings.size()) fail(HttpStatus.BAD_REQUEST, "org.invalidRequest");
+            for (var mapping : mappings) {
+                var source = affected.stream().filter(row -> row.get("user_id").equals(mapping.userId())).findFirst()
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "org.invalidRequest"));
+                if (mapping.departmentId() == null || branch.contains(mapping.departmentId())) fail(HttpStatus.BAD_REQUEST, "org.invalidPlacement");
+                department(actor, companyId, mapping.departmentId());
+                String positionId = mapping.positionId() == null ? "" : mapping.positionId();
+                if ((source.get("position_id") != null || request.employeeMappings() != null) && positionId.isEmpty()) fail(HttpStatus.BAD_REQUEST, "org.invalidPlacement");
+                if (!companyId.equals(assignments.validate(actor.merchantId(), mapping.departmentId(), positionId))) fail(HttpStatus.BAD_REQUEST, "org.invalidPlacement");
+            }
+            for (var row : affected) {
                 String userId = (String) row.get("user_id");
+                var mapping = mappings.stream().filter(item -> userId.equals(item.userId())).findFirst().orElse(null);
+                if (mapping == null) continue;
                 auth.lockUser(userId);
-                auth.saveCompanyPlacement(actor.merchantId(), companyId, userId, request.departmentId(), mapping.positionId());
+                auth.saveCompanyPlacement(actor.merchantId(), companyId, userId, mapping.departmentId(), mapping.positionId());
                 assignments.synchronize(actor.merchantId(), userId, actor.id());
                 var before = new LinkedHashMap<String,Object>();
                 before.put("departmentId", row.get("department_id")); before.put("positionId", row.get("position_id"));
                 var after = new LinkedHashMap<String,Object>();
-                after.put("departmentId", request.departmentId()); after.put("positionId", mapping.positionId());
+                after.put("departmentId", mapping.departmentId()); after.put("positionId", mapping.positionId());
                 var changes = AuditChanges.between(before, after); changes.put("companyId", companyId);
                 auth.audit(actor.merchantId(), actor.id(), "identity.user.reassigned", "user", userId, changes);
             }
         }
+        if ("retain".equals(request.mode()) && request.employeeMappings() != null && !request.employeeMappings().isEmpty()) fail(HttpStatus.BAD_REQUEST, "org.invalidRequest");
         deleteDepartment(actor, id, request.version());
     }
 
     public record ImpactGroup(String key, String departmentId, String departmentName, String positionId, String positionName, int employeeCount) { }
-    public record RemovalImpact(int employeeCount, List<ImpactGroup> groups, String snapshot, boolean canReassign) { }
+    public record ImpactEmployee(String userId, String name, String departmentId, String departmentName, String positionId, String positionName) { }
+    public record RemovalImpact(int employeeCount, List<ImpactGroup> groups, String snapshot, boolean canReassign, List<ImpactEmployee> employees) { }
     public record PositionMapping(String sourceKey, String positionId) { }
-    public record RemoveDepartment(long version, String mode, String departmentId, List<PositionMapping> positionMappings, String snapshot) { }
+    public record EmployeeMapping(String userId, String departmentId, String positionId) { }
+    public record RemoveDepartment(long version, String mode, String departmentId, List<PositionMapping> positionMappings, String snapshot, List<EmployeeMapping> employeeMappings) {
+        public RemoveDepartment(long version, String mode, String departmentId, List<PositionMapping> positionMappings, String snapshot) {
+            this(version, mode, departmentId, positionMappings, snapshot, null);
+        }
+    }
 
     @Transactional(readOnly = true)
     public List<CompanyAccess> companies(Actor actor) {

@@ -22,6 +22,7 @@ import { useAuthStore } from '@/stores/authStore'
 import type { DatabaseDepartment as OrganizationNode, DatabasePosition as PositionRecord } from '@/modules/core/identity/services/organizationService'
 import { fetchOrganizationStructure, createOrganizationBatch, fetchDepartmentRemovalImpact, removeDepartmentWithEmployees, updateOrganization, deletePosition, deletePositions, updatePosition } from '@/modules/core/identity/services/organizationService'
 import './IdentityPage.css'
+import { DepartmentRemovalEmployees, type EmployeeRemovalPlan } from './DepartmentRemovalEmployees'
 import './OrganizationPage.css'
 import './UsersDirectoryDesign.css'
 
@@ -64,10 +65,9 @@ export function OrganizationPage() {
   const [removalImpact,setRemovalImpact]=useState<Awaited<ReturnType<typeof fetchDepartmentRemovalImpact>>|null>(null)
   const [impactLoading,setImpactLoading]=useState(false)
   const [removalMode,setRemovalMode]=useState<'retain'|'reassign'>('retain')
-  const [reassignmentDepartment,setReassignmentDepartment]=useState('')
-  const [reassignmentPositions,setReassignmentPositions]=useState<Record<string,string>>({})
+  const [employeeRemovalPlans,setEmployeeRemovalPlans]=useState<Record<string,EmployeeRemovalPlan>>({})
   useEffect(()=>{
-    setRemovalImpact(null);setReassignmentDepartment('');setReassignmentPositions({});setRemovalMode('retain')
+    setRemovalImpact(null);setEmployeeRemovalPlans({});setRemovalMode('retain')
     if(pendingDelete?.kind!=='department') {setImpactLoading(false);return}
     const controller=new AbortController()
     setImpactLoading(true)
@@ -263,19 +263,10 @@ export function OrganizationPage() {
   const managedDepartments=departments.filter(d=>deletingPositions.some(position=>position.id===d.managerPositionId)).length
   const deleteBlocked=Boolean(managedDepartments)
 
-  const reassignmentTarget=departments.find(department=>department.id===reassignmentDepartment)
-  const reassignmentChoices=positions.filter(position=>position.organizationId===reassignmentDepartment&&position.status==='active')
-  const removalIncomplete=pendingDelete?.kind==='department'&&(impactLoading||!removalImpact||removalMode==='reassign'&&removalImpact.employeeCount>0&&(!reassignmentTarget||removalImpact.groups.some(group=>group.positionId&&!reassignmentPositions[group.key])))
+  const removalIncomplete=pendingDelete?.kind==='department'&&(impactLoading||!removalImpact)
   const removalEmployeeControls=pendingDelete?.kind==='department' ? <div className="organization-removal-placement">
-    {impactLoading ? <p role="status">{t('org.loadingRemovalImpact')}</p> : removalImpact?.employeeCount ? <>
-      <p className="organization-removal-count">{t('org.affectedEmployees',{count:removalImpact.employeeCount})}</p>
-      <label><input type="radio" name="department-removal-mode" checked={removalMode==='reassign'} disabled={isDeleting||!removalImpact.canReassign} onChange={()=>setRemovalMode('reassign')} />{t('org.reassignBeforeRemoval')}</label>
-      <label><input type="radio" name="department-removal-mode" checked={removalMode==='retain'} disabled={isDeleting} onChange={()=>setRemovalMode('retain')} />{t('org.removeWithoutReassignment')}</label>
-      {removalMode==='retain' ? <p>{t('org.needsReassignmentAfterRemoval')}</p> : <>
-        <FormField label={t('org.destinationDepartment')} htmlFor="removal-destination"><SelectField id="removal-destination" label={t('org.destinationDepartment')} value={reassignmentDepartment} disabled={isDeleting} onChange={value=>{setReassignmentDepartment(value);setReassignmentPositions({})}} options={[{value:'',label:t('org.chooseDepartment')},...departments.filter(department=>!deletingDepartmentIds.has(department.id)&&departmentActive(department)).map(department=>({value:department.id,label:department.name}))]} /></FormField>
-        {removalImpact.groups.map(group=><FormField key={group.key} label={t('org.mapRemovalPosition',{name:group.positionName||group.departmentName,count:group.employeeCount})} htmlFor={'removal-position-'+group.key}><SelectField id={'removal-position-'+group.key} label={t('org.destinationPosition')} value={reassignmentPositions[group.key]||''} disabled={isDeleting||!reassignmentDepartment} onChange={value=>setReassignmentPositions(current=>({...current,[group.key]:value}))} options={[{value:'',label:t(group.positionId ? 'org.choosePosition' : 'org.noPosition')},...reassignmentChoices.map(position=>({value:position.id,label:position.name}))]} /></FormField>)}
-      </>}
-    </> : null}
+    {impactLoading ? <p role="status">{t('org.loadingRemovalImpact')}</p> : removalImpact?.employeeCount ?
+      <DepartmentRemovalEmployees key={pendingDelete.item.id} impact={removalImpact} departments={departments.filter(department=>!deletingDepartmentIds.has(department.id)&&departmentActive(department))} positions={positions} mode={removalMode} plans={employeeRemovalPlans} busy={isDeleting} onModeChange={setRemovalMode} onPlansChange={setEmployeeRemovalPlans} /> : null}
   </div> : null
 
   async function remove() {
@@ -287,7 +278,7 @@ export function OrganizationPage() {
     try {
       if (kind==='department') {
         if(!removalImpact)return
-        await removeDepartmentWithEmployees(pendingDelete.item as OrganizationNode,{mode:removalMode,departmentId:reassignmentDepartment,positionMappings:removalImpact.groups.map(group=>({sourceKey:group.key,positionId:reassignmentPositions[group.key]||''})),snapshot:removalImpact.snapshot})
+        await removeDepartmentWithEmployees(pendingDelete.item as OrganizationNode,{mode:removalMode,employeeMappings:removalMode==='reassign' ? Object.entries(employeeRemovalPlans).map(([userId,plan])=>({userId,...plan})) : [],snapshot:removalImpact.snapshot})
       }
       else await deletePosition(pendingDelete.item as PositionRecord)
       if (useCompanyStore.getState().companyId!==scope) return
@@ -573,6 +564,6 @@ export function OrganizationPage() {
     </form></dialog> : null}
     <ConfirmDialog className="organization-deactivate-dialog" open={Boolean(pendingDeactivate&&canManage)} title={t('org.deactivateDepartmentTitle',{ name:pendingDeactivate?.department.name })} description={<><span className="organization-deactivate-count">{t('org.deactivateDepartmentImpact',{ count:pendingDeactivate ? departments.filter(d=>isDescendant(d,pendingDeactivate.department.id)).length : 0 })}</span><p>{t('org.deactivateDepartmentAvailability')}</p>{error&&pendingDeactivate?.source==='toggle' ? <p className="organization-create-dialog__error" role="alert">{error}</p> : null}</>} warning={t('org.deactivateDepartmentRestore')} confirmLabel={t('org.setInactive')} cancelLabel={t('users.cancel')} busyLabel={t('org.updatingStatus')} busy={isSubmitting} onConfirm={()=>{if(!pendingDeactivate) return; if(pendingDeactivate.source==='editor') void save(undefined,true); else void toggleStatus(pendingDeactivate.department)}} onCancel={()=>{if(!isSubmitting) setPendingDeactivate(null)}} />
     <ConfirmDialog variant="deletion" open={Boolean(pendingBulkDeleteIds.length&&canManage)} title={t('org.deletePositionsTitle',{ count:bulkPositions.length })} items={bulkPositions.map(position=>({id:position.id,name:position.name,details:departments.find(department=>department.id===position.organizationId)?.name||t('org.companyLevel')}))} description={<><p>{t('org.deletePositionsShort')}</p>{bulkManaged ? <p>{t('org.managedDepartmentDependency',{ count:bulkManaged })}</p> : null}</>} error={deleteError} warning={bulkDeleteBlocked||deleteConflict ? t('org.deleteBlocked') : undefined} confirmDisabled={deleteConflict||bulkDeleteBlocked||!bulkPositions.length} confirmLabel={t('org.deletePositionsAction')} cancelLabel={t('users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={removeSelectedPositions} onCancel={()=>setPendingBulkDeleteIds([])} />
-    <ConfirmDialog variant="deletion" open={Boolean(pendingDelete&&canManage)} title={t(deleteBlocked||deleteConflict||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? pendingDelete?.kind==='department' ? 'org.cannotDeleteDepartment' : 'org.cannotDeletePosition' : pendingDelete?.kind==='department' ? 'org.deleteDepartmentTitle' : 'org.deletePositionTitle')} items={pendingDelete ? [{id:pendingDelete.item.id,name:pendingDelete.item.name}] : []} description={<><p>{t(deleteConflict ? 'org.deleteRefreshShort' : managedDepartments ? 'org.deleteManagerShort' : pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? 'org.deleteInactiveFirst' : pendingDelete?.kind==='department' ? 'org.deleteDepartmentQuestion' : 'org.deletePositionShort',{ departments:childDepartments,positions:dependentPositions })}</p>{removalEmployeeControls}</>} warningTitle={pendingDelete?.kind==='department'&&Boolean(cascadeItems)&&!deleteBlocked&&!deleteConflict ? t('org.deleteWarningHeading') : undefined} warning={pendingDelete?.kind==='department'&&cascadeItems&&!deleteBlocked&&!deleteConflict ? t('org.deleteDepartmentCascadeWarning',{ items:cascadeItems }) : undefined} error={deleteError} hideConfirm={deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive'} confirmDisabled={Boolean(removalIncomplete)||deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive'} confirmLabel={t(pendingDelete?.kind==='department' ? 'org.deleteDepartmentAction' : 'org.deletePositionAction')} cancelLabel={t(deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? 'org.deleteClose' : 'users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={remove} onCancel={()=>setPendingDelete(null)} />
+    <ConfirmDialog className={pendingDelete?.kind==='department'&&removalImpact?.employeeCount&&removalImpact.canReassign ? 'organization-removal-dialog' : undefined} variant="deletion" open={Boolean(pendingDelete&&canManage)} title={t(deleteBlocked||deleteConflict||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? pendingDelete?.kind==='department' ? 'org.cannotDeleteDepartment' : 'org.cannotDeletePosition' : pendingDelete?.kind==='department' ? 'org.deleteDepartmentTitle' : 'org.deletePositionTitle')} items={pendingDelete ? [{id:pendingDelete.item.id,name:pendingDelete.item.name}] : []} description={<><p>{t(deleteConflict ? 'org.deleteRefreshShort' : managedDepartments ? 'org.deleteManagerShort' : pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? 'org.deleteInactiveFirst' : pendingDelete?.kind==='department' ? 'org.deleteDepartmentQuestion' : 'org.deletePositionShort',{ departments:childDepartments,positions:dependentPositions })}</p>{removalEmployeeControls}</>} warningTitle={pendingDelete?.kind==='department'&&Boolean(cascadeItems)&&!deleteBlocked&&!deleteConflict ? t('org.deleteWarningHeading') : undefined} warning={pendingDelete?.kind==='department'&&cascadeItems&&!deleteBlocked&&!deleteConflict ? t('org.deleteDepartmentCascadeWarning',{ items:cascadeItems }) : undefined} error={deleteError} hideConfirm={deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive'} confirmDisabled={Boolean(removalIncomplete)||deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive'} confirmLabel={t(pendingDelete?.kind==='department' ? 'org.deleteDepartmentAction' : 'org.deletePositionAction')} cancelLabel={t(deleteConflict||deleteBlocked||pendingDelete?.kind==='position'&&pendingDelete.item.status!=='inactive' ? 'org.deleteClose' : 'users.cancel')} busyLabel={t('org.deleting')} busy={isDeleting} onConfirm={remove} onCancel={()=>setPendingDelete(null)} />
   </div>
 }

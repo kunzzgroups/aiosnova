@@ -1,3 +1,11 @@
+## Selective employee reassignment during department removal
+
+Removal impact responses now include `employees` (user ID, display name and source department/position) only for actors with both Organization management and employee-management/owner access. Aggregate counts remain available under the existing Organization read rules. The dialog lists affected employees without search, supports selection/select-all, stages department/position destinations for each selected group and provides Undo. Queued changes apply only when removal succeeds; unassigned employees retain removed placement references and appear under Needs reassignment.
+
+`POST /api/identity/organizations/{id}/remove` accepts `employeeMappings: [{userId, departmentId, positionId}]` alongside the existing mode, version and impact snapshot. Each employee must belong to the affected subtree; IDs must be unique, and each destination must be an active position in an available department outside the subtree in the same company. All mappings are validated before writes. Reassignment, assignment history, audits and subtree removal share the existing transaction. Other-company placements/access stay unchanged. Legacy group mappings remain supported for older clients. No database migration is required; deploy/restart the backend with the frontend.
+
+Verification: frontend build, Maven package and rolled-back MySQL checks passed for partial reassignment to different destinations, retained employees/removed markers, other-company preservation, unrelated/duplicate/foreign/stale/permission rejection, employee-identity privacy and legacy mapping. Browser interaction remains unverified; existing bundle warnings remain.
+
 ## Inactive placement labels
 
 Directory memberships expose `departmentInactive` and `positionInactive` for existing placements, including inactivity inherited from ancestor departments. Employee view/edit fields append the existing localized Inactive label to the selected department/position; removed labels retain precedence. Selection values, assignment eligibility and account status are unchanged. No migration is needed. Frontend/Maven builds and rolled-back database checks passed for active placements, inactive positions, inactive ancestors and reactivation; rendered browser verification remains pending.
