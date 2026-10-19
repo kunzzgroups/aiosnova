@@ -258,7 +258,7 @@ function RolesAndAccessEditor() {
           document.getElementById(`${ids}-${next}-tab`)?.focus()
         }}>{t(`access.${value}`)}</button>)}
       </div>
-      {tab === 'permissions' && <Button onClick={() => openEditor()}><IconPlus />{t('access.addRole')}</Button>}
+      {<Button onClick={() => openEditor()}><IconPlus />{t('access.addRole')}</Button>}
     </div>
     <TablePanel id={`${ids}-roles-panel`} role="tabpanel" aria-labelledby={`${ids}-roles-tab`} hidden={tab !== 'roles'} className="roles-access__table-panel">
       <TableToolbar
