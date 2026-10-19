@@ -1,0 +1,67 @@
+/* Identity pages also render dialogs, drawers and menus through body portals. */
+body:has(.identity-page, .roles-access) *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+body:has(.identity-page, .roles-access) *::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: var(--space-2);
+  margin-inline: var(--space-2);
+}
+
+body:has(.identity-page, .roles-access) *::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+body:has(.identity-page, .roles-access) *::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+body:has(.identity-page, .roles-access) *::-webkit-scrollbar-button,
+body:has(.identity-page, .roles-access) *::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+body:has(.identity-page, .roles-access) *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  body:has(.identity-page, .roles-access) * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+}
+
+/* Border-box keeps padding inside the dropdown's height limit. */
+body:has(.identity-page, .roles-access) :is(.ui-select-field__list, .sidebar-select__menu, .ui-confirm-dialog) {
+  box-sizing: border-box;
+}
+
+body:has(.identity-page, .roles-access) .ui-popover {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Drawers retain their header/footer while only the body scrolls. */
+body:has(.identity-page, .roles-access) .ui-drawer {
+  min-height: 0;
+  overflow: hidden;
+}
+
+body:has(.identity-page, .roles-access) .ui-drawer__header {
+  flex-shrink: 0;
+}
+
+body:has(.identity-page, .roles-access) .ui-drawer__body {
+  overscroll-behavior: contain;
+}
+
+/* Rounded table panels clip their internal horizontal and vertical scrollbars. */
+body:has(.identity-page, .roles-access) .ui-table-panel {
+  overflow: hidden;
+}

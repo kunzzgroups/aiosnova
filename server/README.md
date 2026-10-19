@@ -8,7 +8,7 @@ Verification: frontend build, Maven package and rolled-back MySQL checks passed 
 
 ## Inactive placement labels
 
-Directory memberships expose `departmentInactive` and `positionInactive` for existing placements, including inactivity inherited from ancestor departments. Employee view/edit fields append the existing localized Inactive label to the selected department/position; removed labels retain precedence. Selection values, assignment eligibility and account status are unchanged. No migration is needed. Frontend/Maven builds and rolled-back database checks passed for active placements, inactive positions, inactive ancestors and reactivation; rendered browser verification remains pending.
+Directory memberships expose `departmentInactive` and `positionInactive` for existing placements, including inactivity inherited from ancestor departments. Employee view/edit fields show the existing localized Inactive badge beside the department/position field label; removed labels retain precedence. Selected names are truncated within the field and available through its title, keeping long values from overflowing adjacent fields. Selection values, assignment eligibility and account status are unchanged. No migration is needed. Frontend/Maven builds and rolled-back database checks passed for active placements, inactive positions, inactive ancestors and reactivation; rendered browser verification remains pending.
 
 ## Assignment reconciliation (V13)
 

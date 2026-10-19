@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import './FormField.css'
 
 type FormFieldProps = {
-  label: string
+  label: ReactNode
   htmlFor: string
   error?: string
   hint?: string
