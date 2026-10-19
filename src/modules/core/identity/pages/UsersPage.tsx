@@ -206,7 +206,7 @@ export function UsersPage() {
       if(statusFilter!=='all'&&user.status!==statusFilter) {
         return false
       }
-      if(placementFilter==='needsReassignment'&&!memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&(m.organizationDeleted||m.positionDeleted))) return false
+      if(placementFilter==='needsReassignment'&&!memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&(m.organizationDeleted||m.positionDeleted||m.organizationInactive||m.positionInactive))) return false
       if(mfaFilter==='enabled'&&(!user.signInMethod||!user.mfaEnabled)) {
         return false
       }
@@ -556,7 +556,7 @@ export function UsersPage() {
                         <div className="directory-design-identity">
                           <Link className="identity-text-link" to={'/system/core/employees/'+user.id}>{user.displayName}</Link>
                           <span>{user.email}</span>
-                          {memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&(m.organizationDeleted||m.positionDeleted)) ? <span className="directory-needs-reassignment">{t('users.needsReassignment')}</span> : null}
+                          {memberships.some(m=>m.userId===user.id&&m.companyId===activeCompanyId&&(m.organizationDeleted||m.positionDeleted||m.organizationInactive||m.positionInactive)) ? <span className="directory-needs-reassignment">{t('users.needsReassignment')}</span> : null}
                         </div>
                         {sessionUser?.id===user.id ? <span className="directory-design-you">{t('users.designYou')}</span> : null}
                       </div>

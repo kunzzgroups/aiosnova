@@ -219,13 +219,23 @@ button.organization-status:disabled { cursor:default; opacity:.55; }
 .organization-removal-employees__destination .ui-button { padding:var(--space-1); min-height:1.75rem; font-size:var(--text-xs); color:var(--color-text-muted); }
 .organization-removal-assignment { display:grid; gap:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-border); }
 .organization-removal-assignment__fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); }
+.organization-removal-assignment__fields .ui-form-field { min-width:0; }
+.organization-removal-assignment__fields .ui-select-field__trigger { height:2.75rem; }
+.organization-removal-assignment__fields .ui-select-field__trigger > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .organization-removal-assignment > .ui-button { justify-self:start; }
 .organization-removal-note { color:var(--color-text-muted); font-size:var(--text-xs); }
+.ui-confirm-dialog:has(.organization-removal-placement)::-webkit-scrollbar,
 .organization-removal-employees ul::-webkit-scrollbar { width:6px; }
+.ui-confirm-dialog:has(.organization-removal-placement)::-webkit-scrollbar-track,
 .organization-removal-employees ul::-webkit-scrollbar-track { background:transparent; }
+.ui-confirm-dialog:has(.organization-removal-placement)::-webkit-scrollbar-track { margin-block:var(--radius-lg); }
+.ui-confirm-dialog:has(.organization-removal-placement)::-webkit-scrollbar-corner { background:transparent; }
+.ui-confirm-dialog:has(.organization-removal-placement)::-webkit-scrollbar-thumb,
 .organization-removal-employees ul::-webkit-scrollbar-thumb { background:var(--color-border); border-radius:var(--radius-md); }
+.ui-confirm-dialog:has(.organization-removal-placement)::-webkit-scrollbar-button,
 .organization-removal-employees ul::-webkit-scrollbar-button { display:none; width:0; height:0; }
 @supports not selector(::-webkit-scrollbar) {
+  .ui-confirm-dialog:has(.organization-removal-placement),
   .organization-removal-employees ul { scrollbar-width:thin; scrollbar-color:var(--color-border) transparent; }
 }
 @media(max-width:480px) {
