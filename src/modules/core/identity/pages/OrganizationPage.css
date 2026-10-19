@@ -221,6 +221,13 @@ button.organization-status:disabled { cursor:default; opacity:.55; }
 .organization-removal-assignment__fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); }
 .organization-removal-assignment__fields .ui-form-field { min-width:0; }
 .organization-removal-assignment__fields .ui-select-field__trigger { height:2.75rem; }
+.organization-removal-assignment__fields .ui-select-field__list::-webkit-scrollbar { width:6px; }
+.organization-removal-assignment__fields .ui-select-field__list::-webkit-scrollbar-track { background:transparent; }
+.organization-removal-assignment__fields .ui-select-field__list::-webkit-scrollbar-thumb { background:var(--color-border); border-radius:var(--radius-md); }
+.organization-removal-assignment__fields .ui-select-field__list::-webkit-scrollbar-button { display:none; width:0; height:0; }
+@supports not selector(::-webkit-scrollbar) {
+  .organization-removal-assignment__fields .ui-select-field__list { scrollbar-width:thin; scrollbar-color:var(--color-border) transparent; }
+}
 .organization-removal-assignment__fields .ui-select-field__trigger > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .organization-removal-assignment > .ui-button { justify-self:start; }
 .organization-removal-note { color:var(--color-text-muted); font-size:var(--text-xs); }

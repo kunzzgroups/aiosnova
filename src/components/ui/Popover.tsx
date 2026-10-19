@@ -3,13 +3,15 @@ import { createPortal } from 'react-dom'
 import './Popover.css'
 
 type PopoverProps = {
+  width?: number
+  panelClassName?: string
   placement?: 'bottom' | 'left'
   label: string
   trigger: ReactNode
   children: ReactNode
 }
 
-export function Popover({ label, trigger, children, placement = 'bottom' }: PopoverProps) {
+export function Popover({ label, trigger, children, placement = 'bottom', width = 280, panelClassName = '' }: PopoverProps) {
   const id = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -33,7 +35,7 @@ export function Popover({ label, trigger, children, placement = 'bottom' }: Popo
         setOpen(false)
         return
       }
-      panel.style.width = `${Math.min(280, rightEdge - leftEdge)}px`
+      panel.style.width = `${Math.min(width, rightEdge - leftEdge)}px`
       panel.style.maxHeight = `${Math.min(384, bottomEdge - topEdge)}px`
       const height = panel.offsetHeight
       if (placement === 'left') {
@@ -87,14 +89,14 @@ export function Popover({ label, trigger, children, placement = 'bottom' }: Popo
       document.removeEventListener('focusin', dismiss)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open, placement])
+  }, [open, placement, width])
 
   return <>
     <button ref={triggerRef} type="button" className="ui-popover-trigger" aria-label={label}
       aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}
       onClick={() => setOpen(value => !value)}>{trigger}</button>
     {open ? createPortal(
-      <div ref={panelRef} id={id} className="ui-popover" role="dialog" aria-label={label} tabIndex={-1}>
+      <div ref={panelRef} id={id} className={`ui-popover ${panelClassName}`} role="dialog" aria-label={label} tabIndex={-1}>
         {children}
       </div>, document.body,
     ) : null}
