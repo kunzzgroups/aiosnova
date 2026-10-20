@@ -7,9 +7,15 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @RestController
 @Profile("local")
+@ConditionalOnProperty(
+        name = "app.mail.provider",
+        havingValue = "mock",
+        matchIfMissing = true
+)
 public class MockInboxController {
 
     private final MockEmailService emailService;
