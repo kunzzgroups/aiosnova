@@ -1,0 +1,29 @@
+/* Compact Models directory layout. */
+.ai-model-management-actions { display: inline-flex; align-items: center; justify-content: center; }
+.ai-settings-models-page .ai-settings-model-table th:last-child,
+.ai-settings-models-page .ai-settings-model-table td:last-child { width: 7.25rem; min-width: 7.25rem; }
+.ai-settings-models-page .ai-settings-model-table { width: 100%; min-width: 36rem; table-layout: fixed; }
+/* Share the space left by Actions, rather than giving all surplus to the name. */
+.ai-model-col-name { width: calc(var(--ai-model-content-width, 30rem) * 0.28); }
+.ai-model-col-status { width: calc(var(--ai-model-content-width, 30rem) * 0.18); }
+.ai-model-col-type { width: calc(var(--ai-model-content-width, 30rem) * 0.18); }
+.ai-model-col-context { width: calc(var(--ai-model-content-width, 30rem) * 0.16); }
+.ai-model-col-used { width: calc(var(--ai-model-content-width, 30rem) * 0.20); }
+.ai-model-col-actions { width: 7.25rem; }
+.ai-settings-models-page .ai-settings-model-table :is(th, td) { padding-inline: 0.625rem !important; }
+.ai-settings-models-page .ai-settings-model-table tbody tr { height: auto; }
+.ai-settings-models-page .ai-settings-model-table tbody td { padding-block: 0.625rem; }
+.ai-model-management-actions { flex-wrap: nowrap; white-space: nowrap; }
+.ai-model-management-actions > .ui-icon-button-wrap { flex: 0 0 auto; }
+.ai-settings-models-page .ai-settings-model-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-settings-models-page > .ui-table-panel { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.ai-settings-models-page > .ui-table-panel > .console-table-wrap { flex: 1 1 0; min-height: 0; }
+.ai-settings-models-page > .ui-table-panel > .identity-directory-footer { flex: 0 0 auto; margin-top: 0; }
+.ai-settings-main:has(.ai-settings-models-page) { display: flex; flex-direction: column; overflow: hidden; }
+.ai-settings-models-page .console-status { width: 4.75rem; min-width: 4.75rem; height: 1.25rem; padding: 0.1rem 0.4rem; font-size: 11px; }
+.ai-settings-models-empty { flex: 1 1 0; padding: 0 var(--space-5) var(--space-5); }
+.ai-settings-models-page .ai-settings-model-table td:last-child > .row-menu { display: inline-flex; vertical-align: middle; text-align: left; }
+.ai-settings-models-page .ai-settings-model-name strong { font-size: var(--text-sm); }
+.ai-settings-models-page .ai-settings-model-name small { font-size: var(--text-xs); }
+.ai-settings-models-page .ai-settings-model-table th:nth-child(4),
+.ai-settings-models-page .ai-settings-model-table td:nth-child(4) { text-align: center; }

@@ -1,0 +1,8 @@
+.ai-tool-action-settings {display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;margin-top:1rem;min-width:0}
+.ai-tool-action-settings h4 {margin:0;font-size:var(--text-sm);font-weight:600}
+.ai-tool-action-settings .ui-form-field {width:100%;min-width:0}
+.ai-tool-config-toggle {display:flex;align-items:center;gap:.5rem;min-height:2.5rem;font-size:var(--text-sm);color:var(--color-text)}
+.ai-tool-config-toggle input {width:1rem;height:1rem;flex-shrink:0;accent-color:var(--color-brand)}
+.ai-tool-json-details {margin-top:1rem;border-top:1px solid var(--color-border);min-width:0}
+.ai-tool-json-details summary {padding:.75rem 0;cursor:pointer;font-size:var(--text-sm);font-weight:500}
+.ai-tool-json-preview {max-width:100%;box-sizing:border-box;margin:0;padding:.75rem;background:var(--color-bg-muted);border-radius:var(--radius-sm);font-size:var(--text-xs);line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}

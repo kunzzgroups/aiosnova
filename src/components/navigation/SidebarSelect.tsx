@@ -1,4 +1,5 @@
-import { type AriaAttributes, useEffect, useId, useRef, useState } from 'react'
+import { type AriaAttributes, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { IconChevron } from '@/components/navigation/SidebarIcons'
 import './SidebarSelect.css'
 
@@ -36,6 +37,7 @@ type SidebarSelectProps = Pick<AriaAttributes, 'aria-invalid' | 'aria-describedb
    */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  menuPortal?: boolean
 }
 
 type NormalizedOption = {
@@ -62,6 +64,7 @@ export function SidebarSelect({
   title,
   open: controlledOpen,
   onOpenChange,
+  menuPortal = false,
 }: SidebarSelectProps) {
   // `open` is potentially controlled. The uncontrolled path keeps its own
   // state under a distinct name; `setOpen` fans out to both the parent (via
@@ -76,12 +79,25 @@ export function SidebarSelect({
   }
 
   const rootRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLUListElement>(null)
   const generatedId = useId()
   const listId = id ? `${id}-list` : generatedId
 
   const items = normalizeOptions(options)
   const selected = items.find((item) => item.value === value) ?? null
   const selectedLabel = selected?.label ?? value
+  useLayoutEffect(() => {
+    if (!open || !menuPortal) return
+    function position() {
+      const trigger=rootRef.current?.querySelector('button'),menu=menuRef.current
+      if(!trigger||!menu)return
+      const rect=trigger.getBoundingClientRect(),below=window.innerHeight-rect.bottom-16,above=rect.top-16
+      const height=Math.min(menu.scrollHeight,198),up=below<height&&above>below
+      Object.assign(menu.style,{position:'fixed',left:Math.max(8,Math.min(rect.left,window.innerWidth-rect.width-8))+'px',width:Math.min(rect.width,window.innerWidth-16)+'px',minWidth:'0',maxWidth:'none',maxHeight:Math.max(32,Math.min(198,up?above:below))+'px',top:up?'auto':rect.bottom+6+'px',bottom:up?window.innerHeight-rect.top+6+'px':'auto',zIndex:'200'})
+    }
+    position();window.addEventListener('resize',position);window.addEventListener('scroll',position,true)
+    return()=>{window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true)}
+  },[open,menuPortal,items.length])
 
   // Close on outside click and on Escape.
   useEffect(() => {
@@ -90,7 +106,7 @@ export function SidebarSelect({
     }
 
     function handlePointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      if (!rootRef.current?.contains(event.target as Node) && !menuRef.current?.contains(event.target as Node)) {
         setOpen(false)
       }
     }
@@ -109,6 +125,11 @@ export function SidebarSelect({
     }
   }, [open])
 
+  const menu = open ? (
+        <ul ref={menuRef} className="sidebar-select__menu" id={listId} role="listbox" aria-label={label}>
+          {items.map(option=><li key={option.value} role="presentation"><button type="button" role="option" aria-selected={option.value===value} className={['sidebar-select__option',option.value===value?'is-selected':'',option.hint?'has-hint':''].filter(Boolean).join(' ')} onClick={()=>{onChange(option.value);setOpen(false);rootRef.current?.querySelector('button')?.focus({preventScroll:true})}}><span className="sidebar-select__option-label">{option.label}</span>{option.hint?<span className="sidebar-select__option-hint">{option.hint}</span>:null}</button></li>)}
+        </ul>
+  ) : null
   return (
     <div
       className={['sidebar-select', className].filter(Boolean).join(' ')}
@@ -138,8 +159,9 @@ export function SidebarSelect({
         </span>
       </button>
 
-      {open ? (
+      {menuPortal ? (open ? createPortal(<div className={`sidebar-select sidebar-select--portal ${className.split(/\s+/).filter(name => name !== 'console-form-select--down').join(' ')}`}>{menu}</div>,document.body) : null) : open ? (
         <ul
+          ref={menuRef}
           className="sidebar-select__menu"
           id={listId}
           role="listbox"

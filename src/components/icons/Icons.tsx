@@ -30,6 +30,23 @@ export function IconEye(props: IconProps) {
   )
 }
 
+export function IconPower(props: IconProps) {
+  return (
+    <IconSvg {...props}>
+      <path d="M12 2v10" />
+      <path d="M6.3 5.3a9 9 0 1 0 11.4 0" />
+    </IconSvg>
+  )
+}
+
+export function IconInfo(props: IconProps) {
+  return <IconSvg {...props}><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></IconSvg>
+}
+
+export function IconArrowLeft(props: IconProps) {
+  return <IconSvg {...props}><path d="m12 5-7 7 7 7M5 12h14" /></IconSvg>
+}
+
 export function IconPencil(props: IconProps) {
   return (
     <IconSvg {...props}>

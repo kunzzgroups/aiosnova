@@ -1,0 +1,2 @@
+/* Settings-only workspace drawer behavior; the system Drawer stays unchanged. */
+.ui-drawer-overlay--contained {position:absolute}

@@ -1,0 +1,121 @@
+/* Providers follows the shared Agents directory presentation. */
+.ai-settings-main:has(:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page)) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) {
+  padding: 0.85rem;
+  box-sizing: border-box;
+  height: auto;
+  flex: 1 1 0;
+}
+
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) thead th {
+  height: 53.5px !important;
+  min-height: 53.5px !important;
+  box-sizing: border-box !important;
+  padding: 16px 24px !important;
+  line-height: 21px !important;
+  vertical-align: middle !important;
+  font-family: "DM Sans", "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  white-space: nowrap !important;
+  background-color: var(--color-bg-muted) !important;
+}
+
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:nth-child(2),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:nth-child(2),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:nth-child(3),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:nth-child(3),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:nth-child(5),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:nth-child(5) {
+  text-align: center;
+  vertical-align: middle;
+}
+
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) .identity-pagination-select .sidebar-select__menu {
+  top: auto;
+  bottom: calc(100% + 0.5rem);
+}
+
+.ai-settings-providers-empty {
+  flex: 1 1 0;
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+@media (max-width: 760px) {
+  :is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) { padding: 0.55rem; }
+}
+
+/* Center the menu itself, not just the cell's inline text. */
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) thead th:last-child,
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) tbody td:last-child {
+  text-align: center !important;
+}
+
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:last-child > .row-menu {
+  display: inline-flex;
+  vertical-align: middle;
+  text-align: left;
+}
+
+/* Actions scrolls horizontally with the rest of the table. */
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:last-child,
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:last-child {
+  position: relative;
+  right: auto;
+  width: 7rem;
+  padding-inline: 0.75rem !important;
+  background: var(--color-bg-elevated);
+  box-shadow: none;
+}
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) thead th:last-child {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-bg-muted);
+}
+.ai-settings-provider-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.ai-settings-provider-actions > .ui-button {
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  padding: 0;
+}
+
+/* Keep expanded menus above neighboring rows without fixing the column. */
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) tbody td:last-child {
+  z-index: 1;
+  overflow: visible;
+}
+
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) tbody td:last-child:has(.row-menu__trigger[aria-expanded="true"]) {
+  z-index: 4;
+}
+
+/* Match Organization's inline row-selection placement and checkbox size. */
+.ai-settings-selection-name { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.ai-settings-selection-name > .ai-settings-model-name,
+.ai-settings-selection-name > .ai-settings-provider-link { min-width: 0; }
+.ai-settings-selection-checkbox { width: 1rem; height: 1rem; flex-shrink: 0; margin: 0; accent-color: var(--color-brand); cursor: pointer; }
+.ai-settings-selection-checkbox:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 3px; }
+.ai-settings-bulk-delete-copy { display: grid; gap: var(--space-3); }
+.ai-settings-bulk-delete-copy p { margin: 0; }
+.ai-settings-bulk-delete-list { list-style: none; margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-muted); text-align: left; max-height: 12rem; overflow-y: auto; }
+.ai-settings-bulk-delete-list li { padding-block: var(--space-2); overflow-wrap: anywhere; }
+.ai-settings-bulk-delete-list li + li { border-top: 1px solid var(--color-border); }
+
+/* Align header and row selection controls on the same horizontal inset. */
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:first-child,
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:first-child {
+  padding-inline: 1.5rem !important;
+}

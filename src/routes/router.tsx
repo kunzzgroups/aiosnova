@@ -15,6 +15,12 @@ import { AgentsPage } from '@/modules/ai/agents/pages/AgentsPage'
 import { KnowledgeBasesPage } from '@/modules/ai/knowledge/pages/KnowledgeBasesPage'
 import { KnowledgeBaseDetailPage } from '@/modules/ai/knowledge/pages/KnowledgeBaseDetailPage'
 import { TemplatesPage } from '@/modules/ai/knowledge/pages/TemplatesPage'   // ← 新增
+import { AiSettingsPage } from '@/modules/ai/settings/pages/AiSettingsPage'
+import { ProvidersPage } from '@/modules/ai/settings/pages/ProvidersPage'
+import { ProviderModelsPage } from '@/modules/ai/settings/pages/ProviderModelsPage'
+import { ToolsPage } from '@/modules/ai/settings/pages/ToolsPage'
+import { ToolDetailPage } from '@/modules/ai/settings/pages/ToolDetailPage'
+import { McpPage } from '@/modules/ai/settings/pages/McpPage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
@@ -50,6 +56,13 @@ export function AppRouter() {
             <Route path="/ai/ai/knowledge/templates" element={<TemplatesPage />} />
             <Route path="/ai/ai/knowledge/:baseId" element={<KnowledgeBaseDetailPage />} />
             <Route path="/ai/ai/knowledge/:baseId/:tab" element={<KnowledgeBaseDetailPage />} />
+
+            <Route path="/ai/ai/ai-settings" element={<AiSettingsPage />} />
+            <Route path="/ai/ai/ai-settings/models/providers" element={<ProvidersPage />} />
+            <Route path="/ai/ai/ai-settings/models/providers/:providerId/models" element={<ProviderModelsPage />} />
+            <Route path="/ai/ai/ai-settings/tools" element={<ToolsPage />} />
+            <Route path="/ai/ai/ai-settings/tools/:toolId" element={<ToolDetailPage />} />
+            <Route path="/ai/ai/ai-settings/mcp" element={<McpPage />} />
 
             <Route path="/system/core/employees" element={<UsersPage />} />
             <Route path="/system/core/employees/:userId" element={<UserDetailPage />} />

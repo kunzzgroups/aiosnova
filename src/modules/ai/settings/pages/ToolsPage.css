@@ -1,0 +1,102 @@
+/* Tools list uses the same full-height directory layout as Providers. */
+.ai-settings-tools-page .ai-settings-tool-table { min-width: 62rem; }
+.ai-settings-tools-page .ui-table-toolbar > .sidebar-select { flex-basis: 9rem; }
+.ai-settings-tools-page .ui-table-toolbar > .sidebar-select:has(#tools-module-filter) { flex: 0 0 12rem; }
+.ai-settings-tools-page #tools-module-filter-list .sidebar-select__option-label { white-space: nowrap; }
+.ai-settings-tools-page .ai-settings-tool-table th:nth-child(n+4),
+.ai-settings-tools-page .ai-settings-tool-table td:nth-child(n+4) { text-align: center; }
+.ai-settings-tool-name-cell { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.ai-settings-tool-name-cell .ai-settings-provider-mark { width: 1.6rem; height: 1.6rem; flex-basis: 1.6rem; }
+.ai-settings-tool-name-cell svg { width: 0.85rem; height: 0.85rem; }
+.ai-settings-tool-name { color: var(--color-text); font-weight: 650; text-decoration: none; overflow: hidden; text-overflow: ellipsis; }
+.ai-settings-tool-name:hover { color: var(--color-brand); }
+/* Use the same AI Settings action sizing as Providers and Models. */
+.ai-settings-page :is(.ai-settings-tools-page, .ai-settings-tool-detail) .ui-button--icon {
+  width:40px;
+  min-width:40px;
+  height:38.39px;
+  min-height:38.39px;
+  padding:0;
+  flex-shrink:0;
+}
+:is(.ai-settings-tools-page, .ai-settings-tool-detail) a,
+:is(.ai-settings-tools-page, .ai-settings-tool-detail) a:is(:hover, :focus, :active) {
+  text-decoration: none;
+}
+.ai-settings-tools-empty { display: grid; place-content: center; justify-items: center; gap: var(--space-3); padding: 2.5rem var(--space-5); text-align: center; }
+.ai-settings-tools-page .console-status,
+.ai-settings-tool-detail .console-status { width: 4.75rem; min-width: 4.75rem; height: 1.25rem; padding: 0.1rem 0.4rem; font-size: 11px; }
+.ai-settings-tool-risk { text-transform: capitalize; border: 1px solid transparent; }
+.ai-settings-tool-risk--high { background: var(--color-danger-bg); color: var(--color-danger); }
+.ai-settings-tool-risk--medium { background: var(--color-warning-bg); color: var(--color-warning); }
+.ai-settings-tool-risk--low { background: var(--color-success-bg); color: var(--color-success); }
+
+/* Dashboard detail: metadata grid, assignment rows and a restrained danger area. */
+.ai-settings-tool-detail { padding: 0; display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.ai-settings-tool-detail .console-panel { flex: 0 0 auto; padding: 1.1rem 1.25rem; }
+.ai-settings-tool-back { color: var(--color-brand); text-decoration: none; align-self: flex-start; font-size: var(--text-sm); }
+.ai-settings-tool-detail-header { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.ai-settings-tool-detail-header > div { flex: 1; min-width: 12rem; }
+.ai-settings-tool-detail h1 { margin: 0; font-size: 1.4rem; line-height: 1.3; }
+.ai-settings-tool-detail h2 { margin: 0 0 1rem; font-size: 0.95rem; }
+.ai-settings-tool-detail h3 { margin: 0 0 0.4rem; font-size: var(--text-sm); }
+.ai-settings-tool-detail p { margin: 0.35rem 0; font-size: var(--text-sm); line-height: 1.55; }
+.ai-settings-tool-detail-header p { color: var(--color-text-muted); }
+.ai-settings-tool-detail-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(16rem, 1fr); align-items: start; gap: 1rem; }
+.ai-settings-tool-detail-rail { display: grid; align-content: start; gap: 1rem; min-width: 0; }
+.ai-settings-tool-info { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem 1.75rem; font-size: var(--text-sm); }
+.ai-settings-tool-info > div { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; min-width: 0; }
+.ai-settings-tool-info dt { color: var(--color-text-muted); font-size: var(--text-xs); }
+.ai-settings-tool-info dd { margin: 0; overflow-wrap: anywhere; font-weight: 550; min-width: 0; }
+.ai-settings-tool-description { margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+.ai-settings-tool-description p { color: var(--color-text-muted); }
+.ai-settings-tool-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.ai-settings-tool-card-heading > span { color: var(--color-text-muted); font-size: var(--text-sm); font-weight: 500; }
+.ai-settings-tool-agents, .ai-settings-tool-list { list-style: none; padding: 0; margin: 0; max-height: 13rem; overflow-y: auto; font-size: var(--text-sm); }
+.ai-settings-tool-agents > li { display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0; }
+.ai-settings-tool-agents > li > div { display: grid; gap: 0.2rem; min-width: 0; }
+.ai-settings-tool-agents strong { font-size: var(--text-sm); font-weight: 600; overflow-wrap: anywhere; }
+.ai-settings-tool-agents > li > div > span { color: var(--color-text-muted); font-size: var(--text-xs); }
+.ai-settings-tool-agents .ai-settings-provider-mark { color: var(--color-brand); background: var(--color-brand-soft); }
+.ai-settings-tool-manage-agents { display: inline-block; margin-top: 0.75rem; color: var(--color-brand); font-size: var(--text-sm); text-decoration: none; }
+.ai-settings-tool-list li { display: grid; grid-template-columns: 0.4rem minmax(0, 1fr); align-items: start; gap: 0.55rem; padding: 0.55rem 0; }
+.ai-settings-tool-list li > .ai-settings-health-dot { margin-top: 0.4rem; }
+.ai-settings-tool-list li > div { display: grid; gap: 0.3rem; }
+.ai-settings-tool-list time { color: var(--color-text-muted); font-size: var(--text-xs); }
+.ai-settings-tool-event--success { background: var(--color-success); }
+.ai-settings-tool-event--error { background: var(--color-danger); }
+.ai-settings-tool-detail .ai-settings-tool-danger { min-height: 5rem; box-sizing: border-box; padding-block: 0.85rem; border-color: color-mix(in srgb, var(--color-danger) 25%, var(--color-border)); display: flex; flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+.ai-settings-tool-danger h2 { color: var(--color-danger); margin-bottom: 0.2rem; font-size: var(--text-sm); }
+.ai-settings-tool-danger p { color: var(--color-text-muted); margin: 0; }
+.ai-settings-tool-danger-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.ai-settings-tool-code { font-family: monospace; tab-size: 2; max-height: 24rem; overflow: auto; padding: 1rem; background: var(--color-bg-muted); border-radius: var(--radius-md); }
+.ai-settings-tool-error { color: var(--color-danger); font-size: var(--text-sm); }
+
+/* Existing Add/Edit Drawer presentation is preserved. */
+.ai-settings-tool-confirmation { display: flex; align-items: center; gap: var(--space-2); margin: 1rem 0; font-size: var(--text-sm); }
+.ai-settings-tool-json { font-family: monospace; tab-size: 2; resize: vertical; min-height: 8rem; }
+@container ai-settings-content (max-width: 860px) {
+  .ai-settings-tool-detail-grid { grid-template-columns: 1fr; }
+  .ai-settings-tools-page .ui-table-toolbar .ui-table-toolbar__search { flex-basis: 100%; width: 100%; }
+  .ai-settings-tools-page .ui-table-toolbar > .sidebar-select { flex: 1 1 8rem; }
+}
+@container ai-settings-content (max-width: 450px) {
+  .ai-settings-tool-info { grid-template-columns: 1fr; }
+}
+
+/* Match Knowledge's top viewbar without a separate title block. */
+.ai-settings-tool-viewbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem 1rem; padding: 0.75rem 0.85rem; border-bottom: 1px solid var(--color-border); }
+.ai-settings-tool-tabs { display: flex; gap: var(--space-1); padding: var(--space-1); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); min-width: 0; max-width: 100%; overflow-x: auto; }
+.ai-settings-tool-tabs button { flex-shrink: 0; border: 0; background: transparent; color: var(--color-text-muted); font: inherit; cursor: pointer; padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm); font-size: var(--text-sm); white-space: nowrap; }
+.ai-settings-tool-tabs button:hover:not([aria-selected="true"]) { background: var(--color-bg-muted); color: var(--color-text); }
+.ai-settings-tool-tabs button[aria-selected="true"] { color: var(--color-on-brand); background: var(--color-brand); }
+.ai-settings-tool-tabs button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: -2px; }
+.ai-settings-tool-view-actions { display: flex; gap: var(--space-2); margin-left: auto; }
+.ai-settings-tool-tab-content { display: flex; flex-direction: column; gap: 1rem; padding: 0.85rem; min-width: 0; }
+
+.ai-settings-tool-execution { grid-template-columns: 1fr; gap: 0; padding: 0.25rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.ai-settings-tool-execution > div { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(0, 2fr); align-items: center; gap: 1rem; padding: 0.65rem 0; }
+.ai-settings-tool-execution > div + div { border-top: 1px solid var(--color-border); }
+.ai-settings-tool-detail .ai-settings-tool-parameters-heading { margin-top: 1.25rem; }
+.ai-settings-tool-runtime-empty { display: grid; justify-items: center; align-content: center; min-height: 10rem; padding: 1rem; text-align: center; }
+.ai-settings-tool-runtime-empty p { color: var(--color-text-muted); }

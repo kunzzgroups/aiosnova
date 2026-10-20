@@ -996,7 +996,7 @@ button.console-status:disabled {
   position: relative;
 }
 
-.console-form-select--down .sidebar-select__menu {
+.console-form-select--down:not(.sidebar-select--portal) .sidebar-select__menu {
   top: calc(100% + 0.4rem) !important;
   bottom: auto !important;
   left: 0 !important;
