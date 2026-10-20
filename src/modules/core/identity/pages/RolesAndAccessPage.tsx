@@ -144,7 +144,7 @@ function RolesAndAccessEditor() {
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([])
   const [pendingBulkIds, setPendingBulkIds] = useState<string[]>([])
   const selectAllRolesRef = useRef<HTMLInputElement>(null)
-  const dialogRef = useRef<HTMLDialogElement>(null)
+
   const tableRef = useRef<HTMLDivElement>(null)
   const autoFitRowMeasurement = useRef({ width: 0, height: 0 })
   const selected = roles.find(role => role.id === selectedId)
@@ -233,13 +233,6 @@ function RolesAndAccessEditor() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [hasDrafts, editorOpen])
 
-  useEffect(() => {
-    if (!editorOpen) return
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const dialog = dialogRef.current
-    dialog?.showModal()
-    return () => { dialog?.close(); if (previous?.isConnected) previous.focus() }
-  }, [editorOpen])
 
   function update(next: string[]) {
     if (!selected?.enabled) return
@@ -269,9 +262,10 @@ function RolesAndAccessEditor() {
     notifySuccess(t('access.saved'))
   }
 
-  function openEditor(role?: AccessDemoRole) {
+  function openEditor() {
     setNameError('')
-    setEditor(role ? { id: role.id, name: role.name, enabled: role.enabled, permissions: [...drafts[role.id]] } : { name: '', enabled: true, permissions: [] })
+    if (!editor) setEditor({ name: '', enabled: true, permissions: [] })
+    setSelectedId('__new__')
   }
 
   function saveRole() {
@@ -307,7 +301,6 @@ function RolesAndAccessEditor() {
           document.getElementById(`${ids}-${next}-tab`)?.focus()
         }}>{t(`access.${value}`)}</button>)}
       </div>
-      {<Button onClick={() => openEditor()}><IconPlus />{t('access.addRole')}</Button>}
     </div>
     <TablePanel id={`${ids}-roles-panel`} role="tabpanel" aria-labelledby={`${ids}-roles-tab`} hidden={tab !== 'roles'} className="roles-access__table-panel">
       <TableToolbar
@@ -344,7 +337,7 @@ function RolesAndAccessEditor() {
     <div className="roles-access__permission-tab" id={`${ids}-permissions-panel`} role="tabpanel" aria-labelledby={`${ids}-permissions-tab`} hidden={tab !== 'permissions'}>
       <div className="roles-access__workspace">
         <aside className="roles-access__sidebar" aria-label={t('access.roles')}>
-          <div className="roles-access__list-heading">{t('access.roles')}<span>{roles.length}</span></div>
+          <div className="roles-access__list-heading"><span className="roles-access__list-title">{t('access.roles')}<span>{roles.length}</span></span><Button variant="ghost" className="roles-access__add-role" aria-pressed={selectedId === '__new__'} onClick={openEditor}><IconPlus />{t('access.addRole')}</Button></div>
           <div className="roles-access__role-list" tabIndex={0} role="region" aria-label={t('access.roles')}>
             {roles.map(role => <button type="button" className="roles-access__role" key={role.id} aria-pressed={selectedId === role.id} onClick={() => setSelectedId(role.id)}>
               <strong>{role.name}</strong><span>{t('access.roleMeta', { count: drafts[role.id].length })} · {t(role.enabled ? 'access.enabled' : 'access.disabled')}{differs(drafts[role.id], role.permissions) ? ` · ${t('access.unsaved')}` : ''}</span>
@@ -352,7 +345,16 @@ function RolesAndAccessEditor() {
           </div>
         </aside>
         <div className="roles-access__panel">
-          {selected ? <>
+          {editor && selectedId === '__new__' ? <form className="roles-access__create-panel" onSubmit={event => { event.preventDefault(); saveRole() }}>
+            <header className="roles-access__role-heading">
+              <div className="roles-access__create-fields"><FormField className="roles-access__name-field" htmlFor={`${ids}-new-name`} label={t('access.roleName')} error={nameError}><TextField id={`${ids}-new-name`} autoFocus required maxLength={80} placeholder={t('access.roleNamePlaceholder')} value={editor.name} hasError={!!nameError} aria-invalid={!!nameError} aria-describedby={nameError ? `${ids}-new-name-error` : undefined} onChange={event => { setEditor({ ...editor, name: event.target.value }); setNameError('') }} /></FormField>
+                <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={editor.enabled} aria-label={t('access.status')} onChange={event => setEditor({ ...editor, enabled: event.target.checked })} />{t(editor.enabled ? 'access.enabled' : 'access.disabled')}</label>
+              </div>
+              <div className="roles-access__search-row"><div className="roles-access__access-search"><IconSearch aria-hidden="true" /><TextField type="search" aria-label={t('access.searchPermissionCategories')} placeholder={t('access.searchPermissionCategories')} value={accessSearch} onChange={event => setAccessSearch(event.target.value)} /></div><span className="roles-access__selected-total" role="status">{t('access.granted', { count: editor.permissions.length, total: totalPermissions })}</span></div>
+            </header>
+            <PermissionChoices permissions={editor.permissions} onChange={next => setEditor({ ...editor, permissions: next })} idPrefix={`${ids}-create`} query={accessSearch} />
+            <footer className="roles-access__footer"><div className="roles-access__actions"><Button variant="ghost" onClick={() => { setEditor(null); setNameError(''); setSelectedId(roles[0]?.id ?? '') }}>{t('access.cancel')}</Button><Button type="submit">{t('access.saveRole')}</Button></div></footer>
+          </form> : selected ? <>
             <header className="roles-access__role-heading">
               <div className="roles-access__name">
                 <div className="roles-access__inline-title">
@@ -378,20 +380,6 @@ function RolesAndAccessEditor() {
         </div>
       </div>
     </div>
-    {editor && <dialog ref={dialogRef} className="roles-access__dialog" aria-labelledby={`${ids}-editor-title`} onCancel={() => setEditor(null)}>
-      <form onSubmit={event => { event.preventDefault(); saveRole() }}>
-        <h2 id={`${ids}-editor-title`}>{t(editor.id ? 'access.edit' : 'access.addRole')}</h2>
-        <div className="roles-access__fields">
-          <FormField htmlFor={`${ids}-name`} label={t('access.roleName')} error={nameError}><TextField id={`${ids}-name`} autoFocus required maxLength={80} placeholder={t('access.roleNamePlaceholder')} value={editor.name} hasError={!!nameError} aria-invalid={!!nameError} aria-describedby={nameError ? `${ids}-name-error` : undefined} onChange={event => { setEditor({ ...editor, name: event.target.value }); setNameError('') }} /></FormField>
-          {!editor.id && <div className="roles-access__editor-status"><span id={`${ids}-status-label`}>{t('access.status')}</span><label className="identity-invite-switch"><input type="checkbox" role="switch" aria-labelledby={`${ids}-status-label`} checked={editor.enabled} onChange={event => setEditor({ ...editor, enabled: event.target.checked })} />{t(editor.enabled ? 'access.enabled' : 'access.disabled')}</label></div>}
-        </div>
-        {!editor.id && <>
-          <div className="roles-access__form-permissions"><h3>{t('access.permissions')}</h3><span role="status">{t('access.selectedCount', { count: editor.permissions.length, total: totalPermissions })}</span></div>
-          <PermissionChoices permissions={editor.permissions} onChange={next => { if (editor.enabled) setEditor({ ...editor, permissions: next }) }} idPrefix={`${ids}-editor`} disabled={!editor.enabled} />
-        </>}
-        <footer className="roles-access__footer"><div className="roles-access__actions"><Button variant="ghost" onClick={() => setEditor(null)}>{t('access.cancel')}</Button><Button type="submit">{t(editor.id ? 'access.rename' : 'access.saveRole')}</Button></div></footer>
-      </form>
-    </dialog>}
     <ConfirmDialog open={!!deleteRole} variant="deletion" title={t('access.deleteTitle')} description={deleteRole?.peopleCount ? t('access.deleteAssigned', { count: deleteRole.peopleCount, name: deleteRole.name }) : t('access.deleteConfirm', { name: deleteRole?.name })} confirmLabel={t('access.delete')} confirmDisabled={!!deleteRole?.enabled || !!deleteRole?.peopleCount} onCancel={() => setDeleteId(null)} onConfirm={() => {
       if (!deleteRole || deleteRole.enabled || deleteRole.peopleCount) return
       const remaining = roles.filter(role => role.id !== deleteRole.id)
@@ -500,6 +488,9 @@ function RolesAndAccessEditor() {
     </Drawer>
   </section>
 }
+
+
+
 
 
 
