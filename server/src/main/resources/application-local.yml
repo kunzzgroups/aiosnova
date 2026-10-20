@@ -17,3 +17,8 @@ app:
     enabled: ${LOCAL_TEST_LOGIN_ENABLED:false}
     email: ${LOCAL_TEST_LOGIN_EMAIL:demo@aios.dev}
   local-merchant-id: ${LOCAL_MERCHANT_ID:00000000-0000-4000-8000-000000000002}
+  mail:
+    provider: ${EMAIL_PROVIDER:mock}
+    from: ${EMAIL_FROM:AIOS <noreply@aiosnova.com>}
+    resend:
+      api-key: ${RESEND_API_KEY:}

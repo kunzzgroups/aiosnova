@@ -9,9 +9,15 @@ import java.util.UUID;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Service
 @Profile("local")
+@ConditionalOnProperty(
+        name = "app.mail.provider",
+        havingValue = "mock",
+        matchIfMissing = true
+)
 public class MockEmailService implements EmailService {
 
     private final Map<String, List<MockEmail>> inbox = new HashMap<>();
