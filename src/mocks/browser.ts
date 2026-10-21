@@ -23,6 +23,10 @@ const backendTacHandlers = [
   http.post('/api/mock/invitations', () => passthrough()),
   http.get('/api/mock/invitations/:token', () => passthrough()),
   http.post('/api/mock/invitations/:token/mfa/start', () => passthrough()),
+  http.post('/api/identity/roles', () => passthrough()),
+  http.get('/api/identity/roles', () => passthrough()),
+  http.patch('/api/identity/roles/:id', () => passthrough()),
+  http.patch('/api/identity/roles/:id/status', () => passthrough()),
 ]
 export const worker = setupWorker(
   ...backendTacHandlers,

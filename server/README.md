@@ -1,3 +1,26 @@
+## Role & Access database foundation (V14)
+
+`src/main/resources/db/migration/mysql/V14__create_role_access_tables.sql`
+was manually applied to the development database on 2026-10-21.
+Do not rerun it on this database.
+
+V14 creates `role`, `permission`, `user_role`, and `role_permission`.
+Role names are case-insensitive unique within each merchant.
+User-role assignments use a composite foreign key to enforce matching
+merchant scope.
+
+Manual database verification passed:
+- Duplicate user-role assignments were rejected.
+- Assignments with mismatched merchant scope were rejected.
+- Deleting a role assigned to a user was rejected.
+- After unassignment, deleting a role removed its role-permission
+  associations while preserving permission records.
+- Test data was rolled back successfully.
+
+This migration adds the database structure only. Role APIs and frontend
+integration are not implemented. Existing direct-grant authorization
+remains unchanged.
+
 ## Selective employee reassignment during department removal
 
 Removal impact responses now include `employees` (user ID, display name and source department/position) only for actors with both Organization management and employee-management/owner access. Aggregate counts remain available under the existing Organization read rules. The dialog lists affected employees without search, supports selection/select-all, stages department/position destinations for each selected group and provides Undo. Queued changes apply only when removal succeeds; unassigned employees retain removed placement references and appear under Needs reassignment.
