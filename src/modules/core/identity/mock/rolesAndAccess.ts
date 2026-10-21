@@ -17,9 +17,9 @@ export const accessPermissionRisks: Record<string, { kind: 'destructive' | 'priv
   deleteRoles: { kind: 'destructive', hintKey: 'access.deleteRolesHint' },
 }
 
-export type AccessDemoRole = { id: string; name: string; enabled: boolean; permissions: string[]; peopleCount: number; createdAt: string }
+export type AccessRole = { id: string; name: string; enabled: boolean; permissions: string[]; peopleCount: number; createdAt: string }
 
-export function createAccessDemoRoles(): AccessDemoRole[] {
+export function createAccessDemoRoles(): AccessRole[] {
   return [
     { id: 'hr-admin', name: 'HR Administrator', enabled: true, permissions: ['viewEmployees', 'createEmployees', 'editEmployees', 'viewOrganization'], peopleCount: 3, createdAt: '2026-10-12T08:00:00Z' },
     { id: 'viewer', name: 'Employee Viewer', enabled: true, permissions: ['viewEmployees'], peopleCount: 8, createdAt: '2026-10-13T08:00:00Z' },

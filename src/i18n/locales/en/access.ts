@@ -71,4 +71,11 @@ export const access = {
   'access.noChanges': 'No unsaved changes',
   'access.discard': 'Discard changes',
   'access.save': 'Save changes',
+  'access.createFailed': 'Unable to create role. Please try again.',
+  'access.createForbidden': 'Only the merchant owner can create roles.',
+  'access.permissionMappingPending': 'Permission saving is not connected yet. Clear the selection to create an empty role.',
+  'access.loadFailed': 'Unable to load roles. Please try again.',
+  'access.loading': 'Loading roles...',
+  'access.renameFailed': 'Unable to rename role. Please try again.',
+  'access.statusFailed': 'Unable to update role status. Please try again.',
 }
