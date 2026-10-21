@@ -34,9 +34,9 @@ function records(companyId: string) {
       id: 'tool-' + (index + 1)+'-'+companyId, companyId, name, action, module, risk, status, agents,
       description: 'Provides ' + name.toLowerCase() + ' capabilities to assigned agents.',
       timeoutSeconds: fixture.security.timeout, requiresConfirmation: risk === 'high', configuration: mockToolConfiguration(companyId,action),
-      usage: {sample:true,points:usageDaily(history.filter(record=>record.tool===name)).map((point,day)=>({date:point.date,requests:point.requests,errors:point.errors,latencyMs:90+index*27+(day*13)%110}))},
+      usage: {sample:true,points:usageDaily(history.filter(record=>record.toolId==='tool-'+(index+1)+'-'+companyId)).map((point,day)=>({date:point.date,requests:point.requests,errors:point.errors,latencyMs:90+index*27+(day*13)%110}))},
       updatedAt: fixtureTime(60+index*11),
-      activity: [{ id: companyId+'-initial-'+index, time: fixtureTime(60+index*11), message: status === 'error' ? 'Connection failed. Review the tool configuration.' : 'Tool configuration registered.', status: status === 'error' ? 'error' : 'info' }],
+      activity: [{ id: companyId+'-initial-'+index, time: fixtureTime(60+index*11), message: status === 'error' ? 'Sample error scenario. Review the tool configuration; no live execution was attempted.' : 'Tool configuration registered.', status: status === 'error' ? 'error' : 'info' }],
     })))
   }
   return store.get(companyId)!
@@ -50,7 +50,7 @@ function activity(tool: AiTool, message: string) {
   tool.updatedAt = new Date().toISOString()
   tool.activity.unshift({ id: crypto.randomUUID(), time: tool.updatedAt, message, status: 'info' })
 }
-function validate(companyId: string, payload: SaveToolPayload, editingId?: string) {
+function validate(payload: SaveToolPayload) {
   if (!payload.name.trim()) throw new Error('Tool name is required.')
   if (!TOOL_MODULES.includes(payload.module)) throw new Error('Choose a valid module.')
   if (!['low', 'medium', 'high'].includes(payload.risk)) throw new Error('Choose a valid risk level.')
@@ -60,13 +60,13 @@ function validate(companyId: string, payload: SaveToolPayload, editingId?: strin
   const configurationErrors=validateToolConfiguration(payload.action,payload.configuration)
   if(Object.keys(configurationErrors).length)throw new Error(Object.values(configurationErrors)[0])
   if (payload.risk === 'high' && !payload.requiresConfirmation) throw new Error('High-risk tools must require confirmation.')
-  if (records(companyId).some(item => item.id !== editingId && item.action === payload.action.trim())) throw new Error('This action is already registered in this company.')
 }
 export async function fetchTools(companyId: string) { return records(companyId).map(clone) }
 export async function fetchTool(companyId: string, id: string) { return clone(find(companyId, id)) }
 export async function saveToolAgents(companyId: string, id: string, names: string[]) {
   const tool = find(companyId, id)
   const { items } = await fetchAgents(companyId)
+  if(find(companyId,id)!==tool)throw new Error('Tool configuration changed. Reopen Manage agents and try again.')
   const allowed = new Set([...items.map(agent => agent.name), ...tool.agents])
   const selected = [...new Set(names)]
   if (selected.some(name => !allowed.has(name))) throw new Error('The agent list has changed. Reopen Manage agents and try again.')
@@ -75,17 +75,20 @@ export async function saveToolAgents(companyId: string, id: string, names: strin
   return clone(tool)
 }
 export async function saveTool(companyId: string, payload: SaveToolPayload, id?: string) {
-  validate(companyId, payload, id)
+  validate(payload)
   const previous = id ? find(companyId, id) : undefined
+  const actionChanged = !!previous && previous.action !== payload.action.trim()
+  const changedAt = new Date().toISOString()
   const tool: AiTool = {
     id: previous?.id ?? crypto.randomUUID(), companyId,
     name: payload.name.trim(), description: payload.description.trim(), module: payload.module,
     action: payload.action.trim(), risk: payload.risk, timeoutSeconds: payload.timeoutSeconds,
     requiresConfirmation: payload.requiresConfirmation, configuration: structuredClone(payload.configuration),
     status: payload.enabled ? previous?.status === 'error' ? 'error' : 'active' : 'disabled',
-    agents: previous?.agents ?? [], activity: previous?.activity ?? [], usage: previous?.usage, updatedAt: new Date().toISOString(),
+    agents: previous?.agents ?? [], activity: previous?.activity ?? [], usage: actionChanged ? undefined : previous?.usage, updatedAt: changedAt,
+    previousActions: actionChanged && previous ? [...(previous.previousActions ?? []), structuredClone({ action: previous.action, name: previous.name, changedAt, configuration: previous.configuration, usage: previous.usage })] : previous?.previousActions,
   }
-  activity(tool, previous ? 'Tool configuration updated.' : 'Tool created.')
+  activity(tool, actionChanged ? `Tool action changed from ${previous!.action} to ${tool.action}. Previous configuration and usage archived. Agent assignments retained; review access for the new capability.` : previous ? 'Tool configuration updated.' : 'Tool created.')
   if (previous) store.set(companyId, records(companyId).map(item => item.id === id ? tool : item))
   else records(companyId).push(tool)
   return clone(tool)

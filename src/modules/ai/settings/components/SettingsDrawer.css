@@ -1,2 +1,40 @@
 /* Settings-only workspace drawer behavior; the system Drawer stays unchanged. */
 .ui-drawer-overlay--contained {position:absolute}
+.ai-settings-drawer .ui-drawer {min-height:0;max-height:100%;overflow:hidden}
+.ai-settings-drawer .ui-drawer__header,
+.ai-settings-drawer .ui-drawer__footer {flex:0 0 auto}
+.ai-settings-drawer .ui-drawer__body {flex:1 1 0;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain}
+/* Activity and archived JSON use the drawer body as their vertical scroll owner. */
+.ai-settings-drawer .ai-tool-all-activity .ai-settings-tool-list {max-height:none;overflow:visible}
+.ai-settings-drawer .ai-tool-all-activity .ai-tool-json-preview {max-height:none;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Assignment controls stay above the only scrolling list. */
+.ai-settings-agents-drawer .ui-drawer__body {display:flex;flex-direction:column;gap:.75rem;overflow:hidden}
+.ai-settings-agents-controls,.ai-settings-agents-feedback {flex:0 0 auto;min-width:0}
+.ai-settings-agents-list {flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding-inline-end:.25rem}
+
+/* Portals live outside #root, so mirror the page scrollbar skin locally. */
+.ai-settings-drawer .ui-drawer__body,
+.ai-settings-drawer .ui-drawer__body * {
+  scrollbar-width:thin;
+  scrollbar-color:rgb(100 116 139 / 58%) transparent;
+}
+@supports selector(::-webkit-scrollbar) {
+  .ai-settings-drawer .ui-drawer__body,
+  .ai-settings-drawer .ui-drawer__body * {
+    scrollbar-width:auto !important;
+    scrollbar-color:auto !important;
+  }
+  .ai-settings-drawer ::-webkit-scrollbar {width:6px;height:6px}
+  .ai-settings-drawer ::-webkit-scrollbar-track {background:transparent}
+  .ai-settings-drawer ::-webkit-scrollbar-thumb {border-radius:999px;background:rgb(100 116 139 / 58%)}
+  .ai-settings-drawer ::-webkit-scrollbar-thumb:hover {background:rgb(71 85 105 / 72%)}
+  .ai-settings-drawer ::-webkit-scrollbar-button {
+    -webkit-appearance:none !important;
+    appearance:none !important;
+    display:none !important;
+    width:0 !important;
+    height:0 !important;
+  }
+  .ai-settings-drawer ::-webkit-scrollbar-corner {background:transparent}
+}

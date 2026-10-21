@@ -7,6 +7,7 @@ import type {
   SaveModelPayload,
   SaveProviderPayload,
 } from '../types/settings'
+import { fetchModelCapabilities } from './modelCapabilitiesService'
 
 const USE_MOCK = true
 
@@ -287,38 +288,40 @@ function ensureCompany(companyId: string) {
   const fixture = companyFixture(companyId)
   if (initializedCompanies.has(companyId)) return
   const selectedProviders = PROVIDER_SEEDS.filter(provider => provider.slug in fixture.providers)
-  providers.push(...selectedProviders.map((provider,index) => ({
-    ...provider, companyId, id:provider.id+'-'+companyId,
-    status:fixture.providers[provider.slug],
-    enabled:fixture.providers[provider.slug]!=='disabled',
-    lastTestedAt:fixture.providers[provider.slug]==='disabled'?null:fixtureTime(45+index*17),
+  providers.push(...selectedProviders.map((provider, index) => ({
+    ...provider, companyId, id: provider.id + '-' + companyId,
+    status: fixture.providers[provider.slug],
+    enabled: fixture.providers[provider.slug] !== 'disabled',
+    lastTestedAt: fixture.providers[provider.slug] === 'disabled' ? null : fixtureTime(45 + index * 17),
   })))
-  const providerMap = new Map(selectedProviders.map(provider => [provider.id,provider]))
+  const providerMap = new Map(selectedProviders.map(provider => [provider.id, provider]))
   const selectedModels = MODEL_SEEDS.filter(model =>
     fixture.modelIds.includes(model.modelId) ||
-    (fixture.testModels>0 && model.modelId.startsWith('openai-test-') && Number(model.modelId.slice(12))<=fixture.testModels)
+    (fixture.testModels > 0 && model.modelId.startsWith('openai-test-') && Number(model.modelId.slice(12)) <= fixture.testModels)
   )
-  models.push(...selectedModels.filter(model=>providerMap.has(model.providerId)).map(model => {
-    const provider=providerMap.get(model.providerId)!
-    const providerStatus=fixture.providers[provider.slug]
-    const status=providerStatus==='disabled'?'disabled':fixture.modelStates?.[model.modelId]??model.status
-    return {...model,id:model.id+'-'+companyId,providerId:model.providerId+'-'+companyId,
-      status,usedByAgents:companyId==='company-j1'?model.usedByAgents:0}
+  models.push(...selectedModels.filter(model => providerMap.has(model.providerId)).map(model => {
+    const provider = providerMap.get(model.providerId)!
+    const providerStatus = fixture.providers[provider.slug]
+    const status = providerStatus === 'disabled' ? 'disabled' : fixture.modelStates?.[model.modelId] ?? model.status
+    return {
+      ...model, id: model.id + '-' + companyId, providerId: model.providerId + '-' + companyId,
+      status, usedByAgents: companyId === 'company-j1' ? model.usedByAgents : 0
+    }
   }))
   initializedCompanies.add(companyId)
-  providers.filter(provider=>provider.companyId===companyId).forEach(provider=>recalcProviderCount(provider.id))
+  providers.filter(provider => provider.companyId === companyId).forEach(provider => recalcProviderCount(provider.id))
 }
 
-export async function fetchRuntimeDefaults(companyId:string) {
+export async function fetchRuntimeDefaults(companyId: string) {
   ensureCompany(companyId)
-  const fixture=companyFixture(companyId)
-  const enabled=models.filter(model=>model.status==='enabled'&&providers.some(provider=>provider.id===model.providerId&&provider.companyId===companyId&&provider.status==='connected'))
-  const model=enabled.find(model=>model.modelId===fixture.runtime.model)
-  const fallback=enabled.find(model=>model.modelId===fixture.runtime.fallback)
+  const fixture = companyFixture(companyId)
+  const enabled = models.filter(model => model.status === 'enabled' && providers.some(provider => provider.id === model.providerId && provider.companyId === companyId && provider.status === 'connected'))
+  const model = enabled.find(model => model.modelId === fixture.runtime.model)
+  const fallback = enabled.find(model => model.modelId === fixture.runtime.fallback)
   return {
-    provider:model?providers.find(provider=>provider.id===model.providerId)!.name:'Not configured',
-    model:model?.name??'Not configured',fallbackModel:fallback?.name??'Not configured',
-    routing:model?fixture.runtime.routing:'Not configured',
+    provider: model ? providers.find(provider => provider.id === model.providerId)!.name : 'Not configured',
+    model: model?.name ?? 'Not configured', fallbackModel: fallback?.name ?? 'Not configured',
+    routing: model ? fixture.runtime.routing : 'Not configured',
   }
 }
 
@@ -327,11 +330,15 @@ function delay(ms = 180) {
 }
 
 function cloneProvider(provider: AiProvider): AiProvider {
-  return { ...provider }
+  return structuredClone(provider)
+}
+function logProvider(provider: AiProvider, message: string, status: 'success' | 'error' | 'neutral' = 'neutral', time = new Date().toISOString()) {
+  provider.activity ??= []
+  provider.activity.unshift({ id: crypto.randomUUID(), time, message, status })
 }
 
 function cloneModel(model: AiModel): AiModel {
-  return { ...model }
+  return structuredClone(model)
 }
 
 function slugify(value: string) {
@@ -414,11 +421,12 @@ export async function createProvider(
     baseUrl: payload.baseUrl.trim(),
     apiKeyMasked: payload.apiKey ? '••••••••••••••••' : '',
     enabled: payload.enabled,
-    status: payload.enabled ? 'connected' : 'disabled',
-    lastTestedAt: payload.enabled ? new Date().toISOString() : null,
+    status: payload.enabled ? 'not_verified' : 'disabled',
+    lastTestedAt: null,
     modelCount: 0,
   }
 
+  logProvider(provider, payload.enabled ? 'Provider configuration saved. Not verified.' : 'Provider configuration saved. Disabled.')
   providers.push(provider)
   return cloneProvider(provider)
 }
@@ -431,12 +439,15 @@ export async function updateProvider(
   const provider = providers.find((item) => item.id === providerId)
   if (!provider || provider.companyId !== payload.companyId) throw new Error('Provider is not available in this company.')
 
+  const changed = provider.baseUrl !== payload.baseUrl.trim() || !!payload.apiKey?.trim() || provider.enabled !== payload.enabled
   provider.name = payload.name.trim()
   provider.slug = slugify(payload.name)
   provider.baseUrl = payload.baseUrl.trim()
   if (payload.apiKey) provider.apiKeyMasked = '••••••••••••••••'
   provider.enabled = payload.enabled
-  provider.status = payload.enabled ? 'connected' : 'disabled'
+  provider.status = payload.enabled ? changed ? 'not_verified' : provider.status : 'disabled'
+  if (changed) { provider.lastTestedAt = null; delete provider.lastCheck }
+  logProvider(provider, changed ? 'Provider configuration updated. ' + (provider.enabled ? 'Not verified.' : 'Disabled.') : 'Provider details updated. Connection status unchanged.')
 
   return cloneProvider(provider)
 }
@@ -448,8 +459,11 @@ export async function setProviderEnabled(
   const provider = providers.find((item) => item.id === providerId)
   if (!provider) throw new Error(`Provider ${providerId} not found.`)
 
+  if (provider.enabled === enabled) return cloneProvider(provider)
+  if (provider.enabled !== enabled) { provider.lastTestedAt = null; delete provider.lastCheck }
   provider.enabled = enabled
-  provider.status = enabled ? 'connected' : 'disabled'
+  provider.status = enabled ? 'not_verified' : 'disabled'
+  logProvider(provider, enabled ? 'Provider enabled. Not verified.' : 'Provider disabled.')
   return cloneProvider(provider)
 }
 
@@ -467,6 +481,8 @@ export async function deleteProvider(providerId: string): Promise<void> {
 }
 
 export async function testProviderConnection(input: {
+  companyId?: string
+  outcome?: import('../types/connection').MockConnectionOutcome
   providerId?: string
   baseUrl: string
   apiKey?: string
@@ -474,40 +490,156 @@ export async function testProviderConnection(input: {
   await delay(650)
 
   const checkedAt = new Date().toISOString()
-  const validUrl = /^https?:\/\/\S+/i.test(input.baseUrl.trim())
+  let validUrl = false
+  try { const url = new URL(input.baseUrl.trim()); validUrl = ['http:', 'https:'].includes(url.protocol) && !!url.hostname && !/\s/.test(input.baseUrl.trim()) } catch { /* Report a local validation result below. */ }
 
   if (!validUrl) {
     return {
+      simulated: true,
       ok: false,
-      message: 'Enter a valid HTTP or HTTPS Base URL.',
+      message: 'Simulated check: enter a valid HTTP or HTTPS URL. No live connection was tested.',
       checkedAt,
     }
   }
 
-  if (input.providerId) {
-    const provider = providers.find((item) => item.id === input.providerId)
-    if (provider) {
-      provider.lastTestedAt = checkedAt
-      if (provider.enabled) provider.status = 'connected'
+  if (!input.providerId && !input.apiKey?.trim()) {
+    return {
+      simulated: true,
+      ok: false,
+      message: 'Simulated check: enter an API key. No live authentication was tested.',
+      checkedAt,
     }
   }
 
-  return {
-    ok: true,
-    message: 'Connection successful.',
-    checkedAt,
+  const outcome = input.outcome ?? 'validate'
+  if (!['validate', 'success', 'failure'].includes(outcome)) throw new Error('Choose a valid mock result.')
+  const result: ProviderConnectionResult = { simulated: true, outcome, ok: outcome !== 'failure', message: outcome === 'success' ? 'Mock connection success. Connected is a demo result; no live request was made.' : outcome === 'failure' ? 'Mock connection failure. Error is a demo result; no live request was made.' : 'Simulated check completed. URL format accepted; live connectivity and authentication were not verified.', checkedAt }
+  if (input.providerId) {
+    const provider = providers.find((item) => item.id === input.providerId)
+    if (!provider || input.companyId && provider.companyId !== input.companyId) throw new Error('Provider is not available in this company.')
+    if (!provider.enabled && outcome !== 'validate') throw new Error('Enable this provider before testing.')
+    if (provider && provider.baseUrl.trim() === input.baseUrl.trim() && !input.apiKey?.trim()) {
+      provider.lastTestedAt = checkedAt
+      provider.lastCheck = { ...result }
+      if (outcome !== 'validate') provider.status = outcome === 'success' ? 'connected' : 'error'
+      logProvider(provider, result.message, outcome === 'success' ? 'success' : outcome === 'failure' ? 'error' : 'neutral', checkedAt)
+    }
   }
+
+  return result
 }
 
 export async function fetchProviderModels(
   providerId: string,
-): Promise<{ items: AiModel[] }> {
+  companyId?: string
+): Promise<{
+  items: AiModel[]
+  capabilityErrors: string[]
+}> {
   await delay()
+
+  const provider = providers.find(
+    item => item.id === providerId
+  )
+
+  if (!provider) {
+    throw new Error('Provider 不存在。')
+  }
+
+  if (companyId && provider.companyId !== companyId) {
+    throw new Error('Provider 不属于当前公司。')
+  }
+
+  const capabilityErrors: string[] = []
+
+  const providerModels = models.filter(
+    model => model.providerId === providerId
+  )
+
+  // 只有明确传入公司、且属于 OpenRouter 时才读取能力。
+  if (
+    companyId &&
+    provider.baseUrl.trim() === 'https://openrouter.ai/api/v1'
+  ) {
+    for (const model of providerModels) {
+      // 开始重新读取，先清除旧结果。
+      delete model.capabilities
+      delete model.capabilitiesCheckedAt
+
+      try {
+        await refreshModelCapabilities(
+          companyId,
+          providerId,
+          model.id
+        )
+      } catch (caught) {
+        const reason = caught instanceof Error
+          ? caught.message
+          : '未知错误'
+
+        capabilityErrors.push(
+          `${model.modelId}：${reason}`
+        )
+      }
+    }
+  }
+
   return {
     items: models
-      .filter((model) => model.providerId === providerId)
+      .filter(model => model.providerId === providerId)
       .map(cloneModel),
+    capabilityErrors,
   }
+}
+
+export async function refreshModelCapabilities(
+  companyId: string,
+  providerId: string,
+  id: string
+): Promise<AiModel> {
+  const provider = providers.find(
+    item => item.id === providerId &&
+      item.companyId === companyId
+  )
+
+  if (!provider) {
+    throw new Error('当前公司下未找到这个 Provider。')
+  }
+
+  if (provider.baseUrl.trim() !== 'https://openrouter.ai/api/v1') {
+    throw new Error('目前只支持读取 OpenRouter 模型能力。')
+  }
+
+  const model = models.find(
+    item => item.id === id &&
+      item.providerId === providerId
+  )
+
+  if (!model) {
+    throw new Error('这个 Provider 下未找到模型。')
+  }
+
+  const requestedModelId = model.modelId.trim()
+  const requestedBaseUrl = provider.baseUrl.trim()
+
+  const capabilities =
+    await fetchModelCapabilities(requestedModelId)
+
+  // 等待网络响应期间，记录可能已经被修改或删除。
+  if (
+    !models.includes(model) ||
+    !providers.includes(provider) ||
+    model.modelId.trim() !== requestedModelId ||
+    provider.baseUrl.trim() !== requestedBaseUrl ||
+    provider.companyId !== companyId
+  ) {
+    throw new Error('模型配置已经改变，请重新读取能力。')
+  }
+
+  model.capabilities = capabilities
+  model.capabilitiesCheckedAt = new Date().toISOString()
+
+  return cloneModel(model)
 }
 
 export async function createModel(
@@ -540,6 +672,11 @@ export async function updateModel(
   const model = models.find((item) => item.id === modelId)
   if (!model) throw new Error(`Model ${modelId} not found.`)
   if (model.providerId !== payload.providerId) throw new Error('Model is not available in this provider.')
+
+  if (model.modelId.trim() !== payload.modelId.trim()) {
+    delete model.capabilities
+    delete model.capabilitiesCheckedAt
+  }
 
   model.name = payload.name.trim()
   model.modelId = payload.modelId.trim()

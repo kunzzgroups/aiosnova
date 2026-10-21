@@ -18,7 +18,8 @@ import { IconButton } from '@/components/ui/IconButton'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { TablePanel } from '@/components/ui/TablePanel'
 import { TableToolbar } from '@/components/ui/TableToolbar'
-import { TablePagination } from '@/components/ui/TablePagination'
+import { ModelsPagination } from './ModelsPagination'
+import { modelTableLayout } from '../services/modelTableLayout'
 import { IconPlus, IconTrash, IconPower, IconPencil, IconX } from '@/components/icons/Icons'
 import { TextField } from '@/components/ui/TextField'
 
@@ -57,7 +58,7 @@ type ModelManagementProps = {
   onClose?: () => void
 }
 
-export function ModelManagement({ providerId, initialCreate=false, onBusyChange, onClose }: ModelManagementProps) {
+export function ModelManagement({ providerId, initialCreate = false, onBusyChange, onClose }: ModelManagementProps) {
   const companyId = useCompanyStore((state) => state.companyId)
   const [pendingBulk, setPendingBulk] = useState<{ ids: string[]; scope: string; companyId: string } | null>(null)
   const [bulkError, setBulkError] = useState<string | null>(null)
@@ -142,13 +143,30 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
       const [nextProvider, modelResult] =
         await Promise.all([
           fetchProvider(providerId),
-          fetchProviderModels(providerId),
+          fetchProviderModels(providerId, companyId),
         ])
 
       if (!isCurrent()) return
       if (nextProvider.companyId !== companyId) throw new Error('Provider is not available in the current company.')
       setProvider(nextProvider)
       setModels(modelResult.items.filter(model => model.providerId === providerId))
+      console.table(
+        modelResult.items.map(model => ({
+          id: model.id,
+          modelId: model.modelId,
+          chat: model.capabilities?.chat,
+          vision: model.capabilities?.vision,
+          toolCalling: model.capabilities?.toolCalling,
+          contextWindow: model.capabilities?.contextWindow,
+          checkedAt: model.capabilitiesCheckedAt,
+        }))
+      )
+      if (modelResult.capabilityErrors.length > 0) {
+        setError(
+          '模型列表已加载，但部分能力读取失败：' +
+          modelResult.capabilityErrors.join('；')
+        )
+      }
     } catch (caught) {
       if (!isCurrent()) return
       setProvider(null)
@@ -204,16 +222,15 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
 
   useEffect(() => {
     if (tableRef.current) tableRef.current.scrollTop = 0
-  }, [query, statusFilter, currentPage, effectivePageSize, providerId])
+  }, [query, statusFilter, currentPage, effectivePageSize, pageSize, providerId])
 
 
   // 条件变化时重置页码
   useEffect(() => {
     setPage(1)
-  }, [query, statusFilter, effectivePageSize, providerId])
+  }, [query, statusFilter, effectivePageSize, pageSize, providerId])
 
-  // Match Manage Templates: measure a stable, full-height table viewport.
-  // Only a full Auto page shares the small remainder; short pages stay compact.
+  // Count complete natural-height rows in the space above the fixed footer.
   useEffect(() => {
     if (isLoading || !visibleModels.length) return
     const container = tableRef.current
@@ -234,17 +251,12 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
       if (availableHeight <= 0) return
 
       const naturalHeight = Math.max(1, ...rows.map(row => row.getBoundingClientRect().height))
+      const layout = modelTableLayout(availableHeight, naturalHeight, pageSize, rows.length, currentPage === pageCount)
       if (pageSize === 0) {
-        const limit = Math.max(1, Math.floor(availableHeight / naturalHeight))
-        setAutoPageSize(current => current === limit ? current : limit)
-        if (rows.length === limit) {
-          const height = Math.max(naturalHeight, (availableHeight - 1) / limit)
-          rows.forEach(row => { row.style.height = `${height}px` })
-        }
-      } else if (rows.length === pageSize) {
-        // Match Templates: a full explicit page shares spare space; long pages scroll.
-        const height = Math.max(naturalHeight, (availableHeight - 1) / rows.length)
-        rows.forEach(row => { row.style.height = `${height}px` })
+        setAutoPageSize(current => current === layout.autoPageSize ? current : layout.autoPageSize)
+      }
+      if (layout.rowHeight !== null) {
+        rows.forEach(row => { row.style.height = `${layout.rowHeight}px` })
       }
     }
 
@@ -255,6 +267,7 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
 
     const observer = new ResizeObserver(scheduleMeasure)
     observer.observe(container)
+    observer.observe(table)
     scheduleMeasure()
 
     return () => {
@@ -262,7 +275,7 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
       cancelAnimationFrame(frame)
       table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => row.style.removeProperty('height'))
     }
-  }, [isLoading, visibleModels.length, pageSize, currentPage, effectivePageSize])
+  }, [isLoading, visibleModels.length, pageSize, currentPage, effectivePageSize, pageCount, providerId, query, statusFilter])
 
 
   function resetForm() {
@@ -277,14 +290,14 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
     setError(null)
   }
 
-  const initialCreatePending=useRef(initialCreate)
-  useEffect(()=>{
-    if(initialCreatePending.current&&!isLoading&&provider){
-      initialCreatePending.current=false
+  const initialCreatePending = useRef(initialCreate)
+  useEffect(() => {
+    if (initialCreatePending.current && !isLoading && provider) {
+      initialCreatePending.current = false
       resetForm()
       setFormOpen(true)
     }
-  },[isLoading,provider])
+  }, [isLoading, provider])
 
   function openCreate() {
     resetForm()
@@ -461,187 +474,186 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
       />
 
       <div className="console-page console-page--internal-table-scroll ai-settings-models-page">
-      <TablePanel>
-        <TableToolbar
-          search={
-            <TextField
-              className="ui-table-toolbar__search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search models…"
-              aria-label="Search models"
-            />
-          }
-          filters={
-            <SidebarSelect
-              id="model-status-filter"
-              label="Model status"
-              hideLabel
-              value={statusFilter}
-              options={[
-                { value: 'all', label: 'All status' },
-                { value: 'enabled', label: 'Enabled' },
-                { value: 'disabled', label: 'Disabled' },
-                { value: 'error', label: 'Error' },
-              ]}
-              onChange={(value) => setStatusFilter(value as StatusFilter)}
-            />
-          }
-          actions={<>{selection.selected.length > 1 ? <Button variant="danger" disabled={isDeleting || isLoading || isUpdating} onClick={() => { setBulkError(null); setPendingBulk({ ids: selection.selected.map(item => item.id), scope: providerId, companyId }) }}><IconTrash aria-hidden="true" />Remove</Button> : null}<Button onClick={openCreate} disabled={!provider || isDeleting || isLoading || isUpdating}><IconPlus />Add Model</Button>{onClose ? <IconButton label="Close model manager" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null} onClick={onClose}><IconX /></IconButton> : null}</>}
-        />
+        <TablePanel>
+          <TableToolbar
+            search={
+              <TextField
+                className="ui-table-toolbar__search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search models…"
+                aria-label="Search models"
+              />
+            }
+            filters={
+              <SidebarSelect
+                id="model-status-filter"
+                label="Model status"
+                hideLabel
+                value={statusFilter}
+                options={[
+                  { value: 'all', label: 'All status' },
+                  { value: 'enabled', label: 'Enabled' },
+                  { value: 'disabled', label: 'Disabled' },
+                  { value: 'error', label: 'Error' },
+                ]}
+                onChange={(value) => setStatusFilter(value as StatusFilter)}
+              />
+            }
+            actions={<>{selection.selected.length > 1 ? <Button variant="danger" disabled={isDeleting || isLoading || isUpdating} onClick={() => { setBulkError(null); setPendingBulk({ ids: selection.selected.map(item => item.id), scope: providerId, companyId }) }}><IconTrash aria-hidden="true" />Remove</Button> : null}<Button onClick={openCreate} disabled={!provider || isDeleting || isLoading || isUpdating}><IconPlus />Add Model</Button>{onClose ? <IconButton label="Close model manager" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null} onClick={onClose}><IconX /></IconButton> : null}</>}
+          />
 
-        {isLoading ? (
-          <p className="console-empty ai-settings-models-empty">
-            Loading models…
-          </p>
-        ) : visibleModels.length === 0 ? (
-          <div className="ai-settings-empty ai-settings-models-empty">
-            <strong>
-              No models found
-            </strong>
-
-            <p>
-              Add a model or change the current filters.
+          {isLoading ? (
+            <p className="console-empty ai-settings-models-empty">
+              Loading models…
             </p>
+          ) : visibleModels.length === 0 ? (
+            <div className="ai-settings-empty ai-settings-models-empty">
+              <strong>
+                {models.length ? 'No matching models' : 'No models added yet'}
+              </strong>
 
-            <Button
-              onClick={openCreate}
-              disabled={!provider}
-            >
-              Add Model
-            </Button>
-          </div>
-        ) : (
-          <div className="console-table-wrap" ref={tableRef}>
-            <table className="console-table console-table--fixed ai-settings-model-table">
-              <colgroup>
-                <col className="ai-model-col-name" />
-                <col className="ai-model-col-status" />
-                <col className="ai-model-col-type" />
-                <col className="ai-model-col-context" />
-                <col className="ai-model-col-used" />
-                <col className="ai-model-col-actions" />
-              </colgroup>
+              <p>
+                {models.length ? 'No models match the current search and status filters.' : 'Add a model for this provider to make it available to agents.'}
+              </p>
 
-              <thead>
-                <tr>
-                  <th><span className="ai-settings-selection-name">{selection.enabled ? <input ref={selection.selectAllRef} type="checkbox" className="ai-settings-selection-checkbox" aria-label="Select all models on this page" disabled={isDeleting || isUpdating || !selection.hasSelectablePage} checked={selection.allSelected} onChange={event => selection.togglePage(event.target.checked)} /> : null}Model Name</span></th>
+              {models.length ? <Button variant="secondary" onClick={() => { setQuery(''); setStatusFilter('all') }}>Clear filters</Button> : <Button
+                onClick={openCreate}
+                disabled={!provider}
+              >
+                Add Model
+              </Button>}
+            </div>
+          ) : (
+            <div className="console-table-wrap" ref={tableRef}>
+              <table className="console-table console-table--fixed ai-settings-model-table">
+                <colgroup>
+                  <col className="ai-model-col-name" />
+                  <col className="ai-model-col-status" />
+                  <col className="ai-model-col-type" />
+                  <col className="ai-model-col-context" />
+                  <col className="ai-model-col-used" />
+                  <col className="ai-model-col-actions" />
+                </colgroup>
 
-                  <th>
-                    Status
-                  </th>
+                <thead>
+                  <tr>
+                    <th><span className="ai-settings-selection-name">{selection.enabled ? <input ref={selection.selectAllRef} type="checkbox" className="ai-settings-selection-checkbox" aria-label="Select all models on this page" disabled={isDeleting || isUpdating || !selection.hasSelectablePage} checked={selection.allSelected} onChange={event => selection.togglePage(event.target.checked)} /> : null}Model Name</span></th>
 
-                  <th>
-                    Type
-                  </th>
+                    <th>
+                      Status
+                    </th>
 
-                  <th>
-                    Context
-                  </th>
+                    <th>
+                      Type
+                    </th>
 
-                  <th>
-                    Used by
-                  </th>
+                    <th>
+                      Context
+                    </th>
 
-                  <th className="console-table__actions">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
+                    <th>
+                      Used by
+                    </th>
 
-              <tbody>
-                {paginatedModels.map(
-                  (model) => (
-                    <tr key={model.id}>
-                      <td>
-                        <div className="ai-settings-selection-name">{selection.enabled ? <input type="checkbox" className="ai-settings-selection-checkbox" aria-label={`Select ${model.name}`} disabled={isDeleting || isUpdating || model.status !== 'disabled'} checked={selection.ids.includes(model.id)} onChange={event => selection.toggle(model.id, event.target.checked)} /> : null}
-                        <div className="ai-settings-model-name">
-                          <strong>
-                            {model.name}
-                          </strong>
+                    <th className="console-table__actions">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
 
-                          <small>
-                            {model.modelId}
-                          </small>
-                        </div>
-                        </div>
-                      </td>
+                <tbody>
+                  {paginatedModels.map(
+                    (model) => (
+                      <tr key={model.id}>
+                        <td>
+                          <div className="ai-settings-selection-name">{selection.enabled ? <input type="checkbox" className="ai-settings-selection-checkbox" aria-label={`Select ${model.name}`} disabled={isDeleting || isUpdating || model.status !== 'disabled'} checked={selection.ids.includes(model.id)} onChange={event => selection.toggle(model.id, event.target.checked)} /> : null}
+                            <div className="ai-settings-model-name">
+                              <strong>
+                                {model.name}
+                              </strong>
 
-                      <td>
-                        <button
-                          type="button"
-                          className={`console-status console-status--${
-                            model.status ===
-                            'enabled'
-                              ? 'active'
-                              : model.status
-                          } console-status--clickable`}
-                          disabled={isDeleting || isUpdating}
-                          onClick={() =>
-                            void toggleModel(
-                              model,
-                            )
-                          }
-                        >
-                          {model.status}
-                        </button>
-                      </td>
+                              <small>
+                                {model.modelId}
+                              </small>
+                            </div>
+                          </div>
+                        </td>
 
-                      <td>
-                        <span className="console-chip">
-                          {model.type}
-                        </span>
-                      </td>
-
-                      <td>
-                        {formatContext(
-                          model.contextWindow,
-                        )}
-                      </td>
-
-                      <td>
-                        {model.usedByAgents > 0
-                          ? `${model.usedByAgents} Agents`
-                          : '—'}
-                      </td>
-
-                      <td className="console-table__actions identity-table__actions">
-                        <div className="identity-inline-actions identity-directory-actions ai-model-management-actions">
-                          {model.status === 'disabled' ? (
-                            <IconButton label={`Delete ${model.name}`} variant="danger" disabled={isDeleting || isUpdating} onClick={() => { setDeleteError(null); setPendingDelete(model) }}><IconTrash /></IconButton>
-                          ) : (
-                            <IconButton label={`Edit ${model.name}`} disabled={isDeleting || isUpdating} onClick={() => openEdit(model)}><IconPencil /></IconButton>
-                          )}
-                          <IconButton
-                            label={model.status === 'disabled' ? `Enable ${model.name}` : `Disable ${model.name}`}
-                            variant={model.status === 'disabled' ? 'secondary' : 'ghost'}
+                        <td>
+                          <button
+                            type="button"
+                            className={`console-status console-status--${model.status ===
+                                'enabled'
+                                ? 'active'
+                                : model.status
+                              } console-status--clickable`}
                             disabled={isDeleting || isUpdating}
-                            aria-pressed={model.status !== 'disabled'}
-                            onClick={() => void toggleModel(model)}
-                          ><IconPower /></IconButton>
-                        </div>
-                      </td>
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <TablePagination
-          id="models-pagination"
-          total={visibleModels.length}
-          pageSize={pageSize}
-          autoPageSize={autoPageSize}
-          effectivePageSize={effectivePageSize}
-          currentPage={currentPage}
-          pageCount={pageCount}
-          pagesLabel="Model pages"
-          onPageSizeChange={setPageSize}
-          onPageChange={setPage}
-        />
-      </TablePanel>
+                            onClick={() =>
+                              void toggleModel(
+                                model,
+                              )
+                            }
+                          >
+                            {model.status}
+                          </button>
+                        </td>
+
+                        <td>
+                          <span className="console-chip">
+                            {model.type}
+                          </span>
+                        </td>
+
+                        <td>
+                          {formatContext(
+                            model.contextWindow,
+                          )}
+                        </td>
+
+                        <td>
+                          {model.usedByAgents > 0
+                            ? `${model.usedByAgents} Agents`
+                            : '—'}
+                        </td>
+
+                        <td className="console-table__actions identity-table__actions">
+                          <div className="identity-inline-actions identity-directory-actions ai-model-management-actions">
+                            {model.status === 'disabled' ? (
+                              <IconButton label={`Delete ${model.name}`} variant="danger" disabled={isDeleting || isUpdating} onClick={() => { setDeleteError(null); setPendingDelete(model) }}><IconTrash /></IconButton>
+                            ) : (
+                              <IconButton label={`Edit ${model.name}`} disabled={isDeleting || isUpdating} onClick={() => openEdit(model)}><IconPencil /></IconButton>
+                            )}
+                            <IconButton
+                              label={model.status === 'disabled' ? `Enable ${model.name}` : `Disable ${model.name}`}
+                              variant={model.status === 'disabled' ? 'secondary' : 'ghost'}
+                              disabled={isDeleting || isUpdating}
+                              aria-pressed={model.status !== 'disabled'}
+                              onClick={() => void toggleModel(model)}
+                            ><IconPower /></IconButton>
+                          </div>
+                        </td>
+                      </tr>
+                    ),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <ModelsPagination
+            id="models-pagination"
+            total={visibleModels.length}
+            pageSize={pageSize}
+            autoPageSize={autoPageSize}
+            effectivePageSize={effectivePageSize}
+            currentPage={currentPage}
+            pageCount={pageCount}
+            pagesLabel="Model pages"
+            onPageSizeChange={setPageSize}
+            onPageChange={setPage}
+          />
+        </TablePanel>
       </div>
 
       <ConfirmDialog
@@ -683,10 +695,9 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
             ? 'Edit Model'
             : 'Add Model'
         }
-        description={`Configure a model for ${
-          provider?.name ??
+        description={`Configure a model for ${provider?.name ??
           'this provider'
-        }.`}
+          }.`}
         onClose={closeForm}
         busy={isSaving}
         closeLabel="Close"
@@ -862,7 +873,7 @@ export function ModelManagement({ providerId, initialCreate=false, onBusyChange,
                 onChange={(value) =>
                   setEnabled(
                     value ===
-                      'enabled',
+                    'enabled',
                   )
                 }
                 disabled={isSaving}

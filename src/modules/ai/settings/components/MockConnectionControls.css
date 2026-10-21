@@ -1,0 +1,4 @@
+.ai-mock-connection-controls {display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;min-width:0}
+.ai-mock-connection-controls .sidebar-select {flex:0 0 9rem;min-width:9rem}
+.ai-mock-connection-controls > .ui-button {flex:0 0 auto;white-space:nowrap}
+.ai-provider-mock-note {flex:0 0 100%;margin:0}

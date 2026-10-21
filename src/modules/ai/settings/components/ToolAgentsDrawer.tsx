@@ -40,10 +40,14 @@ export function ToolAgentsDrawer({ tool, onClose, onSaved }: { tool: AiTool; onC
       return next
     })
   }
-  return <Drawer open title="Manage agents" description={`Choose agents assigned to ${tool.name}.`} closeLabel="Close manage agents" busy={busy} onClose={onClose} footer={<><Button onClick={() => void save()} disabled={busy || loading || !names.length && !!error}>{busy ? 'Saving…' : 'Save'}</Button><Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button></>}>
+  return <Drawer open className="ai-settings-agents-drawer" title="Manage agents" description={`Choose agents assigned to ${tool.name}.`} closeLabel="Close manage agents" busy={busy} onClose={onClose} footer={<><Button onClick={() => void save()} disabled={busy || loading || !names.length && !!error}>{busy ? 'Saving…' : 'Save'}</Button><Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button></>}>
+    <div className="ai-settings-agents-controls">
     <TextField type="search" aria-label="Search agents" placeholder="Search agents…" value={query} onChange={event => setQuery(event.target.value)} disabled={busy} />
     <div className="ai-tool-agent-selection"><span className="console-table__muted" aria-live="polite">{selected.size} selected · {filtered.length} results</span><Button variant="secondary" disabled={busy || loading || !filtered.length} onClick={toggleFiltered}>{allFilteredSelected ? 'Deselect all results' : 'Select all results'}</Button></div>
-    {loading ? <p role="status">Loading agents…</p> : <div className="ai-tool-agent-choices">{filtered.map(name => <AgentAssignmentChoice key={name} name={name} checked={selected.has(name)} disabled={busy} onChange={() => setSelected(previous => { const next = new Set(previous); if (next.has(name)) next.delete(name); else next.add(name); return next })} />)}{!filtered.length ? <p>{names.length ? 'No matching agents.' : 'No agents available.'}</p> : null}</div>}
-    {error ? <div role="alert"><p className="ai-settings-tool-error">{error}</p><Button variant="secondary" onClick={() => setAttempt(value => value + 1)} disabled={busy}>Retry loading agents</Button></div> : null}
+    </div>
+    <div className="ai-settings-agents-list" role="region" aria-label="Agent assignments" tabIndex={0}>
+    {loading ? <p role="status">Loading agents…</p> : <div className="ai-tool-agent-choices">{filtered.map(name => <AgentAssignmentChoice key={name} name={name} checked={selected.has(name)} disabled={busy} onChange={() => setSelected(previous => { const next = new Set(previous); if (next.has(name)) next.delete(name); else next.add(name); return next })} />)}{!filtered.length ? <p>{names.length ? 'No matching agents.' : 'No agents exist in this company yet. Create an agent before assigning this tool.'}</p> : null}</div>}
+    </div>
+    {error ? <div role="alert" className="ai-settings-agents-feedback"><p className="ai-settings-tool-error">{error}</p><Button variant="secondary" onClick={() => setAttempt(value => value + 1)} disabled={busy}>Retry loading agents</Button></div> : null}
   </Drawer>
 }

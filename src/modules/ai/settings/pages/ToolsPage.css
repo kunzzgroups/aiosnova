@@ -1,4 +1,7 @@
 /* Tools list uses the same full-height directory layout as Providers. */
+.ai-settings-tools-page > .ui-table-panel { overflow:hidden; }
+.ai-settings-tools-page > .ui-table-panel > .console-table-wrap { flex:1 1 0; min-height:0; max-height:none; overflow:auto; }
+.ai-settings-tools-page .ai-settings-tool-table { height:auto; }
 .ai-settings-tools-page .ai-settings-tool-table { min-width: 62rem; }
 .ai-settings-tools-page .ui-table-toolbar > .sidebar-select { flex-basis: 9rem; }
 .ai-settings-tools-page .ui-table-toolbar > .sidebar-select:has(#tools-module-filter) { flex: 0 0 12rem; }
@@ -100,3 +103,6 @@
 .ai-settings-tool-detail .ai-settings-tool-parameters-heading { margin-top: 1.25rem; }
 .ai-settings-tool-runtime-empty { display: grid; justify-items: center; align-content: center; min-height: 10rem; padding: 1rem; text-align: center; }
 .ai-settings-tool-runtime-empty p { color: var(--color-text-muted); }
+.ai-settings-tools-page .ai-settings-tool-table tbody td:nth-child(4),
+.ai-settings-tools-page .ai-settings-tool-table tbody td:nth-child(5) {padding-inline:.375rem !important;text-overflow:clip}
+.ai-settings-tools-page .ai-settings-tool-table :is(.ai-settings-tool-risk,.console-status) {box-sizing:border-box;white-space:nowrap}

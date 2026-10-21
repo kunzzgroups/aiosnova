@@ -23,7 +23,7 @@
 .ai-tool-information dt { color:var(--color-text-muted); }
 .ai-tool-information dd { margin:0; overflow-wrap:anywhere; }
 .ai-tool-overview-content { flex:1; min-height:0; min-width:0; display:grid; grid-template-rows:minmax(12rem,1fr) 7rem; gap:.5rem; padding-top:.5rem; overflow:auto; overscroll-behavior:contain; }
-.ai-tool-overview-content:has(.ai-tool-usage-card[data-has-usage="true"]) {grid-template-rows:minmax(12rem,3fr) minmax(20rem,2fr)}
+.ai-tool-overview-content:has(.ai-tool-usage-card[data-has-usage="true"]) {grid-template-rows:minmax(12rem,3fr) minmax(23rem,2fr)}
 .ai-settings-tool-detail .ai-settings-tool-detail-grid { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); align-items:stretch; gap:.5rem; min-height:0; }
 .ai-settings-tool-detail .ai-settings-tool-detail-rail { display:grid; grid-template-rows:repeat(2,minmax(0,1fr)); gap:.5rem; min-height:0; min-width:0; align-content:stretch; }
 .ai-settings-tool-detail .ai-tool-overview-content .console-panel { display:flex; flex-direction:column; min-height:0; min-width:0; height:100%; overflow:hidden; padding:0; box-sizing:border-box; }
@@ -57,7 +57,7 @@
 .ai-tool-usage-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.75rem; flex:0 0 auto;margin:0; font-size:var(--text-xs); }
 .ai-tool-usage-metrics dt { color:var(--color-text-muted); }
 .ai-tool-usage-metrics dd { margin:.15rem 0 0; font-size:var(--text-md); font-weight:600; }
-.ai-tool-usage-chart { position:relative;flex:1 0 160px;min-height:160px;min-width:0;overflow:hidden;margin:0; }
+.ai-tool-usage-chart { position:relative;flex:1 0 160px;min-height:160px;max-height:240px;min-width:0;overflow:hidden;margin:0; }
 .ai-tool-chart-caption { display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;flex:0 0 auto;font-size:var(--text-xs);color:var(--color-text-muted); }
 .ai-tool-usage-chart svg {position:absolute;inset:0;display:block;width:100%;height:100%;}
 .ai-tool-usage-chart svg:focus {outline:none}
@@ -65,6 +65,15 @@
 .ai-tool-usage-chart text {fill:var(--color-text-muted);font:11px var(--font-sans)}
 .ai-tool-usage-empty { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:.75rem; font-size:var(--text-sm); }
 .ai-tool-usage-empty p { color:var(--color-text-muted); margin:.4rem 0 0; }
+.ai-tool-overview-content--simple:has(.ai-tool-usage-card[data-has-usage="true"]) { grid-template-rows:minmax(15rem,1fr) minmax(23rem,1fr); }
+.ai-tool-usage-summary { display:flex; flex:0 0 auto; flex-wrap:wrap; gap:.5rem 1.5rem; padding-top:.65rem; border-top:1px solid var(--color-border); color:var(--color-text-muted); font-size:var(--text-xs); }
+.ai-tool-usage-summary strong { color:var(--color-text); font-weight:600; }
+.ai-tool-usage-summary > span:last-child { margin-left:auto; }
+.ai-settings-tool-detail .ai-tool-overview-content--simple .ai-settings-tool-detail-grid { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(9rem,1fr); }
+.ai-settings-tool-detail .ai-tool-overview-content--simple .ai-tool-config-card { height:auto; display:grid; grid-template-columns:minmax(8rem,1fr) minmax(0,3fr); }
+.ai-tool-overview-content--simple .ai-tool-config-card > .ai-tool-card-header { border-bottom:0; border-right:1px solid var(--color-border); }
+.ai-tool-overview-content--simple .ai-tool-config-summary { margin:0; }
+.ai-settings-tool-detail .ai-tool-overview-content--simple .ai-settings-tool-detail-rail { grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:minmax(0,1fr); }
 @container ai-settings-content (max-width:860px) {
   .ai-settings-tool-detail .ai-settings-tool-detail-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
   .ai-tool-identity { gap:.5rem; }
@@ -83,5 +92,8 @@
   .ai-settings-tool-detail .ai-settings-tool-detail-rail { grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:minmax(0,1fr); }
   .ai-settings-tool-detail .ai-settings-tool-agents { grid-template-columns:1fr; }
   .ai-tool-overview-content {grid-template-rows:minmax(20rem,1fr) 8rem}
-  .ai-tool-overview-content:has(.ai-tool-usage-card[data-has-usage="true"]) {grid-template-rows:minmax(20rem,3fr) minmax(21rem,2fr)}
+  .ai-tool-overview-content:has(.ai-tool-usage-card[data-has-usage="true"]) {grid-template-rows:minmax(20rem,3fr) minmax(24rem,2fr)}
+  .ai-tool-overview-content--simple:has(.ai-tool-usage-card[data-has-usage="true"]) { grid-template-rows:minmax(17rem,1fr) minmax(24rem,1fr); }
+  .ai-settings-tool-detail .ai-tool-overview-content--simple .ai-tool-config-card { grid-template-columns:minmax(0,1fr); }
+  .ai-tool-overview-content--simple .ai-tool-config-card > .ai-tool-card-header { border-right:0; border-bottom:1px solid var(--color-border); }
 }

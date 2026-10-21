@@ -7,6 +7,7 @@ mock('src/modules/ai/settings/components/SettingsDrawer.tsx',{
   SettingsDrawer:({open,children,footer})=>open?React.createElement('section',null,children,footer):null,
 })
 const config=load('src/modules/ai/settings/services/toolConfiguration.ts')
+const {TOOL_TYPES}=load('src/modules/ai/settings/services/toolTypes.ts')
 const tools=load('src/modules/ai/settings/services/toolsService.ts')
 const usage=load('src/modules/ai/settings/services/usageService.ts')
 const {toolUsageSeries}=load('src/modules/ai/settings/services/toolUsageSeries.ts')
@@ -15,6 +16,13 @@ const {ToolDrawer}=load('src/modules/ai/settings/components/ToolDrawer.tsx')
 const companies=['company-retail','company-wholesale','company-j1','company-j2','company-tokyo-izakaya']
 
 async function main(){
+  assert.equal(new Set(TOOL_TYPES.map(type=>type.action)).size,TOOL_TYPES.length)
+  for(const type of TOOL_TYPES){
+    assert.deepEqual(clean(config.validateToolConfiguration(type.action,config.defaultToolConfiguration(type.action))),{})
+  }
+  const createMarkup=renderToStaticMarkup(React.createElement(ToolDrawer,{companyId:'company-retail',tool:null,onClose(){},onSaved(){}}))
+  assert(createMarkup.includes('tool-type'))
+  assert(createMarkup.includes('id="tool-action"') && createMarkup.includes('readOnly=""'))
   for(const company of companies){
     const records=await usage.fetchUsageRecords(company)
     const entries=await tools.fetchTools(company)
@@ -45,7 +53,10 @@ async function main(){
       }
       const chartMarkup=renderToStaticMarkup(React.createElement(ToolUsage,{usage:tool.usage}))
       assert(chartMarkup.includes('data-has-usage="true"'))
+      assert(chartMarkup.includes('class="ai-tool-usage-area"'))
       assert(chartMarkup.includes('<polyline'))
+      assert(!chartMarkup.includes('<circle'))
+      assert.equal(chartMarkup.match(/<polyline[^>]*points="([^"]+)"/)[1].split(' ').length,30)
       assert(!chartMarkup.includes('NaN'))
     }
   }
@@ -111,6 +122,11 @@ async function main(){
   const emptyMarkup=renderToStaticMarkup(React.createElement(ToolUsage,{}))
   assert(emptyMarkup.includes('No executions recorded yet'))
   assert(!emptyMarkup.includes('<polyline'))
+  const sparseMarkup=renderToStaticMarkup(React.createElement(ToolUsage,{usage:{points:[{date:usage.usageToday(),requests:10,errors:0,latencyMs:100}]}}))
+  const sparsePoints=sparseMarkup.match(/<polyline[^>]*points="([^"]+)"/)[1].split(' ').map(point=>point.split(',').map(Number))
+  assert.equal(sparsePoints.length,30)
+  assert.equal(sparsePoints.filter(([,y])=>y===132).length,29)
+  assert(sparsePoints.at(-1)[1]<132)
   console.log('Passed: action forms, JSON round trips, service validation, company isolation, calendar-day zero filling, weighted latency, chart/empty rendering and usage reconciliation.')
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

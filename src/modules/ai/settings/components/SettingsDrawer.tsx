@@ -95,7 +95,7 @@ export function SettingsDrawer({
 
   return createPortal(
     <div
-      className={`ui-drawer-overlay${portalTarget ? ' ui-drawer-overlay--contained' : ''}${className ? ` ${className}` : ''}`}
+      className={`ui-drawer-overlay ai-settings-drawer${portalTarget ? ' ui-drawer-overlay--contained' : ''}${className ? ` ${className}` : ''}`}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) {

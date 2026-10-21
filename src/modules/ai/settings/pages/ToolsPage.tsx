@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { TablePanel } from '@/components/ui/TablePanel'
 import { TableToolbar } from '@/components/ui/TableToolbar'
-import { TablePagination } from '@/components/ui/TablePagination'
+import { ModelsPagination as SettingsPagination } from '../components/ModelsPagination'
 import { TextField } from '@/components/ui/TextField'
 import { RowMenu } from '@/components/ui/RowMenu'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
@@ -51,7 +51,7 @@ function ToolsList({ companyId }: { companyId: string }) {
   }, [companyId])
   useEffect(() => { void load() }, [load])
   const filtered = useMemo(() => tools.filter(tool => (module === 'all' || tool.module === module) && (status === 'all' || tool.status === status) && (risk === 'all' || tool.risk === risk) && (!query.trim() || [tool.name, tool.action, tool.description].some(value => value.toLowerCase().includes(query.trim().toLowerCase())))).sort((a,b) => a.name.localeCompare(b.name)), [tools, module, status, risk, query])
-  const { tableRef, rows, pagination } = useSettingsPagination(filtered, loading, JSON.stringify([query, module, status, risk]))
+  const { tableRef, rows, pagination } = useSettingsPagination(filtered, loading, JSON.stringify([query, module, status, risk]), {fitCompletePages:true})
   const selection = useDisabledSelection(filtered, rows, status, JSON.stringify([query, module, risk]), companyId)
   const bulkTools = tools.filter(tool => pendingBulk.includes(tool.id))
   async function removeSelectedTools() {
@@ -83,7 +83,7 @@ function ToolsList({ companyId }: { companyId: string }) {
             <td className="console-table__actions"><RowMenu disabled={removing} label={'Actions for ' + tool.name} items={[{id:'detail',label:'View details',onSelect:() => navigate('/ai/ai/ai-settings/tools/' + tool.id)}, {id:'edit',label:'Edit tool',onSelect:() => setEditor({tool})}, {id:'toggle',label:tool.status === 'disabled' ? 'Enable tool' : 'Disable tool',onSelect:() => setAction({tool,kind:'toggle'})}, ...(tool.status === 'disabled' ? [{id:'delete',label:'Delete tool',destructive:true,onSelect:() => setAction({tool,kind:'delete'})}] : [])]}/></td>
           </tr>)}</tbody></table>
         </div>}
-        <TablePagination id="tools-pagination" pagesLabel="Tool pages" {...pagination}/>
+        <SettingsPagination id="tools-pagination" pagesLabel="Tool pages" {...pagination}/>
       </TablePanel>
     </div>
     <ConfirmDialog open={pendingBulk.length > 0} variant="deletion" className="ai-settings-delete-dialog" title={'Remove ' + bulkTools.length + ' tools?'} description={<div className="ai-settings-bulk-delete-copy"><p>The selected tool configurations will be permanently removed.</p><ul className="ai-settings-bulk-delete-list">{bulkTools.map(tool => <li key={tool.id}>{tool.name}</li>)}</ul></div>} warning="This cannot be undone." error={bulkError} busy={removing} confirmDisabled={bulkTools.length < 2 || bulkTools.length !== pendingBulk.length || bulkTools.some(tool => tool.status !== 'disabled')} confirmLabel="Remove" cancelLabel="Cancel" busyLabel="Removing…" onConfirm={removeSelectedTools} onCancel={() => { if (!removing) { setPendingBulk([]); setBulkError(null) } }}/>

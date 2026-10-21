@@ -1,10 +1,13 @@
+import { connectionStatusLabel } from '../services/connectionPresentation'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
-import { IconPower, IconPencil, IconTrash, IconShieldCheck, IconAlertTriangle, IconClock, IconPlus, IconSpark } from '@/components/icons/Icons'
+import { IconPower, IconPencil, IconTrash, IconAlertTriangle, IconClock, IconPlus, IconSpark } from '@/components/icons/Icons'
 import { TableToolbar } from '@/components/ui/TableToolbar'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { MockConnectionControls } from './MockConnectionControls'
+import type { MockConnectionOutcome } from '../types/connection'
 import { fetchProviderModels, testProviderConnection } from '../services/settingsService'
 import type { AiModel, AiProvider } from '../types/settings'
 
@@ -26,10 +29,14 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
+  const [outcome,setOutcome]=useState<MockConnectionOutcome>('validate')
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null)
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null)
   const [modelQuery, setModelQuery] = useState('')
   const [modelStatus, setModelStatus] = useState('all')
+  useEffect(()=>{
+    if(!provider.lastCheck){setConnectionMessage(null);setConnectionOk(null)}
+  },[provider.baseUrl,provider.status,provider.lastCheck?.checkedAt])
   const visibleModels = models.filter(model =>
     (modelStatus === 'all' || model.status === modelStatus) &&
     `${model.name} ${model.modelId}`.toLowerCase().includes(modelQuery.trim().toLowerCase()),
@@ -53,7 +60,7 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
     setConnectionMessage(null)
     setConnectionOk(null)
     try {
-      const result = await testProviderConnection({ providerId: provider.id, baseUrl: provider.baseUrl })
+      const result = await testProviderConnection({ companyId,providerId: provider.id, baseUrl: provider.baseUrl,outcome })
       setConnectionMessage(result.message)
       setConnectionOk(result.ok)
       await onConnectionTested()
@@ -69,7 +76,7 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
         <header className="ai-provider-details-header identity-table__actions">
           <span className={`ai-settings-provider-mark ai-settings-provider-mark--${provider.slug}`} aria-hidden="true">{provider.name.slice(0, 2).toUpperCase()}</span>
           <strong>{provider.name}</strong>
-          <span className={`console-status console-status--${provider.status}`}>{provider.status}</span>
+          <span className={`console-status console-status--${provider.status}`}>{connectionStatusLabel(provider.status)}</span>
           <div className="ai-provider-details-actions identity-inline-actions identity-directory-actions">
             {!provider.enabled && provider.status === 'disabled' ? (
               <IconButton label={`Delete ${provider.name}`} variant="danger" disabled={busy || testing} onClick={onDelete}><IconTrash /></IconButton>
@@ -83,11 +90,12 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
           <dl>
             <dt>API Key</dt><dd>{provider.apiKeyMasked || 'Not configured'}</dd>
             <dt>Base URL</dt><dd>{provider.baseUrl}</dd>
-            <dt>Status</dt><dd><button type="button" className={`console-status console-status--${provider.status} console-status--clickable`} disabled={busy || testing} onClick={onToggle}>{provider.status}</button></dd>
+            <dt>Status</dt><dd><button type="button" className={`console-status console-status--${provider.status} console-status--clickable`} disabled={busy || testing} onClick={onToggle}>{connectionStatusLabel(provider.status)}</button></dd>
           </dl>
-          <div className={`ai-provider-connection-actions ai-provider-connection-check${connectionOk === true ? ' is-success' : connectionOk === false ? ' is-error' : ''}`}>
-            <div className="ai-provider-connection-summary" role="status"><span aria-hidden="true">{connectionOk === true ? <IconShieldCheck/> : connectionOk === false ? <IconAlertTriangle/> : <IconClock/>}</span><div><strong>{testing ? 'Checking connection…' : connectionMessage || 'Connection check'}</strong><small>{provider.lastTestedAt ? `Last tested ${new Date(provider.lastTestedAt).toLocaleString()}` : 'Not tested yet'}</small></div></div>
-            <Button variant="secondary" disabled={busy || testing || !provider.enabled} onClick={() => void testConnection()}>{testing ? 'Testing…' : 'Test Connection'}</Button>
+          <div className={`ai-provider-connection-actions ai-provider-connection-check${connectionOk === false ? ' is-error' : ''}`}>
+            <div className="ai-provider-connection-summary" role="status"><span aria-hidden="true">{connectionOk === false ? <IconAlertTriangle/> : <IconClock/>}</span><div><strong>{testing ? 'Running simulated check…' : connectionMessage || provider.lastCheck?.message || 'Connection check · Simulated'}</strong><small>{provider.lastTestedAt ? `${provider.lastCheck?'Simulated check':'Sample status'} · ${new Date(provider.lastTestedAt).toLocaleString()}` : 'No simulated check run yet'}</small></div></div>
+            <MockConnectionControls id={'provider-mock-result-'+provider.id} value={outcome} onChange={setOutcome} onCheck={()=>void testConnection()} busy={testing} disabled={busy||!provider.enabled}/>
+            <small className="ai-provider-mock-note">Mock results only · no live service is contacted.</small>
           </div>
         </div>
       </section>
@@ -107,7 +115,7 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
             <table className="console-table ai-provider-models-table">
               <thead><tr><th>Model</th><th>Type</th><th>Status</th></tr></thead>
               <tbody>{visibleModels.map(model => <tr key={model.id}>
-                <td><strong>{model.name}</strong><small>{model.modelId}</small></td>
+                <td><strong title={model.name}>{model.name}</strong><small title={model.modelId}>{model.modelId}</small></td>
                 <td><span className="console-chip">{model.type}</span></td>
                 <td><span className={`console-status console-status--${model.status === 'enabled' ? 'active' : model.status}`}>{model.status}</span></td>
               </tr>)}</tbody>

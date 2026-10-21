@@ -119,3 +119,13 @@
 :is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:first-child {
   padding-inline: 1.5rem !important;
 }
+/* Models and Tools share the Models two-line row density and viewport chrome. */
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) {
+  --ai-directory-row-height:calc(var(--text-sm) * 1.5 + var(--text-xs) * 1.5 + 1.25rem + 1px);
+}
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) .console-table tbody tr { height:var(--ai-directory-row-height); }
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) .console-table tbody td { padding-block:.625rem; }
+.ai-settings-main .ai-settings-models-page .ai-settings-model-name :is(strong,small) { line-height:1.5; }
+.ai-settings-main .ai-settings-tools-page .ai-settings-tool-name-cell { white-space:nowrap; }
+/* Do not reserve an empty horizontal scrollbar below a table that fits. */
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) > .ui-table-panel > .console-table-wrap { overflow-x:auto; }

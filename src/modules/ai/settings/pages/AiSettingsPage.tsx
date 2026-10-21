@@ -1,3 +1,4 @@
+import { settingsHealthItems, providerOverviewActivity } from '../services/connectionPresentation'
 import { fetchSecurityPolicy } from '../services/securityService'
 import { fetchUsageRecords, usagePeriod as selectUsagePeriod, usageTotals, usageDaily, type UsageRecord } from '../services/usageService'
 import { usageMoney, usageDate } from '../components/UsageTrend'
@@ -160,7 +161,7 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
 
 
   const [usageRecords,setUsageRecords]=useState<UsageRecord[]>([])
-  const [healthIssues,setHealthIssues]=useState<Array<{id:string;name:string;kind:string;path:string}>>([])
+  const [healthIssues,setHealthIssues]=useState<ReturnType<typeof settingsHealthItems>>([])
   const [recentActivity,setRecentActivity]=useState<OverviewActivity[]>([])
   const requestId=useRef(0)
   const usage=useMemo(()=>{
@@ -219,15 +220,11 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
           if(currentRequest!==requestId.current)return
           setUsageRecords(usageResult)
           setRuntimeDefaults(runtimeResult)
-          setHealthIssues([
-            ...providerResult.items.filter(item=>item.status==='error').map(item=>({id:'provider-'+item.id,name:item.name,kind:'Provider',path:'/ai/ai/ai-settings/models/providers?'+new URLSearchParams({providerId:item.id,companyId}).toString()})),
-            ...toolResult.filter(item=>item.status==='error').map(item=>({id:'tool-'+item.id,name:item.name,kind:'Tool',path:'/ai/ai/ai-settings/tools/'+item.id})),
-            ...mcpResult.filter(item=>item.status==='error').map(item=>({id:'mcp-'+item.id,name:item.name,kind:'MCP',path:'/ai/ai/ai-settings/mcp?'+new URLSearchParams({serverId:item.id,companyId}).toString()}))
-          ])
+          setHealthIssues(settingsHealthItems(companyId,providerResult.items,toolResult,mcpResult))
           const activities:OverviewActivity[]=[
-            ...providerResult.items.filter(provider=>provider.lastTestedAt).map(provider=>({id:'provider-'+provider.id,time:provider.lastTestedAt!,title:provider.name+' · Connection tested',detail:'Provider',status:provider.status==='error'?'error' as const:'neutral' as const})),
+            ...providerResult.items.flatMap(providerOverviewActivity),
             ...toolResult.flatMap(tool=>tool.activity.map(item=>({id:'tool-'+tool.id+'-'+item.id,time:item.time,title:tool.name,detail:item.message,status:item.status==='error'?'error' as const:item.status==='success'?'success' as const:'neutral' as const}))),
-            ...mcpResult.flatMap(server=>server.activity.map(item=>({id:'mcp-'+server.id+'-'+item.id,time:item.time,title:server.name,detail:item.message,status:'neutral' as const}))),
+            ...mcpResult.flatMap(server=>server.activity.map(item=>({id:'mcp-'+server.id+'-'+item.id,time:item.time,title:server.name,detail:item.message,status:item.status??'neutral' as const}))),
             ...securityResult.changes.map(item=>({id:'policy-'+item.id,time:item.time,title:item.field+' updated',detail:item.before+' → '+item.after+' · '+item.actor,status:'neutral' as const}))
           ]
           setRecentActivity(activities.sort((a,b)=>Date.parse(b.time)-Date.parse(a.time)).slice(0,3))
@@ -549,7 +546,7 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
               </h2>
 
 
-              <div className="ai-settings-usage-actions"><div className="ai-settings-period-filter">
+              <div className="ai-settings-usage-actions"><Button variant="secondary" onClick={()=>navigate('/ai/ai/ai-settings/usage-cost?'+new URLSearchParams({period:String(parseInt(usagePeriod))}).toString())}>Usage &amp; Cost</Button><div className="ai-settings-period-filter">
                 <SidebarSelect menuPortal
                   id="ai-settings-usage-period"
                   label="Usage period"
@@ -809,8 +806,8 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
 
 
               {isLoading?<p className="ai-settings-health-empty">Loading configuration…</p>:error?<p role="alert">Unable to check configuration. Use Refresh to retry.</p>:healthIssues.length?
-                <ul className="ai-settings-health-list">{healthIssues.map(issue=><li key={issue.id}><Button variant="ghost" fullWidth className="ai-settings-health-row" title={issue.name+' · '+issue.kind+' · Error'} aria-label={'Review '+issue.name+' '+issue.kind+' error'} onClick={()=>navigate(issue.path)}><span className="ai-settings-health-dot ai-settings-health-dot--error" aria-hidden="true"/><strong>{issue.name}</strong><span className="ai-settings-health-kind">{issue.kind}</span><span aria-hidden="true">›</span></Button></li>)}</ul>
-              :<p className="ai-settings-health-empty"><span className="ai-settings-health-dot" aria-hidden="true"/>{summary.providers+toolCounts.available+mcpCounts.servers?'No configuration errors':'No configuration added yet.'}</p>}
+                <ul className="ai-settings-health-list">{healthIssues.map(issue=><li key={issue.id}><Button variant="ghost" fullWidth className="ai-settings-health-row" title={issue.name+' · '+issue.kind+' · '+issue.label} aria-label={'Review '+issue.name+' '+issue.kind+' '+issue.label} onClick={()=>navigate(issue.path)}><span className={'ai-settings-health-dot ai-settings-health-dot--'+(issue.status==='error'?'error':'pending')} aria-hidden="true"/><strong>{issue.name}</strong><span className="ai-settings-health-kind">{issue.kind} · {issue.label}</span><span aria-hidden="true">›</span></Button></li>)}</ul>
+              :<p className="ai-settings-health-empty"><span className="ai-settings-health-dot" aria-hidden="true"/>{summary.providers+toolCounts.available+mcpCounts.servers?'No sample configuration issues':'No configuration added yet.'}</p>}
             </article>
 
 
@@ -818,7 +815,7 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
             <article className="console-panel ai-settings-rail-panel ai-settings-runtime-panel">
               <div className="ai-settings-section-header">
                 <h2>
-                  Runtime Defaults
+                  <span title="Sample runtime defaults for this company. Runtime editing is not connected in this local demo.">Runtime Defaults · Sample</span>
                 </h2>
 
                 <Button
@@ -830,7 +827,7 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
                     )
                   }
                 >
-                  Configure
+                  View Providers
                 </Button>
               </div>
 

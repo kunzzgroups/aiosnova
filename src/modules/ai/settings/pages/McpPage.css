@@ -11,7 +11,7 @@
 .ai-mcp-mark {display:grid;place-items:center;width:3rem;height:3rem;flex:0 0 3rem;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-bg-muted);font-size:1.1rem;font-weight:600}
 .ai-mcp-page .ai-provider-card-name .console-status {margin-top:.35rem}
 .ai-mcp-page .console-status {display:inline-flex;align-items:center;justify-content:center;font-size:11px;white-space:nowrap}
-.ai-mcp-detail {display:flex;flex-direction:column;min-height:0;min-width:0;gap:.6rem;overflow:hidden}
+.ai-mcp-detail {display:flex;flex-direction:column;min-height:0;min-width:0;gap:.6rem;overflow-y:auto;overscroll-behavior:contain}
 .ai-mcp-identity {display:flex;align-items:center;gap:.65rem;flex:0 0 auto;flex-wrap:wrap;border-bottom:1px solid var(--color-border);padding-bottom:.6rem}
 .ai-mcp-identity h2 {margin:0;font-size:var(--text-lg);max-width:15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ai-mcp-name-group {display:flex;align-items:center;align-self:center;gap:.5rem;min-width:0}
@@ -27,7 +27,7 @@
 .ai-mcp-health dd {font-size:var(--text-md);font-weight:600;margin:.25rem 0 0;overflow-wrap:anywhere;text-transform:capitalize}
 .ai-mcp-demo {margin:0;font-size:var(--text-xs);color:var(--color-text-muted)}
 .ai-mcp-detail > .ai-mcp-error,.ai-mcp-detail > .ai-mcp-muted {margin:0;font-size:var(--text-sm)}
-.ai-mcp-detail-grid {flex:1 1 0;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr));gap:.65rem;overflow:hidden}
+.ai-mcp-detail-grid {flex:1 0 18rem;min-height:18rem;min-width:0;display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr));gap:.65rem;overflow:hidden}
 .ai-mcp-card {min-height:0;min-width:0;overflow:hidden;border:1px solid var(--color-border);border-radius:var(--radius-md);display:flex;flex-direction:column}
 .ai-mcp-capabilities {grid-row:1/3}
 .ai-mcp-card header {padding:.65rem .8rem;border-bottom:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex:0 0 auto;flex-wrap:wrap;min-height:3.8rem}
@@ -110,7 +110,24 @@
 .ai-mcp-access-list .knowledge-agent-choice {flex-shrink:0}
 .ai-mcp-connection-scope {flex:0 0 auto;border-top:1px solid var(--color-border);padding-top:.75rem;min-width:0}
 .ai-mcp-connection-scope dl {display:grid;gap:.5rem;margin:0;font-size:var(--text-sm)}
-.ai-mcp-connection-scope dl > div {display:grid;grid-template-columns:5rem minmax(0,1fr);gap:.5rem}
-.ai-mcp-connection-scope dt {color:var(--color-text-muted)}
-.ai-mcp-connection-scope dd {margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.ai-mcp-connection-scope dl > div {display:grid;grid-template-columns:minmax(7.5rem,max-content) minmax(0,1fr);gap:.5rem;align-items:start}
+.ai-mcp-connection-scope dt {min-width:0;color:var(--color-text-muted);overflow-wrap:anywhere}
+.ai-mcp-connection-scope dd {margin:0;min-width:0;overflow-wrap:anywhere}
 .ai-mcp-access-drawer .ui-drawer__footer {justify-content:flex-end}
+.ai-mcp-connection-check { display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex:0 0 auto; padding:.65rem .8rem; border:1px solid var(--color-border); border-radius:var(--radius-md); font-size:var(--text-sm); }
+.ai-mcp-connection-check__copy { min-width:0; flex:1 1 16rem; }
+.ai-mcp-connection-check > .ai-mock-connection-controls {flex:0 0 auto;max-width:100%}
+.ai-mcp-connection-check__copy > div { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; }
+.ai-mcp-connection-check__copy > div > span { padding:.15rem .4rem; border-radius:var(--radius-sm); background:var(--color-bg-muted); color:var(--color-text-muted); font-size:var(--text-xs); }
+.ai-mcp-connection-check small { display:block; color:var(--color-text-muted); font-size:var(--text-xs); margin-top:.25rem; }
+.ai-mcp-connection-check p { margin:.3rem 0 0; font-size:var(--text-xs); color:var(--color-text-muted); overflow-wrap:anywhere; }
+.ai-mcp-connection-check p.ai-mcp-error { color:var(--color-danger); }
+.ai-mcp-connection-check > .ui-button { flex:0 0 auto; white-space:nowrap; }
+@container ai-settings-content (max-width:860px) {
+  .ai-mcp-connection-check { flex-wrap:wrap; padding:.6rem; }
+}
+/* At half width, the detail column is the single content scrollport. */
+@container ai-settings-content (max-width:860px) {
+  .ai-mcp-detail { overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+  .ai-mcp-detail-grid { flex:0 0 auto; overflow:visible; min-height:auto; }
+}
