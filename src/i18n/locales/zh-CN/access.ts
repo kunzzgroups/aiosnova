@@ -70,4 +70,11 @@ export const access = {
   'access.noChanges': '没有未保存的更改',
   'access.discard': '放弃更改',
   'access.save': '保存更改',
+  'access.createFailed': '无法创建角色，请重试。',
+  'access.createForbidden': '只有商户 Owner 可以创建角色。',
+  'access.permissionMappingPending':'权限保存尚未接通，请清空选择后创建空角色。',
+  'access.loadFailed': '无法加载角色，请重试。',
+  'access.loading': '正在加载角色…',
+  'access.renameFailed': '无法修改角色名称，请重试。',
+  'access.statusFailed': '无法更新角色状态，请重试。',
 }
