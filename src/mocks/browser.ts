@@ -27,6 +27,8 @@ const backendTacHandlers = [
   http.get('/api/identity/roles', () => passthrough()),
   http.patch('/api/identity/roles/:id', () => passthrough()),
   http.patch('/api/identity/roles/:id/status', () => passthrough()),
+  http.get('/api/identity/permissions', () => passthrough()),
+  http.put('/api/identity/roles/:id/permissions', () => passthrough()),
 ]
 export const worker = setupWorker(
   ...backendTacHandlers,

@@ -39,6 +39,23 @@ type RoleSummaryResponse = {
   permissions: string[]
 }
 
+type PermissionResponse = {
+  id: string
+  code: string
+  permissionName: string
+}
+
+const permissionCodeByOption: Record<string, string> = {
+  viewOrganization: 'organization.read',
+  manageOrganization: 'organization.manage',
+}
+
+const permissionOptionByCode = Object.fromEntries(
+  Object.entries(permissionCodeByOption).map(
+    ([option, code]) => [code, option]
+  )
+)
+
 const totalPermissions = accessPermissionGroups.reduce((sum, group) => sum + group.permissions.length, 0)
 const differs = (a: string[], b: string[]) => a.length !== b.length || a.some(id => !b.includes(id))
 
@@ -137,6 +154,9 @@ function RolesAndAccessEditor() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRenaming, setIsRenaming] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [permissionCatalog, setPermissionCatalog] =
+    useState<PermissionResponse[]>([])
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false)
   const ids = useId()
   const [roles, setRoles] = useState<AccessRole[]>([])
   const [drafts, setDrafts] = useState<Record<string, string[]>>({})
@@ -178,14 +198,24 @@ function RolesAndAccessEditor() {
             signal: controller.signal,
           }
         )
+        const catalog = await apiRequest<PermissionResponse[]>(
+          '/api/identity/permissions',
+          {
+            auth: true,
+            signal: controller.signal,
+          }
+        )
         const nextRoles: AccessRole[] = result.map(role => ({
           id: role.id,
           name: role.name,
           enabled: role.status === 'enabled',
           createdAt: role.createdAt,
           peopleCount: role.peopleCount,
-          permissions: role.permissions
+          permissions: role.permissions.map(
+            code => permissionOptionByCode[code] ?? code
+          )
         }))
+        setPermissionCatalog(catalog)
         setRoles(nextRoles)
         setDrafts(Object.fromEntries(
           nextRoles.map(role => [role.id, [...role.permissions]])
@@ -208,9 +238,9 @@ function RolesAndAccessEditor() {
 
 
   function update(next: string[]) {
-    if (!selected?.enabled) return
-    setDrafts(current => ({ ...current, [selectedId]: next }))
-  }
+  if (!selected?.enabled || isSavingPermissions) return
+  setDrafts(current => ({ ...current, [selectedId]: next }))
+}
 
   async function toggleRole(id: string) {
     if (isUpdatingStatus) return
@@ -278,10 +308,36 @@ function RolesAndAccessEditor() {
     }
   }
 
-  function savePermissions() {
-    if (!selected?.enabled || !changes) return
-    setRoles(current => current.map(role => role.id === selectedId ? { ...role, permissions: [...permissions] } : role))
-    notifySuccess(t('access.saved'))
+  async function savePermissions() {
+    if (!selected?.enabled || !changes || isSavingPermissions) return
+    const permissionIds: string[] = []
+
+    for (const option of permissions) {
+      const code = permissionCodeByOption[option] ?? option
+      const permission = permissionCatalog.find(item => item.code === code)
+
+      if (!permission) {
+        notifyError(t('access.permissionMappingPending'))
+        return
+      }
+
+      permissionIds.push(permission.id)
+    }
+    setIsSavingPermissions(true)
+    try {
+      await apiRequest<void>(`/api/identity/roles/${encodeURIComponent(selected.id)}/permissions`, {
+        method: 'PUT',
+        auth: true,
+        body: { permissionIds },
+      })
+      setRoles(current => current.map(role => role.id === selectedId ? { ...role, permissions: [...permissions] } : role))
+      notifySuccess(t('access.saved'))
+    } catch (error) {
+      notifyError(t('access.permissionsSaveFailed'))
+    } finally {
+      setIsSavingPermissions(false)
+    }
+
   }
 
   function openEditor() {
@@ -297,9 +353,18 @@ function RolesAndAccessEditor() {
     const name = editor.name.trim()
     if (!name) { setNameError(t('access.nameRequired')); return }
     if (roles.some(role => role.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { setNameError(t('access.nameDuplicate')); return }
-    if (editor.permissions.length > 0) {
-      notifyError(t('access.permissionMappingPending'))
-      return
+    const permissionIds: string[] = []
+
+    for (const option of editor.permissions) {
+      const code = permissionCodeByOption[option]
+      const permission = permissionCatalog.find(item => item.code === code)
+
+      if (!permission) {
+        notifyError(t('access.permissionMappingPending'))
+        return
+      }
+
+      permissionIds.push(permission.id)
     }
     setIsSaving(true)
     try {
@@ -311,12 +376,12 @@ function RolesAndAccessEditor() {
           body: {
             name,
             status: editor.enabled ? 'enabled' : 'disabled',
-            permissionIds: []
+            permissionIds,
           },
         }
       )
       const id = result.id
-      const next: AccessRole = { id, name: result.name, enabled: result.status === 'enabled', permissions: [], peopleCount: 0, createdAt: new Date().toISOString() }
+      const next: AccessRole = { id, name: result.name, enabled: result.status === 'enabled', permissions: [...editor.permissions], peopleCount: 0, createdAt: new Date().toISOString() }
       setRoles(items => [...items, next])
       setDrafts(items => ({ ...items, [id]: next.permissions }))
       setSelectedId(id)
@@ -419,10 +484,10 @@ function RolesAndAccessEditor() {
               </div>
               <div className="roles-access__search-row"><div className="roles-access__access-search"><IconSearch aria-hidden="true" /><TextField type="search" aria-label={t('access.searchPermissionCategories')} placeholder={t('access.searchPermissionCategories')} value={accessSearch} onChange={event => setAccessSearch(event.target.value)} /></div><span className="roles-access__selected-total" role="status">{t('access.granted', { count: permissions.length, total: totalPermissions })}</span></div>
             </header>
-            <PermissionChoices permissions={permissions} onChange={update} idPrefix={`${ids}-selection`} query={accessSearch} disabled={!selected.enabled} />
+            <PermissionChoices permissions={permissions} onChange={update} idPrefix={`${ids}-selection`} query={accessSearch} disabled={!selected.enabled || isSavingPermissions} />
             <footer className="roles-access__footer">
               <div className="roles-access__feedback" role="status">{changes ? <>{t('access.changes', { count: changes })}<small>{t('access.changeDetails', { added, removed })}</small></> : t('access.noChanges')}</div>
-              <div className="roles-access__actions"><Button variant="ghost" disabled={!selected.enabled || !changes} onClick={() => update([...selected.permissions])}>{t('access.discard')}</Button><Button disabled={!selected.enabled || !changes} onClick={savePermissions}>{t('access.save')}{changes ? ` · ${changes}` : ''}</Button></div>
+              <div className="roles-access__actions"><Button variant="ghost" disabled={!selected.enabled || !changes || isSavingPermissions} onClick={() => update([...selected.permissions])}>{t('access.discard')}</Button><Button disabled={!selected.enabled || !changes || isSavingPermissions} onClick={savePermissions}>{t('access.save')}{changes ? ` · ${changes}` : ''}</Button></div>
             </footer>
           </> : <p className="roles-access__empty">{t('access.noRoles')}</p>}
         </div>
