@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,6 +17,7 @@ import com.aiosnova.auth.SessionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 @RestController
@@ -41,6 +43,11 @@ public class RoleController {
         return service.listRoles(sessions.authenticate(request));
     }
 
+    @GetMapping ("/permissions")
+    public List<RoleRepository.PermissionItem> listPermissions(HttpServletRequest request){
+        return service.listPermissions(sessions.authenticate(request));
+    }
+
     @PatchMapping("/roles/{id}")
     public ResponseEntity<Void> renameRole(
             @PathVariable("id") String id,
@@ -63,6 +70,16 @@ public class RoleController {
                 input.status());
 
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping ("/roles/{id}/permissions")
+    public ResponseEntity<Void> updateRolePermissions(@PathVariable("id") String id, @Valid @RequestBody UpdateRolePermissions input, HttpServletRequest request){
+        service.updateRolePermissions(sessions.authenticate(request), id, input.permissionIds());
+
+        return ResponseEntity.noContent().build();
+    }
+
+    public record UpdateRolePermissions(@NotNull List<@NotBlank String> permissionIds){
     }
 
     public record UpdateRoleStatus(@NotBlank String status) {

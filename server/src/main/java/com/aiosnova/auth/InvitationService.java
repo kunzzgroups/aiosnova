@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-@Profile("local")
+@Profile({"local", "prod"})
 @Transactional(rollbackFor = Exception.class, noRollbackFor = ResponseStatusException.class)
 public class InvitationService {
 

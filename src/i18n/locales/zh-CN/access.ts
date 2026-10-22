@@ -77,4 +77,5 @@ export const access = {
   'access.loading': '正在加载角色…',
   'access.renameFailed': '无法修改角色名称，请重试。',
   'access.statusFailed': '无法更新角色状态，请重试。',
+  'access.permissionsSaveFailed': '无法保存权限，请重新加载后重试。',
 }
