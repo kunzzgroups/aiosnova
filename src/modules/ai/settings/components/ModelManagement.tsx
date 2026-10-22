@@ -1,4 +1,5 @@
 import { useDisabledSelection } from '../hooks/useDisabledSelection'
+import { rememberModelProvider } from '../services/modelProviderSelection'
 import { useCompanyStore } from '@/stores/companyStore'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import {
@@ -20,7 +21,7 @@ import { TablePanel } from '@/components/ui/TablePanel'
 import { TableToolbar } from '@/components/ui/TableToolbar'
 import { ModelsPagination } from './ModelsPagination'
 import { modelTableLayout } from '../services/modelTableLayout'
-import { IconPlus, IconTrash, IconPower, IconPencil, IconX } from '@/components/icons/Icons'
+import { IconPlus, IconTrash, IconPower, IconPencil, IconX, IconRefresh } from '@/components/icons/Icons'
 import { TextField } from '@/components/ui/TextField'
 
 import {
@@ -31,6 +32,7 @@ import {
   fetchProvider,
   fetchProviderModels,
   setModelEnabled,
+  syncProviderModels,
   updateModel,
 } from '../services/settingsService'
 
@@ -95,6 +97,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
   const [message, setMessage] =
     useState<string | null>(null)
+  const [capabilityWarnings, setCapabilityWarnings] = useState<string[]>([])
 
   const [formOpen, setFormOpen] =
     useState(false)
@@ -122,6 +125,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
   const [isSaving, setIsSaving] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   const mutationRef = useRef(false)
   const loadSequence = useRef(0)
   const currentCompanyRef = useRef(companyId)
@@ -137,6 +141,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     const isCurrent = () => request === loadSequence.current && currentScopeRef.current === providerId && currentCompanyRef.current === companyId
     setIsLoading(true)
     setError(null)
+    setCapabilityWarnings([])
 
     try {
       await fetchProviders(companyId)
@@ -148,29 +153,15 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
       if (!isCurrent()) return
       if (nextProvider.companyId !== companyId) throw new Error('Provider is not available in the current company.')
+      rememberModelProvider(companyId, providerId)
       setProvider(nextProvider)
       setModels(modelResult.items.filter(model => model.providerId === providerId))
-      console.table(
-        modelResult.items.map(model => ({
-          id: model.id,
-          modelId: model.modelId,
-          chat: model.capabilities?.chat,
-          vision: model.capabilities?.vision,
-          toolCalling: model.capabilities?.toolCalling,
-          contextWindow: model.capabilities?.contextWindow,
-          checkedAt: model.capabilitiesCheckedAt,
-        }))
-      )
-      if (modelResult.capabilityErrors.length > 0) {
-        setError(
-          '模型列表已加载，但部分能力读取失败：' +
-          modelResult.capabilityErrors.join('；')
-        )
-      }
+      setCapabilityWarnings(modelResult.capabilityErrors)
     } catch (caught) {
       if (!isCurrent()) return
       setProvider(null)
       setModels([])
+      setCapabilityWarnings([])
 
       setError(
         caught instanceof Error
@@ -310,7 +301,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     setName(model.name)
     setModelId(model.modelId)
     setType(model.type)
-    setContextWindow(model.contextWindow)
+    setContextWindow(model.contextWindow ?? 0)
     setEnabled(model.status !== 'disabled')
     setDescription(model.description)
     setError(null)
@@ -397,26 +388,53 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     }
   }
 
-  async function toggleModel(
-    model: AiModel,
-  ) {
-    if (mutationRef.current || isDeleting || isSaving) return
+  async function toggleModel(model: AiModel) {
+    if (
+      mutationRef.current ||
+      isDeleting ||
+      isSaving ||
+      model.providerId !== providerId ||
+      useCompanyStore.getState().companyId !== companyId
+    ) {
+      return
+    }
+
     mutationRef.current = true
     setIsUpdating(true)
+    setError(null)
+
     try {
       await setModelEnabled(
         model.id,
         model.status === 'disabled',
+        companyId,
+        providerId,
+        model.version,
       )
+
+      if (
+        useCompanyStore.getState().companyId !== companyId ||
+        currentScopeRef.current !== providerId
+      ) {
+        return
+      }
 
       await load()
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'Unable to update model.',
-      )
-    } finally { mutationRef.current = false; setIsUpdating(false) }
+      if (
+        useCompanyStore.getState().companyId === companyId &&
+        currentScopeRef.current === providerId
+      ) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : 'Unable to update model.',
+        )
+      }
+    } finally {
+      mutationRef.current = false
+      setIsUpdating(false)
+    }
   }
 
   async function handleDelete() {
@@ -431,6 +449,42 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     } catch (caught) {
       setDeleteError(caught instanceof Error ? caught.message : 'Unable to delete model.')
     } finally { setIsDeleting(false) }
+  }
+
+  async function handleSyncModels() {
+    if (
+      mutationRef.current || isLoading || isDeleting || isSaving ||
+      formOpen || pendingDelete || pendingBulk ||
+      !provider || provider.companyId !== companyId ||
+      useCompanyStore.getState().companyId !== companyId ||
+      provider.baseUrl.trim() !== 'https://openrouter.ai/api/v1'
+    ) return
+
+    const scope = providerId
+    const syncCompany = companyId
+    const isCurrent = () => currentScopeRef.current === scope &&
+      useCompanyStore.getState().companyId === syncCompany
+    mutationRef.current = true
+    setIsUpdating(true)
+    setIsSyncing(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const result = await syncProviderModels(syncCompany, scope)
+      if (!isCurrent()) return
+      selection.clear()
+      setPage(1)
+      await load()
+      if (!isCurrent()) return
+      setMessage(`同步完成：新增 ${result.created} 个，更新 ${result.updated} 个。新模型默认停用，已有状态保留。`)
+    } catch (caught) {
+      if (isCurrent()) setError(caught instanceof Error ? caught.message : '模型同步失败。')
+    } finally {
+      mutationRef.current = false
+      setIsSyncing(false)
+      setIsUpdating(false)
+    }
   }
 
   async function removeSelectedModels() {
@@ -475,6 +529,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
       <div className="console-page console-page--internal-table-scroll ai-settings-models-page">
         <TablePanel>
+          {provider ? <div className="ai-model-provider-context" title={provider.id}>Provider: <strong>{provider.name}</strong></div> : null}
           <TableToolbar
             search={
               <TextField
@@ -501,8 +556,27 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
                 onChange={(value) => setStatusFilter(value as StatusFilter)}
               />
             }
-            actions={<>{selection.selected.length > 1 ? <Button variant="danger" disabled={isDeleting || isLoading || isUpdating} onClick={() => { setBulkError(null); setPendingBulk({ ids: selection.selected.map(item => item.id), scope: providerId, companyId }) }}><IconTrash aria-hidden="true" />Remove</Button> : null}<Button onClick={openCreate} disabled={!provider || isDeleting || isLoading || isUpdating}><IconPlus />Add Model</Button>{onClose ? <IconButton label="Close model manager" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null} onClick={onClose}><IconX /></IconButton> : null}</>}
+            actions={<>
+              {provider?.baseUrl.trim() === 'https://openrouter.ai/api/v1' ? (
+                <Button variant="secondary" onClick={() => void handleSyncModels()} disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null}>
+                  <IconRefresh />{isSyncing ? '同步中…' : '同步模型'}
+                </Button>
+              ) : null}
+              {selection.selected.length > 1 ? <Button variant="danger" disabled={isDeleting || isLoading || isUpdating} onClick={() => { setBulkError(null); setPendingBulk({ ids: selection.selected.map(item => item.id), scope: providerId, companyId }) }}><IconTrash aria-hidden="true" />Remove</Button> : null}
+              <Button onClick={openCreate} disabled={!provider || isDeleting || isLoading || isUpdating}><IconPlus />Add Model</Button>
+              {onClose ? <IconButton label="Close model manager" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null} onClick={onClose}><IconX /></IconButton> : null}
+            </>}
           />
+
+          {!isLoading && capabilityWarnings.length > 0 ? (
+            <details className="ai-model-capability-notice">
+              <summary>{capabilityWarnings.length} 个模型的能力未知</summary>
+              <p>模型列表已加载。这些模型的能力信息不完整，其他模型仍可正常查看。</p>
+              <ul>
+                {capabilityWarnings.map(warning => <li key={warning}>{warning}</li>)}
+              </ul>
+            </details>
+          ) : null}
 
           {isLoading ? (
             <p className="console-empty ai-settings-models-empty">
@@ -515,12 +589,12 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
               </strong>
 
               <p>
-                {models.length ? 'No models match the current search and status filters.' : 'Add a model for this provider to make it available to agents.'}
+                {models.length ? 'No models match the current search and status filters.' : provider?.baseUrl.trim() === 'https://openrouter.ai/api/v1' ? '点击“同步模型”读取真实目录。新模型默认停用；启用后可供 Assistant 使用。' : 'Add a model for this provider to make it available to agents.'}
               </p>
 
               {models.length ? <Button variant="secondary" onClick={() => { setQuery(''); setStatusFilter('all') }}>Clear filters</Button> : <Button
                 onClick={openCreate}
-                disabled={!provider}
+                disabled={!provider || isUpdating || isDeleting || isLoading}
               >
                 Add Model
               </Button>}
@@ -585,9 +659,9 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
                           <button
                             type="button"
                             className={`console-status console-status--${model.status ===
-                                'enabled'
-                                ? 'active'
-                                : model.status
+                              'enabled'
+                              ? 'active'
+                              : model.status
                               } console-status--clickable`}
                             disabled={isDeleting || isUpdating}
                             onClick={() =>
@@ -805,6 +879,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
                     label:
                       'Embedding',
                   },
+                  { value: 'other', label: 'Other / Unknown' },
                 ]}
                 onChange={(value) =>
                   setType(
@@ -903,9 +978,10 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
   )
 }
 
-function formatContext(
-  value: number,
-) {
+function formatContext(value: number | null) {
+  if (value === null) {
+    return '未知'
+  }
   if (value >= 1_000_000) {
     return `${(
       value / 1_000_000

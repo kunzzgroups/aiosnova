@@ -21,8 +21,7 @@ function ScopedModels({companyId,providerId}:{companyId:string;providerId:string
   if(error)return <AiSettingsShell><p role="alert">{error}</p><Button variant="secondary" onClick={()=>setAttempt(value=>value+1)}>Retry</Button></AiSettingsShell>
   if(!providers)return <AiSettingsShell><p role="status">Loading models…</p></AiSettingsShell>
   if(!providers.some(provider=>provider.id===providerId)){
-    const next=providers.find(provider=>providerId.startsWith('provider-'+provider.slug+'-'))??providers[0]
-    return <Navigate replace to={next?`/ai/ai/ai-settings/models/providers/${next.id}/models`:'/ai/ai/ai-settings/models/providers'}/>
+    return <Navigate replace to="/ai/ai/ai-settings/models/providers"/>
   }
   return <AiSettingsShell><ModelManagement providerId={providerId}/></AiSettingsShell>
 }

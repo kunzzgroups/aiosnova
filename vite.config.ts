@@ -28,7 +28,10 @@ export default defineConfig({
     '/api/mock/invitations': 'http://localhost:8080',
     '/api/identity/roles': 'http://localhost:8080',
     '/api/ai/test-connection': 'http://127.0.0.1:8081',
+    '/api/ai/providers': 'http://127.0.0.1:8081',
     '/api/ai/model-capabilities': 'http://127.0.0.1:8081',
+    '/api/ai/openrouter/models': 'http://127.0.0.1:8081',
+    '/api/ai/models': 'http://127.0.0.1:8081',
   },
   },
 })

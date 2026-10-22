@@ -18,6 +18,7 @@ import {
     deleteProvider,
     deleteProviders,
     fetchProviders,
+    recordProviderConnectionTest,
     setProviderEnabled,
     updateProvider,
 } from '../services/settingsService'
@@ -78,6 +79,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
     const [deleteError, setDeleteError] = useState<string | null>(null)
     const [formOpen, setFormOpen] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [editingVersion, setEditingVersion] = useState<number | null>(null)
     const [name, setName] = useState('')
     const [baseUrl, setBaseUrl] = useState('')
     const [apiKey, setApiKey] = useState('')
@@ -148,6 +150,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
 
     function resetForm() {
         setEditingId(null)
+        setEditingVersion(null)
         setName('')
         setBaseUrl('')
         setApiKey('')
@@ -165,6 +168,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
 
     function openEdit(provider: AiProvider) {
         setEditingId(provider.id)
+        setEditingVersion(provider.version)
         setName(provider.name)
         setBaseUrl(provider.baseUrl)
         setApiKey('')
@@ -199,17 +203,19 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         setError(null)
 
         try {
+            let savedProvider: AiProvider
             if (editingId) {
-                await updateProvider(editingId, {
+                if (editingVersion === null) throw new Error('缺少 Provider 版本号，请关闭后重新打开编辑。')
+                savedProvider = await updateProvider(editingId, {
                     companyId,
                     name,
                     baseUrl,
                     apiKey: apiKey.trim() || undefined,
                     enabled,
-                })
+                }, editingVersion)
                 setMessage('Provider updated successfully.')
             } else {
-                await createProvider({
+                savedProvider = await createProvider({
                     companyId,
                     name,
                     baseUrl,
@@ -217,6 +223,10 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                     enabled,
                 })
                 setMessage('Provider created successfully.')
+            }
+
+            if (testResult) {
+                recordProviderConnectionTest(companyId, savedProvider.id, baseUrl, modelId, testResult)
             }
 
             setFormOpen(false)
@@ -248,6 +258,10 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
             })
 
             setTestResult(result)
+            if (editingId) {
+                recordProviderConnectionTest(companyId, editingId, baseUrl, modelId, result)
+                await load(true)
+            }
 
             if (!result.ok) {
                 setError(result.message)
@@ -298,7 +312,11 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         providerMutationRef.current = true
         setIsUpdating(true)
         try {
-            await setProviderEnabled(provider.id, !provider.enabled)
+            await setProviderEnabled(
+                provider.id,
+                !provider.enabled,
+                companyId,
+            )
             await load(true)
         } catch (caught) {
             setError(
@@ -320,7 +338,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         setIsDeleting(true)
         setDeleteError(null)
         try {
-            await deleteProvider(pendingDelete.id)
+            await deleteProvider(pendingDelete.id, companyId)
             setPendingDelete(null)
             setMessage('Provider deleted successfully.')
             await load()
@@ -350,6 +368,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
             selection.clear()
             setPendingBulk(null)
             setMessage(`Removed ${deleted.size} providers successfully.`)
+            await load(true)
         } catch (caught) {
             if (useCompanyStore.getState().companyId === deletingCompanyId && currentScopeRef.current === deletingScope) setBulkError(caught instanceof Error ? caught.message : 'Unable to remove selected providers.')
         } finally {
@@ -438,7 +457,6 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 onEdit={() => openEdit(selectedProvider)}
                                 onToggle={() => void toggleProvider(selectedProvider)}
                                 onDelete={() => { setDeleteError(null); setPendingDelete(selectedProvider) }}
-                                onConnectionTested={() => load(true)}
                                 onManageModels={() => { setManagerStartCreate(false); setManagerBusy(true); setManagerProvider(selectedProvider) }}
                                 onAddModel={() => { setManagerStartCreate(true); setManagerBusy(true); setManagerProvider(selectedProvider) }}
                                 modelsRevision={modelsRevision}

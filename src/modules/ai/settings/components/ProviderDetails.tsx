@@ -2,13 +2,11 @@ import { connectionStatusLabel } from '../services/connectionPresentation'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
-import { IconPower, IconPencil, IconTrash, IconAlertTriangle, IconClock, IconPlus, IconSpark } from '@/components/icons/Icons'
+import { IconPower, IconPencil, IconTrash, IconClock, IconPlus, IconSpark } from '@/components/icons/Icons'
 import { TableToolbar } from '@/components/ui/TableToolbar'
 import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
-import { MockConnectionControls } from './MockConnectionControls'
-import type { MockConnectionOutcome } from '../types/connection'
-import { fetchProviderModels, testProviderConnection } from '../services/settingsService'
+import { fetchProviderModels } from '../services/settingsService'
 import type { AiModel, AiProvider } from '../types/settings'
 
 type Props = {
@@ -18,25 +16,17 @@ type Props = {
   onEdit: () => void
   onToggle: () => void
   onDelete: () => void
-  onConnectionTested: () => Promise<void>
   onManageModels: () => void
   onAddModel: () => void
   modelsRevision: number
 }
 
-export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, onDelete, onConnectionTested, onManageModels, onAddModel, modelsRevision }: Props) {
+export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, onDelete, onManageModels, onAddModel, modelsRevision }: Props) {
   const [models, setModels] = useState<AiModel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [testing, setTesting] = useState(false)
-  const [outcome,setOutcome]=useState<MockConnectionOutcome>('validate')
-  const [connectionMessage, setConnectionMessage] = useState<string | null>(null)
-  const [connectionOk, setConnectionOk] = useState<boolean | null>(null)
   const [modelQuery, setModelQuery] = useState('')
   const [modelStatus, setModelStatus] = useState('all')
-  useEffect(()=>{
-    if(!provider.lastCheck){setConnectionMessage(null);setConnectionOk(null)}
-  },[provider.baseUrl,provider.status,provider.lastCheck?.checkedAt])
   const visibleModels = models.filter(model =>
     (modelStatus === 'all' || model.status === modelStatus) &&
     `${model.name} ${model.modelId}`.toLowerCase().includes(modelQuery.trim().toLowerCase()),
@@ -47,28 +37,13 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
     setLoading(true)
     setModels([])
     setError(null)
-    void fetchProviderModels(provider.id).then(result => {
+    void fetchProviderModels(provider.id, companyId).then(result => {
       if (active) setModels(result.items.filter(model => model.providerId === provider.id))
     }).catch(caught => {
       if (active) setError(caught instanceof Error ? caught.message : 'Unable to load models.')
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [provider.id, companyId, modelsRevision])
-
-  async function testConnection() {
-    setTesting(true)
-    setConnectionMessage(null)
-    setConnectionOk(null)
-    try {
-      const result = await testProviderConnection({ companyId,providerId: provider.id, baseUrl: provider.baseUrl,outcome })
-      setConnectionMessage(result.message)
-      setConnectionOk(result.ok)
-      await onConnectionTested()
-    } catch (caught) {
-      setConnectionMessage(caught instanceof Error ? caught.message : 'Unable to test connection.')
-      setConnectionOk(false)
-    } finally { setTesting(false) }
-  }
 
   return (
     <div className="ai-provider-details">
@@ -79,30 +54,29 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
           <span className={`console-status console-status--${provider.status}`}>{connectionStatusLabel(provider.status)}</span>
           <div className="ai-provider-details-actions identity-inline-actions identity-directory-actions">
             {!provider.enabled && provider.status === 'disabled' ? (
-              <IconButton label={`Delete ${provider.name}`} variant="danger" disabled={busy || testing} onClick={onDelete}><IconTrash /></IconButton>
+              <IconButton label={`Delete ${provider.name}`} variant="danger" disabled={busy} onClick={onDelete}><IconTrash /></IconButton>
             ) : (
-              <IconButton label={`Edit ${provider.name}`} disabled={busy || testing} onClick={onEdit}><IconPencil /></IconButton>
+              <IconButton label={`Edit ${provider.name}`} disabled={busy} onClick={onEdit}><IconPencil /></IconButton>
             )}
-            <IconButton label={provider.enabled ? `Disable ${provider.name}` : `Enable ${provider.name}`} variant={provider.enabled ? 'ghost' : 'secondary'} disabled={busy || testing} aria-pressed={provider.enabled} onClick={onToggle}><IconPower /></IconButton>
+            <IconButton label={provider.enabled ? `Disable ${provider.name}` : `Enable ${provider.name}`} variant={provider.enabled ? 'ghost' : 'secondary'} disabled={busy} aria-pressed={provider.enabled} onClick={onToggle}><IconPower /></IconButton>
           </div>
         </header>
         <div className="ai-provider-overview-body">
           <dl>
             <dt>API Key</dt><dd>{provider.apiKeyMasked || 'Not configured'}</dd>
             <dt>Base URL</dt><dd>{provider.baseUrl}</dd>
-            <dt>Status</dt><dd><button type="button" className={`console-status console-status--${provider.status} console-status--clickable`} disabled={busy || testing} onClick={onToggle}>{connectionStatusLabel(provider.status)}</button></dd>
+            <dt>Status</dt><dd><button type="button" className={`console-status console-status--${provider.status} console-status--clickable`} disabled={busy} onClick={onToggle}>{connectionStatusLabel(provider.status)}</button></dd>
           </dl>
-          <div className={`ai-provider-connection-actions ai-provider-connection-check${connectionOk === false ? ' is-error' : ''}`}>
-            <div className="ai-provider-connection-summary" role="status"><span aria-hidden="true">{connectionOk === false ? <IconAlertTriangle/> : <IconClock/>}</span><div><strong>{testing ? 'Running simulated check…' : connectionMessage || provider.lastCheck?.message || 'Connection check · Simulated'}</strong><small>{provider.lastTestedAt ? `${provider.lastCheck?'Simulated check':'Sample status'} · ${new Date(provider.lastTestedAt).toLocaleString()}` : 'No simulated check run yet'}</small></div></div>
-            <MockConnectionControls id={'provider-mock-result-'+provider.id} value={outcome} onChange={setOutcome} onCheck={()=>void testConnection()} busy={testing} disabled={busy||!provider.enabled}/>
-            <small className="ai-provider-mock-note">Mock results only · no live service is contacted.</small>
+          <div className="ai-provider-connection-actions ai-provider-connection-check">
+            <div className="ai-provider-connection-summary"><span aria-hidden="true"><IconClock/></span><div><strong>{provider.lastConnectionTest?.message ?? 'Live model connection test'}</strong><small>{provider.lastConnectionTest ? `${provider.lastConnectionTest.modelId} · ${new Date(provider.lastConnectionTest.checkedAt).toLocaleString()}` : 'Enter an API key and model ID in the provider editor to run a real request.'}</small><small>Results describe the last test with the supplied credentials; API keys are not retained by this session store.</small></div></div>
+            <Button variant="secondary" disabled={busy || !provider.enabled} onClick={onEdit}>Test Connection</Button>
           </div>
         </div>
       </section>
       <section className="ai-provider-models" aria-label={`${provider.name} models`}>
         <header className="ai-provider-models-header">
           <h2>Models</h2>
-          {models.length||loading||error?<Button variant="secondary" disabled={busy} onClick={onManageModels}>Manage Models</Button>:null}
+          <Button variant="secondary" disabled={busy} onClick={onManageModels}>Manage Models</Button>
         </header>
         {models.length>0?<TableToolbar
           search={<TextField className="ui-table-toolbar__search" type="search" value={modelQuery} onChange={event => setModelQuery(event.target.value)} placeholder="Search models…" aria-label="Search provider models" />}

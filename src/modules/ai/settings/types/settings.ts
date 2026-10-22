@@ -1,12 +1,12 @@
-import type { MockConnectionOutcome } from './connection'
 import type { ModelCapabilities } from '../services/modelCapabilitiesService'
 export type ProviderStatus = 'connected' | 'disabled' | 'error' | 'not_verified'
 export type ModelStatus = 'enabled' | 'disabled' | 'error'
-export type ModelType = 'chat' | 'reasoning' | 'embedding'
+export type ModelType = 'chat' | 'reasoning' | 'embedding' | 'other'
 
 export type AiProvider = {
   id: string
   companyId: string
+  version: number
   name: string
   slug: string
   baseUrl: string
@@ -14,7 +14,12 @@ export type AiProvider = {
   enabled: boolean
   status: ProviderStatus
   lastTestedAt: string | null
-  lastCheck?: ProviderConnectionResult
+  lastConnectionTest?: {
+    ok: boolean
+    message: string
+    modelId: string
+    checkedAt: string
+  }
   activity?: { id: string; time: string; message: string; status?: 'success' | 'error' | 'neutral' }[]
   modelCount: number
 }
@@ -22,15 +27,17 @@ export type AiProvider = {
 export type AiModel = {
   id: string
   providerId: string
+  version: number
   name: string
   modelId: string
   type: ModelType
   status: ModelStatus
-  contextWindow: number
+  contextWindow: number | null
   usedByAgents: number
   description: string
   capabilities?: ModelCapabilities
   capabilitiesCheckedAt?: string
+  capabilityError?: string
 }
 
 export type SaveProviderPayload = {
@@ -49,14 +56,6 @@ export type SaveModelPayload = {
   contextWindow: number
   enabled: boolean
   description?: string
-}
-
-export type ProviderConnectionResult = {
-  simulated: true
-  outcome?: MockConnectionOutcome
-  ok: boolean
-  message: string
-  checkedAt: string
 }
 
 export type AiSettingsSummary = {

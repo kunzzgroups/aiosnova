@@ -1,4 +1,9 @@
 /* Compact Models directory layout. */
+.ai-model-provider-context { flex: 0 0 auto; padding: 0.5rem 1rem; font-size: 0.8125rem; overflow-wrap: anywhere; }
+.ai-model-capability-notice { flex: 0 0 auto; padding: 0.5rem 1rem; font-size: 0.8125rem; }
+.ai-model-capability-notice summary { cursor: pointer; }
+.ai-model-capability-notice p { margin: 0.5rem 0; }
+.ai-model-capability-notice ul { max-height: 10rem; overflow: auto; margin: 0.5rem 0; padding-left: 1.25rem; overflow-wrap: anywhere; }
 .ai-model-management-actions { display: inline-flex; align-items: center; justify-content: center; }
 .ai-settings-models-page .ai-settings-model-table th:last-child,
 .ai-settings-models-page .ai-settings-model-table td:last-child { width: 7.25rem; min-width: 7.25rem; }

@@ -21,6 +21,7 @@ import { ProviderModelsPage } from '@/modules/ai/settings/pages/ProviderModelsPa
 import { ToolsPage } from '@/modules/ai/settings/pages/ToolsPage'
 import { ToolDetailPage } from '@/modules/ai/settings/pages/ToolDetailPage'
 import { McpPage } from '@/modules/ai/settings/pages/McpPage'
+import { SecurityLimitsPage } from '@/modules/ai/settings/pages/SecurityLimitsPage'
 import { UsersPage } from '@/modules/core/identity/pages/UsersPage'
 import { UserDetailPage } from '@/modules/core/identity/pages/UserDetailPage'
 import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage'
@@ -63,6 +64,7 @@ export function AppRouter() {
             <Route path="/ai/ai/ai-settings/tools" element={<ToolsPage />} />
             <Route path="/ai/ai/ai-settings/tools/:toolId" element={<ToolDetailPage />} />
             <Route path="/ai/ai/ai-settings/mcp" element={<McpPage />} />
+            <Route path="/ai/ai/ai-settings/security-limits" element={<SecurityLimitsPage />} />
 
             <Route path="/system/core/employees" element={<UsersPage />} />
             <Route path="/system/core/employees/:userId" element={<UserDetailPage />} />

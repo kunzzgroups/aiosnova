@@ -29,6 +29,10 @@ const backendTacHandlers = [
   http.patch('/api/identity/roles/:id/status', () => passthrough()),
   http.post('/api/ai/test-connection', () => passthrough()),
   http.get('/api/ai/model-capabilities', () => passthrough()),
+  http.get('/api/ai/openrouter/models', () => passthrough()),
+  http.get('/api/ai/models', () => passthrough()),
+  http.post('/api/ai/models/sync', () => passthrough()),
+  http.patch('/api/ai/models/:id/enabled', () => passthrough()),
 ]
 export const worker = setupWorker(
   ...backendTacHandlers,
