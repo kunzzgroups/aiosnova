@@ -9,6 +9,11 @@ server:
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  test-login:
+    enabled: ${TEST_LOGIN_ENABLED:false}
+    email: ${TEST_LOGIN_EMAIL:}
+    code-sha256: ${TEST_LOGIN_CODE_SHA256:}
+    expires-at: ${TEST_LOGIN_EXPIRES_AT:}
 
 auth:
   tac:

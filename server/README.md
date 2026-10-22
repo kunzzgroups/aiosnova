@@ -57,6 +57,57 @@ The existing role/access pages remain mocked: this extends the backend's direct-
 
 Verification: frontend build, Maven package and rolled-back database checks passed for owner access, default denial, independence from employee management, read-only mutation denial, manage-implies-read, company/membership scope and revoked batch retries. Browser interactions have not been verified; existing Vite chunk/import warnings remain.
 
+# Deployed test-site owner shortcut
+
+For the current unfinished deployed site, the existing login form can accept a fixed
+six-digit test credential for one explicitly configured, already active database owner.
+Enter the email and test code and click Sign in directly: **do not click Send OTP**.
+This skips email OTP delivery and the MFA challenge for that credential only. Normal
+OTP/MFA login remains available and MFA enrollment/policies are not changed.
+
+After deploying this backend, set these **backend** environment variables/secrets:
+
+```properties
+TEST_LOGIN_ENABLED=true
+TEST_LOGIN_EMAIL=your-existing-owner@example.com
+TEST_LOGIN_CODE_SHA256=<lowercase SHA-256 of your chosen six-digit code>
+TEST_LOGIN_EXPIRES_AT=2026-11-01T00:00:00Z
+```
+
+The example expiry is 1 November 2026, 08:00 Singapore time. Choose a suitable future
+UTC expiry for your test window. Generate the hash locally in PowerShell 7 without
+putting the code in command history:
+
+```powershell
+$testLoginCode = Read-Host 'Choose a private six-digit test code' -MaskInput
+if ($testLoginCode -notmatch '^[0-9]{6}$') { throw 'Enter exactly six digits' }
+[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($testLoginCode))).ToLowerInvariant()
+Remove-Variable testLoginCode
+```
+
+Keep the hash in deployment secrets, never in frontend `VITE_*` variables or Git.
+A six-digit hash can be guessed offline; treat it as a secret too. No code or hash is
+preconfigured in this repository. The email must identify the existing active owner of
+the backend's configured `LOCAL_MERCHANT_ID`. The account must have completed invitation
+activation and any required MFA enrollment once; the existing login eligibility check
+still applies before the shortcut. This feature neither creates/activates a
+user nor grants ownership. No schema migration is needed. It works with the deployment's
+existing backend profile/configuration; do not enable `LOCAL_TEST_LOGIN_ENABLED` for it.
+
+The shortcut is disabled by default, fails startup on incomplete enabled configuration,
+expires automatically, uses the existing persisted verification throttle (20 attempts per
+email per 15 minutes), and issues an ordinary database session with a
+`identity.session.deployed_test_login` audit event. Database owner/status/merchant checks
+remain authoritative. Incorrect codes fall back to normal OTP verification.
+Only use this while the deployed site contains test data. Turn `TEST_LOGIN_ENABLED=false`
+and restart/redeploy when testing ends; existing sessions retain their ordinary lifetime
+and disabling the shortcut does not revoke them.
+
+Verification: three unit tests cover credential scope, incorrect codes, expiry, disabled/
+incomplete configuration, inactive/non-owner/foreign-merchant denial and session/audit
+creation. `mvnw.cmd '-Dmaven.repo.local=.m2/repository' clean test package` passed.
+Deployed HTTP, browser and MySQL integration for this shortcut remain unverified.
+
 # Backend development
 
 ## Department removal with employee reassignment (V12)
