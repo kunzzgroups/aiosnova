@@ -23,13 +23,16 @@ public class AuthController {
     private final OtpThrottleService otpThrottleService;
     private final InvitationService invitationService;
     private final SessionService sessions;
+    private final DeployedTestLoginService testLogin;
 
     public AuthController(TacService tacService, OtpThrottleService otpThrottleService,
-                          InvitationService invitationService, SessionService sessions) {
+                          InvitationService invitationService, SessionService sessions,
+                          DeployedTestLoginService testLogin) {
         this.tacService = tacService;
         this.otpThrottleService = otpThrottleService;
         this.invitationService = invitationService;
         this.sessions = sessions;
+        this.testLogin = testLogin;
     }
 
     @PostMapping("/login/tac/send")
@@ -83,6 +86,8 @@ public class AuthController {
                             "Too many verification requests. Try again in "
                                     + retryAfter + " seconds."));
         }
+        var testSession = testLogin.tryLogin(request.email(), request.code(), httpRequest);
+        if (testSession != null) return testSession;
         TacService.VerifyResult result = tacService.verify(request.email(), request.code());
         if (result == TacService.VerifyResult.ATTEMPTS_EXCEEDED) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
