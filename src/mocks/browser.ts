@@ -6,6 +6,7 @@ import { agentHandlers } from '@/mocks/handlers/agentHandlers'
 import { knowledgeHandlers } from '@/mocks/handlers/knowledgeHandlers'
 
 const backendTacHandlers = [
+  http.get('/api/identity/directory', () => passthrough()),
   http.get('/api/identity/organizations/:id/removal-impact', () => passthrough()),
   http.post('/api/identity/organizations/:id/remove', () => passthrough()),
   http.delete('/api/identity/users/:id', () => passthrough()),
@@ -44,8 +45,9 @@ const backendTacHandlers = [
   http.delete('/api/ai/models/:id', () => passthrough()),
   http.post('/api/ai/models/bulk-delete', () => passthrough()),
   http.post('/api/ai/models', () => passthrough()),
-  http.post('/api/ai/models/:id/refresh-capabilities', () => passthrough(),
-),
+  http.post('/api/ai/models/:id/refresh-capabilities', () => passthrough()),
+  http.get('/api/identity/permissions', () => passthrough()),
+  http.put('/api/identity/roles/:id/permissions', () => passthrough()),
 ]
 export const worker = setupWorker(
   ...backendTacHandlers,

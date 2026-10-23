@@ -12,6 +12,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+    '/api/identity/directory': 'http://localhost:8080',
     '/api/identity/users': 'http://localhost:8080',
     '/api/identity/invitation-organization': 'http://localhost:8080',
     '/api/auth/local-test-login': 'http://localhost:8080',
@@ -32,8 +33,9 @@ export default defineConfig({
     '/api/ai/model-capabilities': 'http://127.0.0.1:8081',
     '/api/ai/openrouter/models': 'http://127.0.0.1:8081',
     '/api/ai/chat': 'http://127.0.0.1:8081',
-      '/api/ai/models': 'http://127.0.0.1:8081',
-      '/api/ai/model-preferences': 'http://127.0.0.1:8081',
+    '/api/ai/models': 'http://127.0.0.1:8081',
+    '/api/ai/model-preferences': 'http://127.0.0.1:8081',
+    '/api/identity/permissions': 'http://localhost:8080',
   },
   },
 })

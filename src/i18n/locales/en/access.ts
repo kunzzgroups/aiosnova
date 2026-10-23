@@ -78,4 +78,5 @@ export const access = {
   'access.loading': 'Loading roles...',
   'access.renameFailed': 'Unable to rename role. Please try again.',
   'access.statusFailed': 'Unable to update role status. Please try again.',
+  'access.permissionsSaveFailed': 'Unable to save permissions. Please reload and try again.',
 }

@@ -118,7 +118,7 @@ async function loadSavedDirectory(requestedCompanyId?:string,userId?:string):Pro
   if (!directoryRequests.has(key)) {
     const controller=new AbortController()
     directoryControllers.set(key,{companyId:identityCompanies.find(item=>item.code===company.code)?.id||company.id,controller})
-    const pending=apiRequest<SavedDirectory>('/api/mock/invitations/directory?companyId='+encodeURIComponent(company.id)+(userId ? '&userId='+encodeURIComponent(userId) : ''),{cache:'no-store',auth:true,signal:controller.signal}).then(directory => {
+    const pending=apiRequest<SavedDirectory>('/api/identity/directory?companyId='+encodeURIComponent(company.id)+(userId ? '&userId='+encodeURIComponent(userId) : ''),{cache:'no-store',auth:true,signal:controller.signal}).then(directory => {
       controller.signal.throwIfAborted()
       for (const user of directory.users) {
         const existing = identityUsers.find(item => item.id === user.id || item.email === user.email)
@@ -358,7 +358,7 @@ export const identityHandlers = [
     const token=useAuthStore.getState().accessToken
     const activeCode=identityCompanies.find(company=>company.id===useCompanyStore.getState().companyId)?.code
     const placementCompanyId=token?.startsWith('backend_') ? (await directoryCompanyIds(token)).items.find(company=>company.code===activeCode||company.id===useCompanyStore.getState().companyId)?.id : undefined
-    const response = await fetch(bypass('/api/mock/invitations/users/' + encodeURIComponent(String(params.id)), {
+    const response = await fetch(bypass('/api/identity/users/' + encodeURIComponent(String(params.id)), {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: request.headers.get('Authorization') || '' },
       body: JSON.stringify({ ...profile, ...(assignments ? { companyCodes } : {}),...(profile.departmentId!==undefined||profile.positionId!==undefined ? {placementCompanyId} : {}) }),
     }))

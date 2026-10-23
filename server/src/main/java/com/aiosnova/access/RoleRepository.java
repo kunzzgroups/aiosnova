@@ -71,6 +71,16 @@ public class RoleRepository {
                 roleId);
     }
 
+    public List<PermissionItem> listPermissions() {
+        return jdbc.query("""
+                    SELECT id, code, permission_name
+                    FROM permissions
+                    WHERE code IN ('organization.read', 'organization.manage')
+                    ORDER BY code
+                """, (rs, rowNum) -> new PermissionItem(rs.getString("id"), rs.getString("code"),
+                rs.getString("permission_name")));
+    }
+
     public int renameRole(String merchantId, String roleId, String name, String actorId) {
         return jdbc.update("""
                 UPDATE roles SET name = ?, updated_by = ?
@@ -79,18 +89,84 @@ public class RoleRepository {
     }
 
     public int updateRoleStatus(
-        String merchantId,
-        String roleId,
-        String status,
-        String actorId) {
+            String merchantId,
+            String roleId,
+            String status,
+            String actorId) {
 
-    return jdbc.update("""
-            UPDATE roles
-            SET status = ?, updated_by = ?
-            WHERE merchant_id = ? AND id = ?
-            """,
-            status, actorId, merchantId, roleId);
-}
+        return jdbc.update("""
+                UPDATE roles
+                SET status = ?, updated_by = ?
+                WHERE merchant_id = ? AND id = ?
+                """,
+                status, actorId, merchantId, roleId);
+    }
+
+    public int deleteRolePermissions(String merchantId, String roleId) {
+        return jdbc.update("""
+                DELETE rp
+                FROM role_permissions rp
+                JOIN roles r ON r.id = rp.role_id
+                WHERE r.merchant_id = ?
+                  AND r.id = ?
+                """, merchantId, roleId);
+    }
+
+    public RoleSummary lockRole(String merchantId, String roleId) {
+        List<RoleSummary> rows = jdbc.query("""
+                SELECT r.id, r.name, r.status, r.created_at,
+                (SELECT COUNT(*)
+                FROM user_roles ur
+                WHERE ur.merchant_id = r.merchant_id
+                AND ur.role_id = r.id) AS people_count
+                FROM roles r
+                WHERE r.merchant_id = ? AND r.id = ?
+                FOR UPDATE
+                """, (rs, rowNum) -> new RoleSummary(
+                rs.getString("id"),
+                rs.getString("name"),
+                rs.getString("status"),
+                rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getLong("people_count")),
+                merchantId,
+                roleId);
+        return rows.isEmpty() ? null : rows.getFirst();
+    }
+
+    public int touchRole(String merchantId, String roleId, String actorId) {
+        return jdbc.update("""
+                UPDATE roles
+                SET updated_by = ?, updated_at = CURRENT_TIMESTAMP(6)
+                WHERE merchant_id = ? AND id =?
+                """, actorId, merchantId, roleId);
+    }
+
+    public List<String> userRoleIds(String merchantId, String userId) {
+        return jdbc.query("""
+                SELECT role_id
+                FROM user_roles
+                WHERE merchant_id = ? AND user_id = ?
+                ORDER BY role_id
+                """, (rs, rowNum) -> rs.getString("role_id"), merchantId, userId);
+    }
+
+    public int deleteUserRoles(String merchantId, String userId){
+        return jdbc.update("""
+            DELETE FROM user_roles
+            WHERE merchant_id = ? AND user_id = ?
+            """, merchantId, userId);
+    }
+
+    public void insertUserRole(String id, String merchantId, String userId, String roleId){
+        jdbc.update("""
+            INSERT INTO user_roles (id, merchant_id, user_id, role_id)
+            VALUES (?, ?, ?, ?)
+            """, id, merchantId, userId, roleId);
+    }
+
+    public record PermissionItem(String id, String code, String permissionName) {
+
+    }
 
     public record RoleSummary(String id, String name, String status, LocalDateTime createdAt, long peopleCount) {
     }

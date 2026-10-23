@@ -108,6 +108,44 @@ incomplete configuration, inactive/non-owner/foreign-merchant denial and session
 creation. `mvnw.cmd '-Dmaven.repo.local=.m2/repository' clean test package` passed.
 Deployed HTTP, browser and MySQL integration for this shortcut remain unverified.
 
+# Deployed backend profile
+
+Directory reads use `GET /api/identity/directory?companyId=UUID` with optional
+`userId`, in both local and prod. The controller authenticates the backend session
+and delegates to the existing DirectoryService: actor/grants are re-read, company
+access and merchant scope are checked, unrelated users are rejected, owner/phone
+visibility rules are preserved, and responses are `private, no-store`. The legacy
+local directory route remains for compatibility; other local invitation APIs and
+the mock inbox are not exposed in prod. No database migration is needed.
+
+Deploy frontend and backend together and route `/api/identity/directory` to Spring
+Boot. The current employee UI still uses MSW adapters, so its deployed build needs
+`VITE_ENABLE_MOCK=true`; this change does not replace those adapters or implement
+prod invitation sending/profile-edit endpoints. Do not expose the full local
+controller to make those operations available. API reads still require backend
+authorization regardless of frontend mocks. Real database company codes must
+match the current frontend company catalog mapping for those adapters to work.
+
+Use `SPRING_PROFILES_ACTIVE=prod` to load `application-prod.yml`. This profile
+uses Resend explicitly (no mock email fallback) and reads `DB_HOST`, `DB_PORT`
+(default 3306), `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `AUTH_STORAGE_KEY`,
+`LOCAL_MERCHANT_ID`, `FRONTEND_URL`, `EMAIL_FROM` and `RESEND_API_KEY` from the
+backend environment. It does not import `.env.local`. Set `FRONTEND_URL` to the
+full frontend origin, for example `https://www.aiosnova.com`, without `/login`.
+The existing `TEST_LOGIN_*` mappings remain in shared `application.yml`.
+
+The login eligibility/MFA service is available in prod. Local invitation
+controllers, mock inbox and local test-login endpoint remain excluded. Existing
+accounts must already be activated; this does not add production invitation APIs.
+Apply required database migrations separately; schema initialization is disabled.
+
+Redeploy the backend to apply configuration changes. After the persisted send
+limit expires, request one OTP and inspect backend logs and the Resend delivery
+record. HTTP 429 means sending was blocked before contacting Resend. A successful
+send response means Resend accepted the request, not confirmed inbox delivery.
+Resend rejection logs include the HTTP status; connection/timeout errors are
+logged separately. Never log or share OTPs, API keys or authentication keys.
+
 # Backend development
 
 ## Department removal with employee reassignment (V12)
