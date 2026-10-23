@@ -42,7 +42,7 @@ async function main() {
   }
   await service.fetchProviders('company-j1')
   await service.fetchProviders('company-j2')
-  await assert.rejects(service.createModel({ providerId: 'a', modelId: 'fake/model', name: 'Fake', type: 'chat', enabled: false, contextWindow: 32 }), /同步/)
+  await assert.rejects(service.createModel({ providerId: 'a', modelId: 'fake/model', name: '', type: 'chat', enabled: false, contextWindow: 32 }, 'company-j1'), /Enter a model name/)
   const model = (await service.fetchProviderModels('a','company-j1')).items[0]
   const before = calls.length
   for (const ids of [[], ['a', 'a'], ['a', 'c'], ['a', 'enabled'], Array(101).fill('a')]) {

@@ -2,6 +2,32 @@ spring:
   application:
     name: aiosnova-ai-standalone
 
+  datasource:
+    url: "jdbc:mysql://127.0.0.1:3307/aiosnova_ai_local?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true"
+    username: ai_app
+    password: ${AI_DB_PASSWORD}
+
+  config:
+    import: "optional:file:./.env.ai.local[.properties]"
+
+  sql:
+    init:
+      mode: never
+
 server:
   address: 127.0.0.1
   port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-components: always
+      show-details: never
+
+ai:
+  credentials:
+    storage-key: ${AI_STORAGE_KEY}

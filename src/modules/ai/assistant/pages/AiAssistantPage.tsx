@@ -37,10 +37,9 @@ import type {
 } from '../types/assistant'
 import './AiAssistantPage.css'
 import { fetchAgents } from '@/modules/ai/agents/services/agentService'
+import { resolveAgentModelOption } from '@/modules/ai/agents/services/agentModelSelection'
 import type {
   AgentListItem,
-  AgentModelConfig,
-  AgentModelProvider,
 } from '@/modules/ai/agents/types/agent'
 import { retrieveEvidence } from '../services/assistantService'
 import {
@@ -49,49 +48,33 @@ import {
   type AssistantPreferences,
 } from '../preferences'
 import { AssistantSettingsDrawer } from '../components/AssistantSettingsDrawer'
+import { fetchModelCapabilities } from
+  '@/modules/ai/settings/services/modelCapabilitiesService'
+
+import { assertModelCapabilities } from
+  '@/modules/ai/settings/services/modelExecutionGuard'
+
+import {
+  fetchAssistantModelOptions,
+  resolveExecutableModel,
+  type AssistantModelOption,
+} from '@/modules/ai/settings/services/settingsService'
+import { streamAssistantChat } from '../services/chatStreamService'
+import { assistantModelMenuIds, availableDefaultModelId } from '../services/assistantModelMenu'
+import { fetchModelPreferences } from '@/modules/ai/settings/services/modelPreferencesService'
+import { getModelVendor, MODEL_VENDORS } from '@/modules/ai/settings/services/modelVendor'
 
 /** Which side rails the reader has folded away. Session-scoped, like the sidebar. */
 const PANELS_STORAGE_KEY = 'aios.ai.panels'
 /** v3: threads carry an ISO `updatedAt` instead of a translated label. */
 const THREADS_STORAGE_KEY = 'aios.ai.threads.v3'
-/** Versioned so the old full-catalogue cache is discarded automatically. */
-const MODELS_STORAGE_KEY = 'aios.ai.models.v2'
-/** Full provider catalogue, kept separately so search has something to reach into. */
-const ALL_MODELS_STORAGE_KEY = 'aios.ai.models.all.v1'
-
-const PREFERRED_MODELS = [
-  'openai/gpt-4o',
-  'anthropic/claude-sonnet-4',
-  'google/gemini-2.5-pro',
-  'google/gemini-2.5-flash',
-  'deepseek/deepseek-chat',
-  'meta-llama/llama-3.3-70b-instruct',
-]
-
-const FALLBACK_MODELS = PREFERRED_MODELS
-
 /** Sentinel value meaning "let the assistant route". */
 const AUTO_AGENT_ID = 'auto'
 
 const SYSTEM_PROMPT = 'You are a helpful assistant.'
 const DEFAULT_TEMPERATURE = 0.7
 
-/** OpenRouter expects "provider/model". Map our enum to its prefix. */
-const PROVIDER_PREFIX: Record<AgentModelProvider, string> = {
-  auto: '',
-  openai: 'openai/',
-  anthropic: 'anthropic/',
-  google: 'google/',
-  azure: 'openai/',
-}
 
-function resolveAgentModelId(config?: AgentModelConfig): string | null {
-  if (!config) return null
-  if (config.provider === 'auto') return null
-  if (!config.model) return null
-  const prefix = PROVIDER_PREFIX[config.provider] ?? ''
-  return `${prefix}${config.model}`
-}
 
 function pickDefaultAgentId(agents: AgentListItem[]): string | null {
   if (agents.length === 0) return null
@@ -251,13 +234,15 @@ async function readFileForLLM(
 
 type PendingReply = { question: string; mode: 'append' | 'replace' }
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
 
 function AiModelPicker(props: {
   value: string
   recommended: string[]
   all: string[]
+  labels: Record<string, string>
+  shortLabels: Record<string, string>
+  accountLabels: Record<string, string>
+  vendors: Record<string, string>
   temperature: number
   onTemperatureChange: (next: number) => void
   open: boolean
@@ -271,6 +256,10 @@ function AiModelPicker(props: {
     value,
     recommended,
     all,
+    labels,
+    shortLabels,
+    accountLabels,
+    vendors,
     temperature,
     onTemperatureChange,
     open,
@@ -282,11 +271,15 @@ function AiModelPicker(props: {
   } = props
 
   const [query, setQuery] = useState('')
+  const [browseAll, setBrowseAll] = useState(false)
+  const [vendor, setVendor] = useState('all')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) {
       setQuery('')
+      setBrowseAll(false)
+      setVendor('all')
       return
     }
     const handle = window.setTimeout(() => inputRef.current?.focus(), 0)
@@ -294,11 +287,7 @@ function AiModelPicker(props: {
   }, [open])
 
   const needle = query.trim().toLowerCase()
-  const items = needle
-    ? all.filter((id) => id.toLowerCase().includes(needle))
-    : recommended.includes(value)
-      ? recommended
-      : [value, ...recommended.filter((id) => id !== value)]
+  const items = assistantModelMenuIds({ all, recommended, value, query, vendor, vendors, labels, browseAll })
 
   return (
     <div className="ai-model-picker" data-popover>
@@ -316,14 +305,16 @@ function AiModelPicker(props: {
           if (!lockedFromAgent) onOpenChange(!open)
         }}
         aria-disabled={lockedFromAgent || undefined}
-        title={lockedFromAgent ? lockedFromAgentHint : undefined}
+        title={[labels[value], lockedFromAgent ? lockedFromAgentHint : undefined].filter(Boolean).join('\n')}
       >
         {lockedFromAgent ? (
           <span className="ai-model-picker__lock" aria-label={lockedFromAgentLabel}>
             <IconSpark />
           </span>
         ) : null}
-        {value}
+        <span className="ai-model-picker__name">
+          {shortLabels[value] ?? 'Select an available model'}
+        </span>
         <span className="sidebar-select__chevron" aria-hidden>
           <IconChevron />
         </span>
@@ -356,9 +347,18 @@ function AiModelPicker(props: {
             />
           </div>
 
+          <div className="ai-model-picker__browse">
+            <button type="button" onClick={() => { setBrowseAll(!browseAll); setVendor('all'); setQuery('') }}>
+              {browseAll ? 'Recommended' : `All models (${all.length})`}
+            </button>
+            {browseAll || needle ? <select aria-label="Filter models by vendor" value={vendor} onChange={event => setVendor(event.target.value)}>
+              <option value="all">All vendors</option>
+              {MODEL_VENDORS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select> : <span>Recommended</span>}
+          </div>
           <ul className="ai-model-picker__list" role="listbox">
             {items.length === 0 ? (
-              <li className="ai-model-picker__empty">No models match “{query}”</li>
+              <li className="ai-model-picker__empty">{needle || browseAll ? 'No available models match your filters.' : 'No recommended models yet. Browse all available models or configure recommendations in AI Settings.'}</li>
             ) : (
               items.map((id) => (
                 <li key={id} className="ai-model-picker__item">
@@ -366,6 +366,7 @@ function AiModelPicker(props: {
                     type="button"
                     role="option"
                     aria-selected={id === value}
+                    title={labels[id]}
                     className={['ai-model-picker__option', id === value ? 'is-active' : '']
                       .filter(Boolean)
                       .join(' ')}
@@ -374,7 +375,11 @@ function AiModelPicker(props: {
                       onOpenChange(false)
                     }}
                   >
-                    {id}
+                    <span className="ai-model-picker__option-copy">
+                      <strong>{shortLabels[id] ?? id}</strong>
+                      {all.some(other => other !== id && shortLabels[other] === shortLabels[id]) ? <small>{accountLabels[id]}</small> : null}
+                    </span>
+                    {id === value ? <span className="ai-model-picker__selected-mark" aria-hidden="true">✓</span> : null}
                   </button>
                 </li>
               ))
@@ -419,14 +424,39 @@ export function AiAssistantPage() {
   const [compact, setCompact] = useState(() =>
     window.matchMedia('(max-width: 1180px)').matches,
   )
-  const [errorQuestion, setErrorQuestion] = useState<PendingReply | null>(null)
+  const [errorQuestion, setErrorQuestion] = useState<(PendingReply & { message: string }) | null>(null)
   const [interrupted, setInterrupted] = useState<PendingReply | null>(null)
   const [notConnected, setNotConnected] = useState<PendingReply | null>(null)
 
-  const [recommendedModels, setRecommendedModels] = useState<string[]>(FALLBACK_MODELS)
-  const [allModels, setAllModels] = useState<string[]>(FALLBACK_MODELS)
-  const [model, setModel] = useState<string>(PREFERRED_MODELS[0])
+  const [modelOptions, setModelOptions] =
+    useState<AssistantModelOption[]>([])
+
+  const [modelsCompanyId, setModelsCompanyId] =
+    useState<string | null>(null)
+
+  const [model, setModel] = useState('')
+  const [recommendedIds, setRecommendedIds] = useState<string[]>([])
+
+  const currentModelOptions =
+    modelsCompanyId === companyId ? modelOptions : []
+
+  const allModels = currentModelOptions.map(option => option.id)
+  const recommendedModels = recommendedIds.filter(id => allModels.includes(id))
+  const modelVendors = Object.fromEntries(currentModelOptions.map(option => [option.id, getModelVendor(option.modelId)]))
+
+  const modelLabels = Object.fromEntries(
+    currentModelOptions.map(option => [
+      option.id,
+      `${option.label} · ${option.modelId}`,
+    ])
+  )
   const [temperature, setTemperature] = useState<number>(DEFAULT_TEMPERATURE)
+  const modelShortLabels = Object.fromEntries(
+    currentModelOptions.map(option => [option.id, option.name])
+  )
+  const modelAccountLabels = Object.fromEntries(currentModelOptions.map(option => [option.id,
+    option.label.startsWith(`${option.name} (`) ? option.label.slice(option.name.length + 2, -1) : option.label,
+  ]))
 
   const [openPopover, setOpenPopover] = useState<PopoverId>(null)
   const [streamingText, setStreamingText] = useState<string | null>(null)
@@ -469,12 +499,17 @@ export function AiAssistantPage() {
       agentId !== AUTO_AGENT_ID
         ? activeAgents.find((agent) => agent.id === agentId) ?? null
         : null
-    const override = resolveAgentModelId(selected?.model)
-    return {
-      id: override ?? model,
-      fromAgent: override !== null,
+    try {
+      const bound = resolveAgentModelOption(selected?.model, modelsCompanyId === companyId ? modelOptions : [])
+      if (bound) return { id: bound.id, fromAgent: true }
+    } catch {
+      return { id: '', fromAgent: true }
     }
-  }, [agentId, activeAgents, model])
+    return {
+      id: model,
+      fromAgent: false,
+    }
+  }, [agentId, activeAgents, model, modelOptions, modelsCompanyId, companyId])
 
   const announcement =
     pendingQuestion !== null
@@ -535,42 +570,48 @@ export function AiAssistantPage() {
   }, [threads])
 
   useEffect(() => {
-    try {
-      const cachedAll = window.sessionStorage.getItem(ALL_MODELS_STORAGE_KEY)
-      const cachedCurated = window.sessionStorage.getItem(MODELS_STORAGE_KEY)
-      if (cachedAll && cachedCurated) {
-        setAllModels(JSON.parse(cachedAll) as string[])
-        setRecommendedModels(JSON.parse(cachedCurated) as string[])
-        return
+    let active = true
+
+    abortRef.current?.abort()
+    setModelOptions([])
+    setModelsCompanyId(null)
+    setModel('')
+    setRecommendedIds([])
+    modelRef.current = ''
+
+    async function loadCompanyModels() {
+      try {
+        const [options, preferences] = await Promise.all([
+          fetchAssistantModelOptions(companyId), fetchModelPreferences(companyId),
+        ])
+
+        if (!active) return
+
+        setModelOptions(options)
+        setModelsCompanyId(companyId)
+        setRecommendedIds(preferences.recommendedModelConfigIds)
+        if (preferences.defaultModelConfigId) {
+          const initial = availableDefaultModelId(preferences.defaultModelConfigId, options.map(option => option.id))
+          if (initial) { setModel(initial); modelRef.current = initial }
+          else setMessage('The company default model is unavailable. Select an enabled model or update the company default in AI Settings.')
+        }
+      } catch (error) {
+        if (!active) return
+
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load models for this company.'
+        )
       }
-    } catch {
-      /* fall through to the network fetch */
     }
 
-    fetch(OPENROUTER_MODELS_URL)
-      .then((response) => response.json())
-      .then((payload: { data?: Array<{ id: string }> }) => {
-        const ids = (payload.data ?? []).map((entry) => entry.id).sort()
-        if (ids.length === 0) {
-          return
-        }
-        const curated = PREFERRED_MODELS.filter((id) => ids.includes(id))
-        const nextCurated = curated.length > 0 ? curated : PREFERRED_MODELS
+    void loadCompanyModels()
 
-        setAllModels(ids)
-        setRecommendedModels(nextCurated)
-
-        try {
-          window.sessionStorage.setItem(ALL_MODELS_STORAGE_KEY, JSON.stringify(ids))
-          window.sessionStorage.setItem(MODELS_STORAGE_KEY, JSON.stringify(nextCurated))
-        } catch {
-          /* best-effort */
-        }
-      })
-      .catch(() => {
-        /* offline: keep the shortlist */
-      })
-  }, [])
+    return () => {
+      active = false
+    }
+  }, [companyId])
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1180px)')
@@ -824,11 +865,6 @@ export function AiAssistantPage() {
     mode: 'append' | 'replace',
     files: File[] = [],
   ) {
-    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined
-    if (!apiKey) {
-      setNotConnected({ question, mode })
-      return
-    }
 
     setPendingQuestion(question)
     setErrorQuestion(null)
@@ -847,12 +883,26 @@ export function AiAssistantPage() {
     const effectiveAgentId =
       selectedAgent?.id ?? pickDefaultAgentId(activeAgents)
 
-    const agentModelId = resolveAgentModelId(selectedAgent?.model)
-    const selectedModel = agentModelId ?? modelRef.current
     const selectedTemperature =
       selectedAgent?.model?.temperature ?? temperatureRef.current
 
     try {
+      if (modelsCompanyId !== companyId) {
+        throw new Error('Models for this company have not finished loading.')
+      }
+
+      const selectedOption = resolveAgentModelOption(selectedAgent?.model, modelOptions)
+        ?? modelOptions.find(option => option.id === modelRef.current)
+      if (!selectedOption) {
+        throw new Error('Select an enabled model for this company first.')
+      }
+
+      const execution = resolveExecutableModel(companyId, selectedOption.providerId, selectedOption.id)
+      if (execution.provider.baseUrl.trim() !== 'https://openrouter.ai/api/v1') {
+        throw new Error('This chat endpoint currently supports OpenRouter only.')
+      }
+      const selectedModel = execution.model.modelId.trim()
+
       const history = (threads.find((thread) => thread.id === threadId)?.turns ?? []).flatMap(
         (turn) => [
           { role: 'user' as const, content: turn.question },
@@ -861,6 +911,13 @@ export function AiAssistantPage() {
       )
 
       const attachments = await Promise.all(files.map(readFileForLLM))
+
+      const capabilities = await fetchModelCapabilities(selectedModel)
+
+      assertModelCapabilities(capabilities, {
+        hasImages: attachments.some(file => file.kind === 'image'),
+        usesTools: false,
+      })
 
       const parts: Array<
         | { type: 'text'; text: string }
@@ -898,66 +955,36 @@ export function AiAssistantPage() {
       const userContent =
         parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts
 
-      const response = await fetch(OPENROUTER_URL, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: selectedModel,
+      if (useCompanyStore.getState().companyId !== companyId || controller.signal.aborted) {
+        throw new DOMException('Request cancelled', 'AbortError')
+      }
+      const latest = resolveExecutableModel(companyId, selectedOption.providerId, selectedOption.id)
+      if (
+        latest.model.modelId.trim() !== selectedModel ||
+        latest.provider.baseUrl.trim() !== 'https://openrouter.ai/api/v1'
+      ) {
+        throw new Error('Model configuration changed. Select the model again before sending.')
+      }
+
+      const full = await streamAssistantChat(
+        {
+          companyId,
+          providerId: selectedOption.providerId,
+          modelId: selectedModel,
           temperature: selectedTemperature,
-          stream: true,
           messages: [
             { role: 'system', content: systemWithContext },
             ...history,
             { role: 'user', content: userContent },
           ],
-        }),
-      })
-
-      if (!response.ok || !response.body) {
-        const detail = await response.text().catch(() => '')
-        // eslint-disable-next-line no-console
-        console.error('[assistant] OpenRouter error', response.status, detail)
-        throw new Error(`HTTP ${response.status}`)
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let full = ''
-
-      for (; ;) {
-        const { done, value } = await reader.read()
-        if (done) {
-          break
-        }
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) {
-            continue
-          }
-          const payload = line.slice(6).trim()
-          if (payload === '[DONE]' || payload.length === 0) {
-            continue
-          }
-          try {
-            // ✅ 修复点 3：更加安全的流式解析
-            const parsed = JSON.parse(payload) as any;
-            const content = parsed?.choices?.[0]?.delta?.content;
-            if (typeof content === 'string') {
-              full += content;
-              setStreamingText(full);
-            }
-          } catch {
-            /* half a packet */
-          }
-        }
-      }
+        },
+        {
+          signal: controller.signal,
+          onText: (text) => {
+            setStreamingText(text)
+          },
+        },
+      )
 
       const turn: AssistantTurn = {
         id: `turn-${Date.now()}`,
@@ -981,10 +1008,16 @@ export function AiAssistantPage() {
 
       applyTurn(threadId, turn, mode)
     } catch (error) {
-      if ((error as Error).name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         setInterrupted({ question, mode })
       } else {
-        setErrorQuestion({ question, mode })
+        setErrorQuestion({
+          question,
+          mode,
+          message: error instanceof Error && error.message.trim()
+            ? error.message
+            : t('ai.assistant.errorBody'),
+        })
       }
     } finally {
       setStreamingText(null)
@@ -1535,7 +1568,7 @@ export function AiAssistantPage() {
                       <span className="ai-msg__mark">
                         <IconSpark />
                       </span>
-                      {effectiveModel.id}
+                      {modelLabels[effectiveModel.id] ?? 'Select an available model'}
                     </span>
                     {streamingText ? (
                       <div className="ai-prose">
@@ -1601,7 +1634,7 @@ export function AiAssistantPage() {
                       </span>
                       <div>
                         <h3>{t('ai.assistant.errorTitle')}</h3>
-                        <p>{t('ai.assistant.errorBody')}</p>
+                        <p>{errorQuestion.message}</p>
                       </div>
                       <button
                         type="button"
@@ -1712,11 +1745,18 @@ export function AiAssistantPage() {
                   value={effectiveModel.id}
                   recommended={recommendedModels}
                   all={allModels}
+                  labels={modelLabels}
+                  shortLabels={modelShortLabels}
+                  accountLabels={modelAccountLabels}
+                  vendors={modelVendors}
                   temperature={temperature}
                   onTemperatureChange={setTemperature}
                   open={openPopover === 'model'}
                   onOpenChange={(next) => setOpenPopover(next ? 'model' : null)}
-                  onChange={setModel}
+                  onChange={(id) => {
+                    modelRef.current = id
+                    setModel(id)
+                  }}
                   lockedFromAgent={effectiveModel.fromAgent}
                   lockedFromAgentLabel={t('ai.assistant.modelFromAgent', 'from agent')}
                   lockedFromAgentHint={t(

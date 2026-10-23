@@ -14,6 +14,7 @@ import { useCompanyStore } from '@/stores/companyStore'
 import { fetchKnowledgeBases } from '@/modules/ai/knowledge/services/knowledgeService'
 import type { KnowledgeBaseListItem } from '@/modules/ai/knowledge/types/knowledge'
 import { ApiError } from '@/services/httpClient'
+import { fetchAssistantModelOptions, type AssistantModelOption } from '@/modules/ai/settings/services/settingsService'
 import { createAgent, deleteAgent, fetchAgent, fetchAgents, updateAgent } from '../services/agentService'
 import { IconPlus, IconPencil, IconTrash } from '@/components/icons/Icons'
 import { TablePanel } from '@/components/ui/TablePanel'
@@ -23,7 +24,6 @@ import {
   DEFAULT_AGENT_MODEL,
   type AgentListItem,
   type AgentModelConfig,
-  type AgentModelProvider,
   type AgentStatus,
 } from '../types/agent'
 import '@/modules/ai/shared/AiConsole.css'
@@ -35,22 +35,6 @@ const STATUS_LABEL_KEY: Record<AgentStatus, string> = {
   active: 'ai.agents.statusActive',
   draft: 'ai.agents.statusDraft',
   disabled: 'ai.agents.statusDisabled',
-}
-
-const MODEL_PROVIDERS: Array<{ value: AgentModelProvider; label: string }> = [
-  { value: 'auto', label: 'Auto (recommended)' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'google', label: 'Google' },
-  { value: 'azure', label: 'Azure OpenAI' },
-]
-
-const MODELS_BY_PROVIDER: Record<AgentModelProvider, string[]> = {
-  auto: [''],
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'o3-mini'],
-  anthropic: ['claude-sonnet-4', 'claude-3.5-haiku', 'claude-3-opus'],
-  google: ['gemini-2.0-pro', 'gemini-2.0-flash'],
-  azure: ['gpt-4o-azure', 'gpt-4-turbo-azure'],
 }
 
 export function AgentsPage() {
@@ -90,8 +74,28 @@ export function AgentsPage() {
       ? editingAgent.status === 'active'
       : createStatus === 'active'
 
-  const [provider, setProvider] = useState<AgentModelProvider>('auto')
+  const [provider, setProvider] = useState<'auto' | 'specific'>('auto')
   const [model, setModel] = useState('')
+  const [modelOptions, setModelOptions] = useState<AssistantModelOption[]>([])
+  const [modelOptionsCompany, setModelOptionsCompany] = useState('')
+  const [modelOptionsError, setModelOptionsError] = useState<string | null>(null)
+  const currentModelOptions = modelOptionsCompany === companyId ? modelOptions : []
+
+  useEffect(() => {
+    let active = true
+    setModelOptionsError(null)
+    setModelOptionsCompany('')
+    void fetchAssistantModelOptions(companyId).then(options => {
+      if (!active) return
+      setModelOptions(options)
+      setModelOptionsCompany(companyId)
+    }).catch(caught => {
+      if (active) setModelOptionsError(caught instanceof Error ? caught.message : 'Unable to load company models.')
+    })
+    return () => { active = false }
+  }, [companyId, formOpen])
+
+  useEffect(() => { setFormOpen(false); setEditingId(null) }, [companyId])
   const [temperature, setTemperature] = useState(0.3)
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
@@ -243,8 +247,8 @@ export function AgentsPage() {
 
   function resetModelFields(config?: AgentModelConfig) {
     const c = config ?? DEFAULT_AGENT_MODEL
-    setProvider(c.provider)
-    setModel(c.model)
+    setProvider(c.binding || c.provider !== 'auto' ? 'specific' : 'auto')
+    setModel(c.binding?.modelConfigId ?? '')
     setTemperature(c.temperature)
     setAdvancedOpen(false)
   }
@@ -292,9 +296,9 @@ export function AgentsPage() {
     )
   }
 
-  function onProviderChange(next: AgentModelProvider) {
+  function onProviderChange(next: 'auto' | 'specific') {
     setProvider(next)
-    setModel(MODELS_BY_PROVIDER[next][0] ?? '')
+    setModel('')
   }
 
   async function cycleAgentStatus(agentId: string, current: AgentStatus) {
@@ -357,15 +361,19 @@ export function AgentsPage() {
     setIsSaving(true)
     setError(null)
 
-    const modelPayload: AgentModelConfig = {
-      provider,
-      model,
-      temperature,
-      topP: 1,
-      maxTokens: 2048,
-    }
-
     try {
+      const freshOptions = provider === 'specific' ? await fetchAssistantModelOptions(companyId) : []
+      if (useCompanyStore.getState().companyId !== companyId) throw new Error('The company changed. Reopen the form.')
+      const selected = freshOptions.find(option => option.id === model)
+      if (provider === 'specific' && !selected) throw new Error('Select an enabled database model for this company. Legacy configurations must be reselected.')
+      const modelPayload: AgentModelConfig = {
+        provider: 'auto',
+        model: selected?.modelId ?? '',
+        binding: selected ? { providerId: selected.providerId, modelConfigId: selected.id } : undefined,
+        temperature,
+        topP: 1,
+        maxTokens: 2048,
+      }
       if (editingId) {
         await updateAgent(editingId, {
           name,
@@ -388,7 +396,7 @@ export function AgentsPage() {
       closeForm()
       await load()
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : t('ai.agents.errSave'))
+      setError(caught instanceof Error ? caught.message : t('ai.agents.errSave'))
     } finally {
       setIsSaving(false)
     }
@@ -485,9 +493,9 @@ export function AgentsPage() {
                       </td>
                       <td className="console-table__muted">{agent.description || '—'}</td>
                       <td>
-                        {agent.model && agent.model.provider !== 'auto' ? (
+                        {agent.model && (agent.model.binding || agent.model.provider !== 'auto') ? (
                           <span className="console-chip">
-                            {agent.model.provider} · {agent.model.model || '—'}
+                            {currentModelOptions.find(option => option.id === agent.model?.binding?.modelConfigId && option.providerId === agent.model.binding.providerId)?.label ?? (agent.model.binding ? 'Bound model unavailable' : 'Legacy configuration: reselect a model')}
                           </span>
                         ) : (
                           <span className="console-chip console-chip--muted">
@@ -694,24 +702,21 @@ export function AgentsPage() {
           <div className="console-form__section">
             <h4>{t('ai.agents.modelTitle', 'Model')}</h4>
             <p>
-              {t(
-                'ai.agents.modelHint',
-                'Which LLM this agent uses. Auto picks the best model for its knowledge.',
-              )}
+              Follow the current Assistant selection or bind an enabled model configuration from this company. Reselect and save legacy configurations.
             </p>
 
             <div className="console-form__grid">
               <FormField
-                label={t('ai.agents.fieldProvider', 'Provider')}
+                label="Model selection"
                 htmlFor="agent-provider"
               >
                 <SidebarSelect
                   id="agent-provider"
                   className="console-form-select--down"
-                  label={t('ai.agents.fieldProvider', 'Provider')}
+                  label="Model selection"
                   value={provider}
-                  options={MODEL_PROVIDERS}
-                  onChange={(value) => onProviderChange(value as AgentModelProvider)}
+                  options={[{ value: 'auto', label: 'Follow Assistant selection' }, { value: 'specific', label: 'Use a specific model' }]}
+                  onChange={(value) => onProviderChange(value as 'auto' | 'specific')}
                   disabled={isSaving}
                 />
               </FormField>
@@ -724,16 +729,18 @@ export function AgentsPage() {
                   id="agent-model"
                   label={t('ai.agents.fieldModel', 'Model')}
                   value={model}
-                  options={MODELS_BY_PROVIDER[provider].map((m) => ({
-                    value: m,
-                    label: m || t('ai.agents.modelAuto', 'Auto'),
-                  }))}
+                  options={[
+                    { value: '', label: provider === 'auto' ? 'Follow Assistant selection' : 'Select a model configuration' },
+                    ...currentModelOptions.map(option => ({ value: option.id, label: `${option.label} · ${option.modelId}` })),
+                    ...(model && !currentModelOptions.some(option => option.id === model) ? [{ value: model, label: 'Original binding unavailable; select a replacement' }] : []),
+                  ]}
                   onChange={setModel}
-                  disabled={isSaving || provider === 'auto'}
+                  disabled={isSaving || provider === 'auto' || modelOptionsCompany !== companyId}
                 />
               </FormField>
             </div>
 
+            {modelOptionsError ? <p role="alert">{modelOptionsError}</p> : null}
             <button
               type="button"
               className="console-form__toggle"

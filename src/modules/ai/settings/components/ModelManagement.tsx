@@ -1,5 +1,6 @@
 import { useDisabledSelection } from '../hooks/useDisabledSelection'
 import { rememberModelProvider } from '../services/modelProviderSelection'
+import { MODEL_VENDORS, getModelVendor, type ModelVendor } from '../services/modelVendor'
 import { useCompanyStore } from '@/stores/companyStore'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import {
@@ -19,9 +20,10 @@ import { IconButton } from '@/components/ui/IconButton'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { TablePanel } from '@/components/ui/TablePanel'
 import { TableToolbar } from '@/components/ui/TableToolbar'
+import { RowMenu } from '@/components/ui/RowMenu'
 import { ModelsPagination } from './ModelsPagination'
 import { modelTableLayout } from '../services/modelTableLayout'
-import { IconPlus, IconTrash, IconPower, IconPencil, IconX, IconRefresh } from '@/components/icons/Icons'
+import { IconPlus, IconTrash, IconPencil, IconX, IconRefresh, IconCircleCheck } from '@/components/icons/Icons'
 import { TextField } from '@/components/ui/TextField'
 
 import {
@@ -32,8 +34,9 @@ import {
   fetchProvider,
   fetchProviderModels,
   setModelEnabled,
-  syncProviderModels,
+  setModelsEnabled,
   updateModel,
+  refreshModelCapabilities,
 } from '../services/settingsService'
 
 import type {
@@ -62,12 +65,22 @@ type ModelManagementProps = {
 
 export function ModelManagement({ providerId, initialCreate = false, onBusyChange, onClose }: ModelManagementProps) {
   const companyId = useCompanyStore((state) => state.companyId)
-  const [pendingBulk, setPendingBulk] = useState<{ ids: string[]; scope: string; companyId: string } | null>(null)
+  const [selecting, setSelecting] = useState(false)
+  const [pendingBulk, setPendingBulk] = useState<{
+    ids: string[]
+    items: AiModel[]
+    scope: string
+    companyId: string
+  } | null>(null)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [pendingState, setPendingState] = useState<{
+    enabled: boolean; companyId: string; providerId: string; items: { id: string; version: number }[]
+  } | null>(null)
+  const [stateError, setStateError] = useState<string | null>(null)
   const bulkSubmittingRef = useRef(false)
   const currentScopeRef = useRef(providerId)
   currentScopeRef.current = providerId
-  useEffect(() => { setPendingBulk(null); setBulkError(null) }, [providerId, companyId])
+  useEffect(() => { setPendingBulk(null); setBulkError(null); setPendingState(null); setStateError(null) }, [providerId, companyId])
   const [pendingDelete, setPendingDelete] = useState<AiModel | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -92,6 +105,9 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>('all')
 
+  const [vendorFilter, setVendorFilter] =
+    useState<ModelVendor | 'all'>('all')
+
   const [error, setError] =
     useState<string | null>(null)
 
@@ -104,6 +120,9 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
   const [editingId, setEditingId] =
     useState<string | null>(null)
+
+  const [editingVersion, setEditingVersion] =
+    useState<number | null>(null)
 
   const [name, setName] =
     useState('')
@@ -118,22 +137,21 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     useState(128000)
 
   const [enabled, setEnabled] =
-    useState(true)
+    useState(false)
 
   const [description, setDescription] =
     useState('')
 
   const [isSaving, setIsSaving] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [isSyncing, setIsSyncing] = useState(false)
   const mutationRef = useRef(false)
   const loadSequence = useRef(0)
   const currentCompanyRef = useRef(companyId)
   currentCompanyRef.current = companyId
 
   useEffect(() => {
-    onBusyChange?.(isSaving || isDeleting || isUpdating || isLoading || formOpen || pendingDelete !== null || pendingBulk !== null)
-  }, [onBusyChange, isSaving, isDeleting, isUpdating, isLoading, formOpen, pendingDelete, pendingBulk])
+    onBusyChange?.(isSaving || isDeleting || isUpdating || isLoading || formOpen || pendingDelete !== null || pendingBulk !== null || pendingState !== null)
+  }, [onBusyChange, isSaving, isDeleting, isUpdating, isLoading, formOpen, pendingDelete, pendingBulk, pendingState])
 
   const load = useCallback(async () => {
     if (!providerId) return
@@ -184,6 +202,10 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
         query.trim().toLowerCase()
 
       return models
+        .filter(model =>
+          vendorFilter === 'all' ||
+          getModelVendor(model.modelId) === vendorFilter
+        )
         .filter(
           (model) =>
             statusFilter === 'all' ||
@@ -202,24 +224,63 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
         .sort((a, b) =>
           a.name.localeCompare(b.name),
         )
-    }, [models, query, statusFilter])
+    }, [models, query, statusFilter, vendorFilter])
 
   const effectivePageSize = pageSize || autoPageSize
   const pageCount = Math.max(1, Math.ceil(visibleModels.length / effectivePageSize))
   const currentPage = Math.min(page, pageCount)
   const paginatedModels = visibleModels.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize)
-  const selection = useDisabledSelection(visibleModels, paginatedModels, statusFilter, query, `${companyId}:${providerId}`)
-  const bulkItems = models.filter(item => pendingBulk?.ids.includes(item.id))
+  const selection = useDisabledSelection(visibleModels, paginatedModels, selecting ? statusFilter : 'all', query, `${companyId}:${providerId}:${vendorFilter}`)
+  useEffect(() => { setSelecting(false) }, [providerId, companyId, vendorFilter, query])
+  const bulkItems = pendingBulk?.items ?? []
+  const enableTargets = visibleModels.filter(item => item.status !== 'enabled' && item.capabilities && item.capabilitiesCheckedAt && !item.capabilityError)
+  const disableTargets = visibleModels.filter(item => item.status === 'enabled')
+
+  function requestStateChange(enabled: boolean) {
+    const targets = enabled ? enableTargets : disableTargets
+    setStateError(null)
+    setPendingState({ enabled, companyId, providerId, items: targets.map(item => ({ id: item.id, version: item.version })) })
+  }
+
+  async function confirmStateChange() {
+    const target = pendingState
+    if (!target || mutationRef.current || target.companyId !== useCompanyStore.getState().companyId || target.providerId !== currentScopeRef.current) return
+    mutationRef.current = true; setIsUpdating(true); setStateError(null)
+    try {
+      await setModelsEnabled(target.companyId, target.providerId, target.enabled, target.items)
+      if (target.companyId !== useCompanyStore.getState().companyId || target.providerId !== currentScopeRef.current) return
+      setPendingState(null); selection.clear(); await load()
+      setMessage(`${target.items.length} models ${target.enabled ? 'enabled' : 'disabled'}. Assistant recommendations remain separate.`)
+    } catch (caught) {
+      if (target.companyId === useCompanyStore.getState().companyId && target.providerId === currentScopeRef.current)
+        setStateError(caught instanceof Error ? caught.message : 'Unable to update models.')
+    }
+    finally { mutationRef.current = false; setIsUpdating(false) }
+  }
 
   useEffect(() => {
     if (tableRef.current) tableRef.current.scrollTop = 0
-  }, [query, statusFilter, currentPage, effectivePageSize, pageSize, providerId])
+  }, [query, statusFilter, vendorFilter, currentPage, effectivePageSize, pageSize, providerId])
 
 
   // 条件变化时重置页码
   useEffect(() => {
     setPage(1)
-  }, [query, statusFilter, effectivePageSize, pageSize, providerId])
+  }, [query, statusFilter, vendorFilter, effectivePageSize, pageSize, providerId])
+
+  useEffect(() => {
+    setPendingBulk(null)
+    setBulkError(null)
+  }, [vendorFilter])
+
+  useEffect(() => {
+    setVendorFilter('all')
+  }, [companyId, providerId])
+
+  useEffect(() => {
+    setPendingDelete(null)
+    setDeleteError(null)
+  }, [companyId, providerId])
 
   // Count complete natural-height rows in the space above the fixed footer.
   useEffect(() => {
@@ -266,17 +327,18 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
       cancelAnimationFrame(frame)
       table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => row.style.removeProperty('height'))
     }
-  }, [isLoading, visibleModels.length, pageSize, currentPage, effectivePageSize, pageCount, providerId, query, statusFilter])
+  }, [isLoading, visibleModels.length, pageSize, currentPage, effectivePageSize, pageCount, providerId, query, statusFilter, vendorFilter])
 
 
   function resetForm() {
     setOpenFormSelect(null)
     setEditingId(null)
+    setEditingVersion(null)
     setName('')
     setModelId('')
     setType('chat')
     setContextWindow(128000)
-    setEnabled(true)
+    setEnabled(false)
     setDescription('')
     setError(null)
   }
@@ -298,6 +360,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
   function openEdit(model: AiModel) {
     setOpenFormSelect(null)
     setEditingId(model.id)
+    setEditingVersion(model.version)
     setName(model.name)
     setModelId(model.modelId)
     setType(model.type)
@@ -320,7 +383,15 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
   ) {
     event.preventDefault()
 
-    if (!provider) return
+    if (
+      !provider ||
+      provider.id !== providerId ||
+      provider.companyId !== companyId ||
+      useCompanyStore.getState().companyId !== companyId
+    ) {
+      setError('The company or Provider changed. Reopen this page.')
+      return
+    }
 
     if (
       !name.trim() ||
@@ -333,11 +404,12 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     }
 
     if (
-      !Number.isFinite(contextWindow) ||
-      contextWindow <= 0
+      !Number.isSafeInteger(contextWindow) ||
+      contextWindow < 0 ||
+      contextWindow > 2147483647
     ) {
       setError(
-        'Context window must be greater than zero.',
+        'Context window must be an integer from 0 to 2147483647; 0 means unknown.',
       )
       return
     }
@@ -357,20 +429,24 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
       }
 
       if (editingId) {
+        if (editingVersion === null) {
+          throw new Error('Missing edit version. Close and reopen the form.')
+        }
+
         await updateModel(
           editingId,
           payload,
+          companyId,
+          editingVersion,
         )
 
         setMessage(
           'Model updated successfully.',
         )
       } else {
-        await createModel(payload)
+        await createModel(payload, companyId)
 
-        setMessage(
-          'Model added successfully.',
-        )
+        setMessage('Model created and disabled by default. Load capabilities before enabling.')
       }
 
       setFormOpen(false)
@@ -437,79 +513,190 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     }
   }
 
-  async function handleDelete() {
-    if (!pendingDelete || isDeleting || pendingDelete.status !== 'disabled' || pendingDelete.providerId !== providerId || useCompanyStore.getState().companyId !== companyId) return
-    setIsDeleting(true)
-    setDeleteError(null)
-    try {
-      await deleteModel(pendingDelete.id)
-      setPendingDelete(null)
-      setMessage('Model deleted successfully.')
-      await load()
-    } catch (caught) {
-      setDeleteError(caught instanceof Error ? caught.message : 'Unable to delete model.')
-    } finally { setIsDeleting(false) }
-  }
-
-  async function handleSyncModels() {
+  async function handleRefreshCapabilities(model: AiModel) {
     if (
-      mutationRef.current || isLoading || isDeleting || isSaving ||
-      formOpen || pendingDelete || pendingBulk ||
-      !provider || provider.companyId !== companyId ||
-      useCompanyStore.getState().companyId !== companyId ||
-      provider.baseUrl.trim() !== 'https://openrouter.ai/api/v1'
+      mutationRef.current ||
+      isLoading ||
+      isDeleting ||
+      isSaving ||
+      formOpen ||
+      pendingDelete ||
+      pendingBulk ||
+      pendingState ||
+      model.providerId !== providerId ||
+      provider?.companyId !== companyId ||
+      provider.baseUrl.trim() !== 'https://openrouter.ai/api/v1' ||
+      useCompanyStore.getState().companyId !== companyId
     ) return
 
     const scope = providerId
-    const syncCompany = companyId
-    const isCurrent = () => currentScopeRef.current === scope &&
-      useCompanyStore.getState().companyId === syncCompany
+    const refreshCompany = companyId
+
+    const isCurrent = () =>
+      currentScopeRef.current === scope &&
+      useCompanyStore.getState().companyId === refreshCompany
+
     mutationRef.current = true
     setIsUpdating(true)
-    setIsSyncing(true)
     setError(null)
     setMessage(null)
 
     try {
-      const result = await syncProviderModels(syncCompany, scope)
+      const updated = await refreshModelCapabilities(
+        refreshCompany,
+        scope,
+        model.id,
+        model.version,
+      )
+
       if (!isCurrent()) return
-      selection.clear()
-      setPage(1)
+
       await load()
+
       if (!isCurrent()) return
-      setMessage(`同步完成：新增 ${result.created} 个，更新 ${result.updated} 个。新模型默认停用，已有状态保留。`)
+
+      if (updated.capabilityError || !updated.capabilities) {
+        setError(
+          updated.capabilityError ??
+          'Catalog capability metadata is incomplete and was saved as unknown.',
+        )
+      } else {
+        setMessage('Capabilities updated. The name and enabled state are unchanged.')
+      }
     } catch (caught) {
-      if (isCurrent()) setError(caught instanceof Error ? caught.message : '模型同步失败。')
+      if (!isCurrent()) return
+
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to refresh model capabilities.',
+      )
     } finally {
       mutationRef.current = false
-      setIsSyncing(false)
       setIsUpdating(false)
     }
   }
 
+  async function handleDelete() {
+    if (
+      !pendingDelete ||
+      isDeleting ||
+      mutationRef.current ||
+      pendingDelete.status !== 'disabled' ||
+      pendingDelete.providerId !== providerId ||
+      useCompanyStore.getState().companyId !== companyId
+    ) return
+
+    const target = pendingDelete
+    const deleteCompany = companyId
+    const deleteProvider = providerId
+
+    const isCurrent = () =>
+      currentScopeRef.current === deleteProvider &&
+      useCompanyStore.getState().companyId === deleteCompany
+
+    mutationRef.current = true
+    setIsDeleting(true)
+    setDeleteError(null)
+
+    try {
+      await deleteModel(
+        target.id,
+        deleteCompany,
+        deleteProvider,
+        target.version,
+      )
+
+      if (!isCurrent()) return
+
+      setPendingDelete(null)
+      setMessage('Model deleted successfully.')
+      await load()
+    } catch (caught) {
+      if (!isCurrent()) return
+
+      setDeleteError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to delete model.',
+      )
+    } finally {
+      mutationRef.current = false
+      setIsDeleting(false)
+    }
+  }
+
   async function removeSelectedModels() {
-    if (!pendingBulk || useCompanyStore.getState().companyId !== pendingBulk.companyId || pendingBulk.ids.length < 2 || bulkSubmittingRef.current || isDeleting || currentScopeRef.current !== pendingBulk.scope) return
-    if (bulkItems.length !== pendingBulk.ids.length || bulkItems.some(item => item.status !== 'disabled')) {
-      setBulkError('The selection has changed. Select disabled items again.')
+    const target = pendingBulk
+
+    if (
+      !target ||
+      target.items.length < 2 ||
+      target.items.length > 100 ||
+      bulkSubmittingRef.current ||
+      mutationRef.current ||
+      isDeleting ||
+      useCompanyStore.getState().companyId !== target.companyId ||
+      currentScopeRef.current !== target.scope
+    ) return
+
+    if (
+      target.items.length !== target.ids.length ||
+      target.items.some(item =>
+        item.status !== 'disabled' ||
+        item.providerId !== target.scope
+      )
+    ) {
+      setBulkError('Selected models cannot be deleted. Select disabled models again.')
       return
     }
+
+    const isCurrent = () =>
+      useCompanyStore.getState().companyId === target.companyId &&
+      currentScopeRef.current === target.scope
+
     bulkSubmittingRef.current = true
-    const deletingScope = pendingBulk.scope
-    const deletingCompanyId = pendingBulk.companyId
+    mutationRef.current = true
     setBulkError(null)
     setIsDeleting(true)
+
     try {
-      await deleteModels(deletingScope, pendingBulk.ids)
-      if (useCompanyStore.getState().companyId !== deletingCompanyId || currentScopeRef.current !== deletingScope) return
-      const deleted = new Set(pendingBulk.ids)
-      setModels(current => current.filter(item => !deleted.has(item.id)))
+      await deleteModels(
+        target.companyId,
+        target.scope,
+        target.items.map(item => ({
+          id: item.id,
+          version: item.version,
+        })),
+      )
+
+      if (!isCurrent()) return
+
+      const deletedIds = new Set(target.ids)
+
+      setModels(current =>
+        current.filter(item =>
+          item.providerId !== target.scope ||
+          !deletedIds.has(item.id)
+        )
+      )
+
       selection.clear()
       setPendingBulk(null)
-      setMessage(`Removed ${deleted.size} models successfully.`)
+      setMessage(`Removed ${deletedIds.size} models successfully.`)
+
+      await load()
     } catch (caught) {
-      if (useCompanyStore.getState().companyId === deletingCompanyId && currentScopeRef.current === deletingScope) setBulkError(caught instanceof Error ? caught.message : 'Unable to remove selected models.')
+      if (!isCurrent()) return
+
+      setBulkError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to remove selected models.',
+      )
     } finally {
       bulkSubmittingRef.current = false
+      mutationRef.current = false
       setIsDeleting(false)
     }
   }
@@ -529,11 +716,10 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
       <div className="console-page console-page--internal-table-scroll ai-settings-models-page">
         <TablePanel>
-          {provider ? <div className="ai-model-provider-context" title={provider.id}>Provider: <strong>{provider.name}</strong></div> : null}
+          <div className="ai-model-scope-heading"><strong title={provider?.name}>{provider?.name ?? 'Provider models'}</strong><small>Models configured for this Provider only.</small></div>
           <TableToolbar
             search={
               <TextField
-                className="ui-table-toolbar__search"
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -542,6 +728,19 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
               />
             }
             filters={
+              <>
+              <SidebarSelect
+                id="model-vendor-filter"
+                label="Model vendor"
+                hideLabel
+                value={vendorFilter}
+                options={[
+                  { value: 'all', label: 'All vendors' },
+                  ...MODEL_VENDORS.map(item => ({ value: item.value, label: item.label })),
+                ]}
+                onChange={value => setVendorFilter(value as ModelVendor | 'all')}
+                disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null || pendingState !== null}
+              />
               <SidebarSelect
                 id="model-status-filter"
                 label="Model status"
@@ -555,14 +754,24 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
                 ]}
                 onChange={(value) => setStatusFilter(value as StatusFilter)}
               />
+              </>
             }
             actions={<>
-              {provider?.baseUrl.trim() === 'https://openrouter.ai/api/v1' ? (
-                <Button variant="secondary" onClick={() => void handleSyncModels()} disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null}>
-                  <IconRefresh />{isSyncing ? '同步中…' : '同步模型'}
-                </Button>
-              ) : null}
-              {selection.selected.length > 1 ? <Button variant="danger" disabled={isDeleting || isLoading || isUpdating} onClick={() => { setBulkError(null); setPendingBulk({ ids: selection.selected.map(item => item.id), scope: providerId, companyId }) }}><IconTrash aria-hidden="true" />Remove</Button> : null}
+              <Button variant="secondary" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen} onClick={() => { selection.clear(); if (!selecting) setStatusFilter('disabled'); setSelecting(value => !value) }}>{selecting ? 'Done' : 'Select'}</Button>
+              <RowMenu label="Provider model actions" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || !!pendingDelete || !!pendingBulk || !!pendingState}
+                items={[
+                  ...(enableTargets.length && enableTargets.length <= 1000 ? [{ id: 'enable-filtered', label: `Enable filtered models (${enableTargets.length})`, onSelect: () => requestStateChange(true) }] : []),
+                  ...(disableTargets.length && disableTargets.length <= 1000 ? [{ id: 'disable-filtered', label: `Disable filtered models (${disableTargets.length})`, onSelect: () => requestStateChange(false) }] : []),
+                ]} />
+              {selecting && selection.selected.length > 0 ? <Button variant="danger" disabled={isDeleting || isLoading || isUpdating} onClick={() => {
+                setBulkError(null); setPendingBulk({
+                  ids: selection.selected.map(item => item.id),
+                  items: structuredClone(selection.selected),
+                  scope: providerId,
+                  companyId,
+                })
+              }}><IconTrash aria-hidden="true" />Remove</Button> : null}
+              <IconButton label="Reload models" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || !!pendingDelete || !!pendingBulk || !!pendingState} onClick={() => void load()}><IconRefresh /></IconButton>
               <Button onClick={openCreate} disabled={!provider || isDeleting || isLoading || isUpdating}><IconPlus />Add Model</Button>
               {onClose ? <IconButton label="Close model manager" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || pendingDelete !== null || pendingBulk !== null} onClick={onClose}><IconX /></IconButton> : null}
             </>}
@@ -570,8 +779,8 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
           {!isLoading && capabilityWarnings.length > 0 ? (
             <details className="ai-model-capability-notice">
-              <summary>{capabilityWarnings.length} 个模型的能力未知</summary>
-              <p>模型列表已加载。这些模型的能力信息不完整，其他模型仍可正常查看。</p>
+              <summary>{capabilityWarnings.length} models have unknown capabilities</summary>
+              <p>The list is loaded. These models have incomplete capability metadata; other models remain available.</p>
               <ul>
                 {capabilityWarnings.map(warning => <li key={warning}>{warning}</li>)}
               </ul>
@@ -589,10 +798,10 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
               </strong>
 
               <p>
-                {models.length ? 'No models match the current search and status filters.' : provider?.baseUrl.trim() === 'https://openrouter.ai/api/v1' ? '点击“同步模型”读取真实目录。新模型默认停用；启用后可供 Assistant 使用。' : 'Add a model for this provider to make it available to agents.'}
+                {models.length ? 'No models match the current filters.' : 'Sync the catalog from Provider details, or add a model manually.'}
               </p>
 
-              {models.length ? <Button variant="secondary" onClick={() => { setQuery(''); setStatusFilter('all') }}>Clear filters</Button> : <Button
+              {models.length ? <Button variant="secondary" onClick={() => { setQuery(''); setStatusFilter('all'); setVendorFilter('all') }}>Clear filters</Button> : <Button
                 onClick={openCreate}
                 disabled={!provider || isUpdating || isDeleting || isLoading}
               >
@@ -695,17 +904,15 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
                         <td className="console-table__actions identity-table__actions">
                           <div className="identity-inline-actions identity-directory-actions ai-model-management-actions">
                             {model.status === 'disabled' ? (
-                              <IconButton label={`Delete ${model.name}`} variant="danger" disabled={isDeleting || isUpdating} onClick={() => { setDeleteError(null); setPendingDelete(model) }}><IconTrash /></IconButton>
+                              <IconButton label={`Delete ${model.name}`} variant="danger" disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || !!pendingDelete || !!pendingBulk || !!pendingState} onClick={() => { setDeleteError(null); setPendingDelete(structuredClone(model)) }}><IconTrash /></IconButton>
                             ) : (
-                              <IconButton label={`Edit ${model.name}`} disabled={isDeleting || isUpdating} onClick={() => openEdit(model)}><IconPencil /></IconButton>
+                              <IconButton label={`Edit ${model.name}`} disabled={isLoading || isSaving || isDeleting || isUpdating || formOpen || !!pendingDelete || !!pendingBulk || !!pendingState} onClick={() => openEdit(model)}><IconPencil /></IconButton>
                             )}
                             <IconButton
-                              label={model.status === 'disabled' ? `Enable ${model.name}` : `Disable ${model.name}`}
-                              variant={model.status === 'disabled' ? 'secondary' : 'ghost'}
-                              disabled={isDeleting || isUpdating}
-                              aria-pressed={model.status !== 'disabled'}
-                              onClick={() => void toggleModel(model)}
-                            ><IconPower /></IconButton>
+                              label={`Refresh capabilities for ${model.name}`}
+                              disabled={provider?.baseUrl.trim() !== 'https://openrouter.ai/api/v1' || isLoading || isSaving || isDeleting || isUpdating || formOpen || !!pendingDelete || !!pendingBulk || !!pendingState}
+                              onClick={() => void handleRefreshCapabilities(model)}
+                            ><IconCircleCheck /></IconButton>
                           </div>
                         </td>
                       </tr>
@@ -729,6 +936,16 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
           />
         </TablePanel>
       </div>
+
+      <ConfirmDialog
+        open={pendingState !== null}
+        title={`${pendingState?.enabled ? 'Enable' : 'Disable'} ${pendingState?.items.length ?? 0} filtered models?`}
+        description="This updates all captured filtered results, across pages, as one transaction. If any version changed, no models are updated."
+        warning={pendingState?.enabled ? 'Enabled models become available under Browse all. This does not add them to recommendations.' : 'Bound Agents and any company default using these models will become unavailable until re-enabled or reassigned.'}
+        confirmLabel={pendingState?.enabled ? 'Enable models' : 'Disable models'}
+        cancelLabel="Cancel" busyLabel="Updating…" busy={isUpdating} error={stateError}
+        onConfirm={() => void confirmStateChange()} onCancel={() => { if (!isUpdating) setPendingState(null) }}
+      />
 
       <ConfirmDialog
         variant="deletion"
@@ -844,7 +1061,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
                   )
                 }
                 placeholder="gpt-5"
-                disabled={isSaving}
+                disabled={isSaving || editingId !== null}
               />
             </FormField>
           </SettingsEditorSection>
@@ -891,13 +1108,14 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
             </FormField>
 
             <FormField
-              label="Context Window"
+              label="Context Window (0 = unknown)"
               htmlFor="model-context-window"
             >
               <TextField
                 id="model-context-window"
                 type="number"
-                min="1"
+                min="0"
+                max="2147483647"
                 step="1"
                 value={String(
                   contextWindow,
@@ -951,7 +1169,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
                     'enabled',
                   )
                 }
-                disabled={isSaving}
+                disabled={isSaving || editingId === null}
               />
             </FormField>
 
@@ -980,7 +1198,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
 
 function formatContext(value: number | null) {
   if (value === null) {
-    return '未知'
+    return 'Unknown'
   }
   if (value >= 1_000_000) {
     return `${(

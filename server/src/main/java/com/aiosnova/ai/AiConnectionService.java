@@ -36,21 +36,21 @@ public class AiConnectionService {
         if (input.baseUrl() == null || input.baseUrl().isBlank()) {
             return Map.of(
                 "ok", false,
-                "message", "请填写模型服务地址"
+                "message", "Enter the model service URL."
             );
         }
 
         if (input.apiKey() == null || input.apiKey().isBlank()) {
             return Map.of(
                 "ok", false,
-                "message", "请填写 API Key"
+                "message", "Enter an API Key."
             );
         }
 
         if (input.modelId() == null || input.modelId().isBlank()) {
             return Map.of(
                 "ok", false,
-                "message", "请填写模型 ID"
+                "message", "Enter a model ID."
             );
         }
 
@@ -58,7 +58,7 @@ public class AiConnectionService {
         if (!"https://openrouter.ai/api/v1".equals(input.baseUrl().trim())) {
             return Map.of(
                 "ok", false,
-                "message", "当前测试仅支持 https://openrouter.ai/api/v1"
+                "message", "Connection tests currently support https://openrouter.ai/api/v1 only."
             );
         }
 
@@ -103,21 +103,21 @@ public class AiConnectionService {
             if (response.statusCode() == 401) {
                 return Map.of(
                     "ok", false,
-                    "message", "认证失败，请检查 OpenRouter API Key"
+                    "message", "Authentication failed. Check the OpenRouter API Key."
                 );
             }
 
             if (response.statusCode() == 402) {
                 return Map.of(
                     "ok", false,
-                    "message", "OpenRouter 额度不足，请检查余额或密钥额度"
+                    "message", "Insufficient OpenRouter credits. Check your balance or key limits."
                 );
             }
 
             if (response.statusCode() == 429) {
                 return Map.of(
                     "ok", false,
-                    "message", "请求达到频率限制，请稍后再试"
+                    "message", "Rate limit reached. Try again later."
                 );
             }
 
@@ -125,7 +125,7 @@ public class AiConnectionService {
                 return Map.of(
                     "ok", false,
                     "message",
-                    "模型请求失败，HTTP 状态码：" + response.statusCode()
+                    "Model request failed. HTTP status: " + response.statusCode()
                 );
             }
 
@@ -135,7 +135,7 @@ public class AiConnectionService {
             if (responseJson.has("error")) {
                 return Map.of(
                     "ok", false,
-                    "message", "OpenRouter 返回了错误，未获得模型回答"
+                    "message", "OpenRouter returned an error instead of a model reply."
                 );
             }
 
@@ -148,20 +148,20 @@ public class AiConnectionService {
             if (!content.isTextual() || content.asString().isBlank()) {
                 return Map.of(
                     "ok", false,
-                    "message", "模型没有返回有效的文字回答"
+                    "message", "The model returned no valid text reply."
                 );
             }
 
             return Map.of(
                 "ok", true,
-                "message", "模型连接成功",
+                "message", "Model connection successful.",
                 "reply", content.asString()
             );
 
         } catch (HttpTimeoutException error) {
             return Map.of(
                 "ok", false,
-                "message", "模型请求超时"
+                "message", "Model request timed out."
             );
 
         } catch (InterruptedException error) {
@@ -169,19 +169,19 @@ public class AiConnectionService {
 
             return Map.of(
                 "ok", false,
-                "message", "模型请求被中断"
+                "message", "Model request was interrupted."
             );
 
         } catch (IOException error) {
             return Map.of(
                 "ok", false,
-                "message", "无法连接模型服务"
+                "message", "Unable to connect to the model service."
             );
 
         } catch (RuntimeException error) {
             return Map.of(
                 "ok", false,
-                "message", "请求参数或模型响应格式异常"
+                "message", "Invalid request parameters or model response format."
             );
         }
     }

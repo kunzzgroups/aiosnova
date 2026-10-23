@@ -8,6 +8,8 @@
 
 import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
 import { ApiError } from '@/services/httpClient'
+import { fetchAssistantModelOptions } from '../../settings/services/settingsService'
+import { resolveAgentModelOption } from './agentModelSelection'
 import {
   getMockState,
   nextId,
@@ -110,6 +112,9 @@ export async function createAgent(
   payload: CreateAgentPayload,
 ): Promise<AgentListItem> {
   if (USE_MOCK) {
+    if (payload.model?.binding || payload.model && payload.model.provider !== 'auto') {
+      resolveAgentModelOption(payload.model, await fetchAssistantModelOptions(payload.companyId))
+    }
     const state = getMockState()
     const now = new Date().toISOString()
 
@@ -129,7 +134,7 @@ export async function createAgent(
           ? assignableBaseIds(payload.companyId, payload.knowledgeBaseIds)
           : [],
       model: payload.model
-        ? { ...payload.model }
+        ? structuredClone(payload.model)
         : {
             provider: 'auto' as const,
             model: '',
@@ -163,6 +168,10 @@ export async function updateAgent(
       throw new ApiError(`Agent ${agentId} not found.`, 404)
     }
 
+    if (patch.model?.binding || patch.model && patch.model.provider !== 'auto') {
+      resolveAgentModelOption(patch.model, await fetchAssistantModelOptions(agent.companyId))
+    }
+
     if (patch.name !== undefined) {
       agent.name = patch.name.trim() || agent.name
     }
@@ -176,7 +185,7 @@ export async function updateAgent(
     }
 
     if (patch.model !== undefined) {
-      agent.model = { ...patch.model }
+      agent.model = structuredClone(patch.model)
     }
 
     const nextStatus = patch.status ?? agent.status

@@ -1,0 +1,143 @@
+.app-shell:has(.ai-usage-page) .app-shell__workspace {height:100vh;height:100dvh;min-height:0;overflow:hidden}
+.app-shell:has(.ai-usage-page) .app-shell__main {min-height:0;overflow:hidden}
+.ai-settings-page:has(.ai-usage-page) {flex:1 1 0}
+.ai-settings-shell:has(.ai-usage-page) {grid-template-rows:minmax(0,1fr)}
+.ai-settings-main:has(.ai-usage-page) {overflow:hidden}
+.ai-usage-page {display:flex;flex-direction:column;flex:1 1 0;min-height:0;min-width:0;padding:1rem;overflow:hidden;gap:1rem}
+.ai-usage-toolbar {display:flex;align-items:center;gap:1rem;flex:0 0 auto;flex-wrap:wrap}
+.ai-usage-toolbar > .sidebar-select {width:11rem}
+.ai-usage-toolbar > .ui-button {margin-left:auto}
+.ai-usage-compare {display:flex;align-items:center;gap:.5rem;color:var(--color-text-muted);font-size:var(--text-sm)}
+.ai-usage-compare input {accent-color:var(--color-brand)}
+.ai-usage-scroll {display:grid;grid-template-rows:auto minmax(0,1fr) minmax(19rem,1fr);gap:1rem;flex:1 1 0;min-height:0;overflow:hidden;scrollbar-width:thin;overscroll-behavior:contain}
+.ai-usage-scroll > * {flex:0 0 auto}
+.ai-usage-kpis {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}
+.ai-usage-kpis dl {border:1px solid var(--color-border);border-radius:var(--radius-md);padding:.65rem .85rem;margin:0;min-width:0;background:var(--color-bg-elevated)}
+.ai-usage-kpis dt {color:var(--color-text-muted);font-size:var(--text-sm)}
+.ai-usage-kpis dd {font-size:1.5rem;font-weight:600;margin:.4rem 0 0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.ai-usage-kpis small {display:block;color:var(--color-text-muted);font-size:var(--text-xs);margin-top:.3rem}
+.ai-usage-kpis small[hidden] {display:none}
+.ai-usage-secondary {display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;font-size:var(--text-xs);color:var(--color-text-muted)}
+.ai-usage-panel > .ai-usage-secondary {padding:.5rem .85rem 0}
+.ai-usage-middle {display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:1rem;min-height:0;overflow:hidden}
+.ai-usage-middle > .ai-usage-panel {min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.ai-usage-panel {border:1px solid var(--color-border);border-radius:var(--radius-md);min-width:0;overflow:hidden;background:var(--color-bg-elevated)}
+.ai-usage-panel > header,.ai-usage-breakdown-heading {display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;padding:.7rem .85rem;border-bottom:1px solid var(--color-border)}
+.ai-usage-page h3 {font-size:var(--text-sm);margin:0}
+.ai-usage-segments {display:flex;gap:.2rem;flex-wrap:wrap;background:var(--color-bg-muted);padding:.2rem;border-radius:var(--radius-sm)}
+.ai-usage-page .ai-usage-segments .ui-button {font-weight:500;padding:.25rem .65rem;font-size:var(--text-xs)}
+.ai-usage-segments .ui-button[aria-pressed=true] {background:var(--color-brand-soft);color:var(--color-brand)}
+.ai-usage-chart {margin:.4rem .8rem 0;height:175px;min-width:0}
+.ai-usage-chart svg {display:block;width:100%;height:100%}
+.ai-usage-chart text {fill:var(--color-text-muted);font:11px var(--font-sans)}
+.ai-usage-legend {display:flex;gap:.85rem;padding:.65rem .85rem 0;font-size:var(--text-xs);color:var(--color-text-muted)}
+.ai-usage-legend span {display:flex;align-items:center;gap:.35rem}
+.ai-usage-legend i {width:.8rem;height:3px;background:var(--color-brand)}
+.ai-usage-legend i.is-secondary {background:var(--color-info, #3b82f6)}
+.ai-usage-chart-caption {font-size:var(--text-xs);color:var(--color-text-muted);padding:0 .85rem .6rem;margin:0;min-height:1.8rem}
+.ai-usage-budget {padding:.85rem;font-size:var(--text-sm)}
+.ai-usage-budget small {color:var(--color-text-muted);font-size:var(--text-xs)}
+.ai-usage-budget dl {margin:.6rem 0}
+.ai-usage-budget dl > div {display:flex;justify-content:space-between;gap:.5rem;margin:.5rem 0}
+.ai-usage-budget dt {color:var(--color-text-muted)}
+.ai-usage-budget dd {margin:0;font-weight:500;font-variant-numeric:tabular-nums}
+.ai-usage-progress {height:.45rem;background:var(--color-bg-muted);border-radius:1rem;overflow:hidden;margin:.7rem 0 .25rem}
+.ai-usage-progress > div {height:100%;background:var(--color-brand);border-radius:1rem}
+.ai-usage-budget-state {display:flex;justify-content:space-between;gap:.5rem;border-top:1px solid var(--color-border);padding-top:.6rem;margin-top:.6rem}
+.ai-usage-budget-state strong,.ai-usage-budget-state small {display:block}
+.ai-usage-budget-state strong {font-weight:500;font-size:var(--text-sm)}
+.ai-usage-scroll > .ai-usage-breakdown {flex:1 1 0!important;min-height:0;overflow:hidden}
+.ai-usage-breakdown > .console-table-wrap {flex:1 1 0;min-height:0;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
+.ai-usage-breakdown .ai-usage-table thead th {position:sticky;top:0;z-index:1;background:var(--color-bg-muted)}
+.ai-usage-breakdown-heading,.ai-usage-table-footer {flex:0 0 auto}
+.ai-usage-breakdown .ui-table-toolbar {padding:.65rem .85rem}
+.ai-usage-breakdown .ui-table-toolbar__search {flex:0 1 15rem;min-width:0;order:2;margin-left:auto}
+.ai-usage-breakdown .ui-table-toolbar > .ai-usage-segments {order:1}
+.ai-usage-breakdown .ui-table-toolbar .ui-text-field {height:2.25rem;min-height:2.25rem}
+.ai-usage-table {table-layout:fixed;width:100%;min-width:50rem}
+.ai-usage-table th {white-space:nowrap}
+.ai-usage-table th:first-child {width:30%}
+.ai-usage-table :is(th,td):not(:first-child) {text-align:right;font-variant-numeric:tabular-nums}
+.ai-usage-table :is(th,td) {padding:.5rem .8rem}
+.ai-usage-breakdown .ai-usage-table tbody tr {height:auto;min-height:0}
+.ai-usage-row-link {border:0;background:transparent;padding:0;text-align:left;color:var(--color-text);font:inherit;cursor:pointer;overflow-wrap:anywhere}
+.ai-usage-row-link:hover {color:var(--color-brand)}
+.ai-usage-breakdown-heading small,.ai-usage-table-footer {color:var(--color-text-muted);font-size:var(--text-xs)}
+.ai-usage-table-footer {display:flex;justify-content:space-between;gap:.5rem;padding:.6rem .85rem}
+.ai-usage-detail-values {font-size:var(--text-sm);margin:0}
+.ai-usage-detail-values > div {display:flex;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--color-border);padding:.75rem 0}
+.ai-usage-detail-values dd {margin:0;font-weight:500}
+.ai-usage-disclaimer {font-size:var(--text-sm);color:var(--color-text-muted)}
+.ai-usage-budget-panel.is-within-budget .ai-usage-progress > div {background:var(--color-success)}
+.ai-usage-budget-panel.is-within-budget .ai-usage-budget-state > div:first-child > strong {color:var(--color-success)}
+.ai-usage-budget-panel.is-over-budget .ai-usage-progress > div,.ai-usage-budget-panel.is-budget-warning .ai-usage-progress > div {background:var(--color-warning)}
+.ai-usage-budget-panel:is(.is-over-budget,.is-budget-warning) .ai-usage-budget-state > div:first-child > strong,.ai-usage-budget-panel.is-over-budget .ai-usage-budget dl > div:last-child dd {color:color-mix(in srgb,var(--color-warning) 65%,var(--color-text))}
+@container ai-settings-content (max-width:850px) {
+ .ai-usage-middle {grid-template-columns:minmax(0,1fr);overflow:visible}
+ .ai-usage-middle > .ai-usage-panel {overflow:visible}
+ .ai-usage-kpis {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ai-usage-scroll {display:flex;flex-direction:column;overflow:auto;padding-right:.75rem;scrollbar-gutter:stable}
+ .ai-usage-breakdown > .console-table-wrap {--usage-fit-remainder:0}
+ .ai-usage-breakdown .ai-usage-table {min-width:50rem;table-layout:fixed}
+ .ai-usage-breakdown .ai-usage-table th:first-child {width:30%}
+ .ai-usage-breakdown .ai-usage-table :is(th,td) {white-space:nowrap}
+ .ai-usage-breakdown > .console-table-wrap {overflow-x:auto}
+ .ai-usage-scroll > .ai-usage-breakdown {flex:0 0 auto!important;height:28rem;min-height:28rem}
+}
+@container ai-settings-content (max-width:420px) {.ai-usage-page {padding:.65rem}.ai-usage-kpis dd {font-size:1.2rem}.ai-usage-toolbar {gap:.5rem}}
+
+/* Reserve natural control heights outside the scrolling table. */
+.ai-usage-toolbar > .sidebar-select,.ai-usage-toolbar > .ui-button,.ai-usage-compare {flex-shrink:0}
+.ai-usage-breakdown .ai-usage-search-compact {display:none}
+.ai-usage-breakdown .ui-table-toolbar .ui-table-toolbar__search {flex:0 1 15rem;min-width:min(15rem,100%);order:2;margin-left:auto}
+.ai-usage-breakdown .ui-table-toolbar > .ai-usage-segments {flex:0 0 auto;max-width:100%}
+.ai-usage-breakdown .ui-table-toolbar .ui-text-field {height:auto;min-height:0}
+.ai-usage-breakdown .console-table-wrap {max-height:none}
+.ai-usage-breakdown > .identity-directory-footer {flex:0 0 auto;min-height:2.75rem;padding:.3rem .85rem;min-width:0;gap:.5rem;row-gap:.5rem}
+.ai-usage-breakdown .identity-pagination {flex-wrap:wrap}
+.ai-usage-breakdown .identity-directory-footer .identity-pagination .ui-button {flex-shrink:0;min-width:2rem;height:2rem;min-height:2rem;padding:.25rem .5rem}
+@container ai-settings-content (max-width:850px) {
+ .ai-usage-breakdown .ui-table-toolbar {flex-wrap:nowrap;align-items:center}
+ .ai-usage-breakdown .ui-table-toolbar > .ai-usage-segments {flex:1 1 0;min-width:0;max-width:none;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+ .ai-usage-breakdown .ui-table-toolbar > .ai-usage-segments .ui-button {flex:0 0 auto;white-space:nowrap}
+ .ai-usage-breakdown .ui-table-toolbar .ui-table-toolbar__search {flex:0 0 8rem;width:8rem;min-width:8rem;max-width:8rem;margin-left:auto}
+ .ai-usage-breakdown .ai-usage-search-wide {display:none}
+ .ai-usage-breakdown .ai-usage-search-compact {display:block}
+ .ai-usage-budget dl > div,.ai-usage-budget-state {flex-wrap:wrap}
+ .ai-usage-breakdown .identity-directory-footer {align-items:flex-start}
+ .ai-usage-breakdown .identity-directory-footer > nav {margin-left:0;max-width:100%;flex-wrap:wrap}
+}
+
+.ai-usage-chart svg:focus {outline:none}
+.ai-usage-chart svg:focus-visible {outline:2px solid var(--color-brand);outline-offset:-2px;border-radius:var(--radius-sm)}
+.ai-usage-breakdown .ai-usage-table {height:auto}
+.ai-usage-breakdown .ai-usage-table :is(th,td) {padding:.5rem .8rem}
+
+/* Compact pagination is local to Usage & Cost; shared pagination stays unchanged. */
+.ai-usage-breakdown .identity-directory-footer__listing {gap:.5rem}
+.ai-usage-breakdown .identity-directory-footer > .identity-pagination {gap:.35rem}
+.ai-usage-breakdown .identity-pagination-select {width:3.75rem}
+.ai-usage-breakdown .identity-pagination-select .sidebar-select__trigger {height:2rem;min-height:2rem;padding:.25rem .5rem}
+
+/* Auto pagination shows only rows that fit; explicit sizes scroll inside the table. */
+.ai-usage-breakdown.is-auto-pagination > .console-table-wrap {overflow-y:auto}
+.ai-usage-tool-id { display:block; max-width:20rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--color-text-muted); font-size:var(--text-xs); }
+
+/* Reuse pagination controls while retaining compact, unstretched usage rows. */
+.ai-usage-breakdown .ai-usage-table tbody tr {height:2.375rem}
+.ai-usage-breakdown .ai-usage-table tbody td {padding-block:.25rem}
+.ai-usage-breakdown .ai-model-pagination .identity-pagination {flex-wrap:nowrap}
+.ai-usage-breakdown .ai-usage-row-link {display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Full workspace: comparison text does not participate in track sizing.
+   Keep the half-width stacked layout and its existing natural heights. */
+@container ai-settings-content (min-width:851px) {
+ .ai-usage-breakdown > .console-table-wrap {--usage-fit-remainder:1}
+ .ai-usage-kpis dl {position:relative}
+ .ai-usage-kpis dt {max-width:44%}
+ .ai-usage-kpis dd {margin-top:.9rem}
+ .ai-usage-kpis small {position:absolute;inset-block-start:.65rem;inset-inline-end:.85rem;max-width:53%;margin:0;text-align:right;line-height:1.3}
+ .ai-usage-middle > .ai-usage-panel:first-child {display:flex;flex-direction:column;overflow:hidden}
+ .ai-usage-middle > .ai-usage-panel:first-child > :not(.ai-usage-chart) {flex:0 0 auto}
+ .ai-usage-middle .ai-usage-chart {flex:1 1 0;min-height:6rem;height:auto}
+}

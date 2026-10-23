@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useCompanyStore } from '@/stores/companyStore'
 import { AiSettingsShell } from '../components/AiSettingsShell'
-import { ModelManagement } from '../components/ModelManagement'
+import { CompanyModelsWorkspace } from './CompanyModelsPage'
 import { fetchProviders } from '../services/settingsService'
 import type { AiProvider } from '../types/settings'
 import { Button } from '@/components/ui/Button'
@@ -14,6 +14,7 @@ export function ProviderModelsPage() {
 }
 
 function ScopedModels({companyId,providerId}:{companyId:string;providerId:string}) {
+  const navigate = useNavigate()
   const [providers,setProviders]=useState<AiProvider[]|null>(null)
   const [error,setError]=useState<string|null>(null)
   const [attempt,setAttempt]=useState(0)
@@ -23,5 +24,5 @@ function ScopedModels({companyId,providerId}:{companyId:string;providerId:string
   if(!providers.some(provider=>provider.id===providerId)){
     return <Navigate replace to="/ai/ai/ai-settings/models/providers"/>
   }
-  return <AiSettingsShell><ModelManagement providerId={providerId}/></AiSettingsShell>
+  return <AiSettingsShell><CompanyModelsWorkspace companyId={companyId} providerId={providerId} onClose={() => navigate('/ai/ai/ai-settings/models/providers')}/></AiSettingsShell>
 }

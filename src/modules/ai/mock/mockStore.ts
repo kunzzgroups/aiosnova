@@ -202,7 +202,7 @@ export function toAgentListItem(agent: SeedAgent): AgentListItem {
     category: agent.category,
     status: agent.status,
     createdAt: agent.createdAt,
-    model: { ...agent.model },
+    model: structuredClone(agent.model),
     knowledgeBaseCount:
       agent.status === 'active' ? agent.knowledgeBaseIds.length : 0,
     knowledgeBaseIds:

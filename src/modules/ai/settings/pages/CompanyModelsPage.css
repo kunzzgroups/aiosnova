@@ -1,0 +1,41 @@
+/* Match Tools: shared toolbar, directory spacing, row fitting and pagination. */
+.ai-company-models-page > .ui-table-panel { overflow: hidden; }
+.ai-company-models-page > .ui-table-panel > .console-table-wrap { flex: 1 1 0; min-height: 0; max-height: none; overflow: auto; }
+.ai-company-models-page .ui-table-toolbar > .sidebar-select { flex-basis: 9rem; min-width: 0; }
+.ai-company-models-page .ui-table-toolbar > .sidebar-select:has(#company-model-provider-filter) { flex: 0 0 12rem; }
+.ai-company-models-page .sidebar-select__trigger { min-width: 0; box-sizing: border-box; }
+.ai-company-models-page .sidebar-select__value { flex: 1; }
+.ai-company-models-page #company-model-provider-filter-list { width: 22rem; max-width: calc(100vw - 3rem); max-height: 20rem; }
+.ai-company-models-page #company-model-provider-filter-list .sidebar-select__option { min-height: 2.75rem; padding: 0.65rem 0.75rem; line-height: 1.5; }
+.ai-company-models-page .ai-company-model-table { height: auto; min-width: 62rem; }
+.ai-company-model-table .ai-company-model-check { width: 2.5rem; }
+.ai-company-model-table .ai-company-col-name { width: 26%; }
+.ai-company-model-table .ai-company-col-provider { width: 25%; }
+.ai-company-model-table .ai-company-col-status { width: 12%; }
+.ai-company-model-table .ai-company-col-type { width: 8%; }
+.ai-company-model-table .ai-company-col-context { width: 12%; }
+.ai-company-models-page .ai-company-model-table :is(th, td).console-table__actions { width: 7.25rem; min-width: 7.25rem; text-align: center; }
+.ai-company-model-row-actions { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); white-space: nowrap; }
+.ai-company-models-page .ai-company-model-table td.console-table__actions > .row-menu { display: inline-flex; vertical-align: middle; text-align: left; }
+.ai-company-models-page .ai-company-model-table :is(th, td):is(.ai-company-col-status, .ai-company-model-status, .ai-company-col-type, .ai-company-col-context) { text-align: center; }
+.ai-company-models-page .ai-company-model-table thead th { text-transform: none; }
+.ai-company-models-page .console-table.ai-company-model-table :is(th.ai-company-col-type, td.ai-company-model-type) { text-align: center; }
+.ai-company-models-page .console-table.ai-company-model-table :is(th.ai-company-col-provider, td.ai-company-model-provider-cell) { text-align: left; }
+.ai-company-models-page .console-status { width: 4.75rem; min-width: 4.75rem; height: 1.25rem; padding: 0.1rem 0.4rem; font-size: 11px; box-sizing: border-box; white-space: nowrap; }
+.ai-company-model-name { min-width: 0; }
+.ai-company-model-name strong, .ai-company-model-name small, .ai-company-model-provider { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-company-model-name strong { font-size: var(--text-sm); font-weight: 650; }
+.ai-company-model-name small { margin-top: 0.15rem; font-size: var(--text-xs); color: var(--color-text-muted); }
+.ai-company-models-empty { display: flex; flex: 1 1 0; min-height: 16rem; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: 2.5rem var(--space-5); text-align: center; }
+.ai-company-models-empty > p { margin: 0; max-width: 28rem; color: var(--color-text-muted); line-height: 1.6; overflow-wrap: anywhere; }
+.ai-company-models-empty-icon { display: grid; place-items: center; width: 3rem; height: 3rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-muted); color: var(--color-text-muted); }
+.ai-company-models-empty-icon svg { width: 1.25rem; height: 1.25rem; }
+.ai-company-models-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-3); }
+.ai-company-models-provider-link { display: inline-flex; align-items: center; justify-content: center; min-height: 2.25rem; padding: 0.25rem 0.85rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text); font-size: var(--text-sm); }
+.ai-company-models-page .ai-company-models-provider-link:is(:link, :visited, :hover, :focus, :active) { text-decoration: none; }
+.ai-company-models-provider-link:hover { background: var(--color-bg-muted); }
+@container ai-settings-content (max-width: 860px) {
+  .ai-company-models-page .ui-table-toolbar .ui-table-toolbar__search { flex-basis: 100%; width: 100%; }
+  .ai-company-models-page .ui-table-toolbar > .sidebar-select,
+  .ai-company-models-page .ui-table-toolbar > .sidebar-select:has(#company-model-provider-filter) { flex: 1 1 8rem; }
+}

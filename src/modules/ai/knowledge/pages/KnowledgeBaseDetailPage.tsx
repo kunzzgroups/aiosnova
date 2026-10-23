@@ -1,3 +1,4 @@
+import { AgentAssignmentChoice } from '@/modules/ai/shared/AgentAssignmentChoice'
 import {
   Fragment,
   useCallback,
@@ -1990,28 +1991,7 @@ export function KnowledgeBaseDetailPage() {
               {filteredAgents.map((agent) => {
                 const selected = visibleBaseAgentIds.includes(agent.id)
                 return (
-                  <label
-                    key={agent.id}
-                    className={[
-                      'knowledge-agent-choice',
-                      selected ? 'is-selected' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      disabled={isSaving || isLoading}
-                      onChange={() => void toggleBaseAgent(agent.id)}
-                    />
-                    <span className="knowledge-agent-choice__avatar">
-                      {agent.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="knowledge-agent-choice__body">
-                      <strong>{agent.name}</strong>
-                    </span>
-                  </label>
+                  <AgentAssignmentChoice key={agent.id} name={agent.name} checked={selected} disabled={isSaving || isLoading} onChange={() => void toggleBaseAgent(agent.id)} />
                 )
               })}
 

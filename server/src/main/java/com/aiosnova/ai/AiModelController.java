@@ -41,19 +41,54 @@ public class AiModelController {
 
             return Map.of(
                 "ok", false,
-                "message", "读取模型能力的请求被中断"
+                "message", "The model capability request was interrupted."
             );
 
         } catch (IOException error) {
             return Map.of(
                 "ok", false,
-                "message", "读取模型目录失败，请稍后重试"
+                "message", "Unable to load the model catalog. Try again later."
             );
 
         } catch (RuntimeException error) {
             return Map.of(
                 "ok", false,
-                "message", "模型目录解析异常"
+                "message", "Unable to parse the model catalog."
+            );
+        }
+    }
+
+    @GetMapping("/api/ai/openrouter/models")
+    public Map<String, Object> getModelCatalog() {
+        try {
+            var items = modelService.loadModelCatalog();
+
+            return Map.of(
+                "ok", true,
+                "source", "openrouter",
+                "items", items,
+                "count", items.size(),
+                "checkedAt", java.time.Instant.now().toString()
+            );
+
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+
+            return Map.of(
+                "ok", false,
+                "message", "The model catalog request was interrupted."
+            );
+
+        } catch (IOException error) {
+            return Map.of(
+                "ok", false,
+                "message", "Unable to load the model catalog. Try again later."
+            );
+
+        } catch (RuntimeException error) {
+            return Map.of(
+                "ok", false,
+                "message", "Unable to parse the model catalog."
             );
         }
     }

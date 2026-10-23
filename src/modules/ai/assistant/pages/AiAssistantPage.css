@@ -530,6 +530,8 @@
 
 .ai-composer__foot {
   display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
   padding: 0.35rem 0.5rem 0.45rem;
@@ -1177,11 +1179,16 @@
 
 .ai-model-picker {
   position: relative;
-  flex: none;
+  flex: 0 1 18rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ai-model-picker__trigger {
   display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 0.3rem;
   min-height: 1.75rem;
@@ -1196,6 +1203,53 @@
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ai-model-picker__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-model-picker__trigger > .sidebar-select__chevron,
+.ai-model-picker__lock {
+  flex-shrink: 0;
+}
+
+.ai-model-picker__option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ai-model-picker__option-copy strong { font-weight: 600; }
+.ai-model-picker__option-copy small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.ai-model-picker__browse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  font-size: var(--text-xs);
+}
+.ai-model-picker__browse button,
+.ai-model-picker__browse select {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.45rem;
+  font: inherit;
 }
 
 .ai-model-picker__trigger:hover,
@@ -1235,8 +1289,10 @@
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
   padding: 0.3rem;
-  min-width: 20rem;
-  max-width: 24rem;
+  box-sizing: border-box;
+  width: min(24rem, calc(100vw - 3rem));
+  min-width: 0;
+  max-width: calc(100vw - 3rem);
 }
 
 /* --- temperature (compact single row) ------------------------------------- */
@@ -1312,10 +1368,9 @@
   border-color: var(--color-border-focus);
 }
 
-/* --- model list: exactly six rows tall ------------------------------------ */
+/* Fixed viewport; full labels wrap into variable-height rows. */
 
 /*
- * Each row is 2rem. The list is 6 × 2rem + 2 × 0.2rem padding = 12.4rem.
  * A hard `height` (not `max-height`) so the panel keeps the same silhouette
  * even when a search returns fewer (or one) result.
  */
@@ -1357,9 +1412,8 @@
   display: flex;
   align-items: center;
   width: 100%;
-  /* Fixed height so exactly 6 rows fit. */
-  height: 2rem;
-  padding: 0 0.7rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.7rem;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1370,6 +1424,11 @@
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
+.ai-model-picker__selected-mark { flex-shrink: 0; margin-left: auto; color: var(--color-brand); font-size: 0.9rem; }
+.ai-model-picker__browse button { cursor: pointer; border: 1px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text); border-radius: var(--radius-sm); padding: 0.35rem 0.55rem; }
+.ai-model-picker__browse button:hover { background: var(--color-bg-muted); }
+.ai-model-picker__browse button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.ai-model-picker__browse > span { color: var(--color-text-muted); font-size: var(--text-xs); }
 
 .ai-model-picker__option:hover {
   background: var(--color-bg-muted);
@@ -1525,5 +1584,49 @@
     width: min(15.5rem, 88vw);
     background: var(--color-bg-elevated);
     box-shadow: var(--shadow-md);
+  }
+}
+
+/* Respond to composer width, including space taken by side panels. */
+.ai-composer { container: assistant-composer / inline-size; }
+
+.ai-composer__foot > .ai-pill-select {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 12rem;
+}
+
+.ai-composer__foot .sidebar-select,
+.ai-composer__foot .sidebar-select__trigger {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ai-composer__foot .sidebar-select__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-composer__foot > .attach-menu { flex-shrink: 0; }
+
+@container assistant-composer (max-width: 34rem) {
+  .ai-composer__foot {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.4rem;
+  }
+
+  .ai-composer__foot > .ai-model-picker {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .ai-composer__foot > .ai-composer__spacer { display: none; }
+
+  .ai-model-picker__menu {
+    width: 100%;
+    max-width: 100%;
   }
 }

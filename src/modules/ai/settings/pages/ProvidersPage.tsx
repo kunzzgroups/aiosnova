@@ -10,7 +10,7 @@ import { FlashToasts } from '@/components/ui/FlashToasts'
 import { FormField } from '@/components/ui/FormField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { TablePanel } from '@/components/ui/TablePanel'
-import { IconPlus, IconTrash } from '@/components/icons/Icons'
+import { IconPlus, IconTrash, IconRefresh } from '@/components/icons/Icons'
 import { TableToolbar } from '@/components/ui/TableToolbar'
 import { TextField } from '@/components/ui/TextField'
 import {
@@ -20,6 +20,7 @@ import {
     fetchProviders,
     recordProviderConnectionTest,
     setProviderEnabled,
+    syncProviderModels,
     updateProvider,
 } from '../services/settingsService'
 import type {
@@ -27,17 +28,19 @@ import type {
     ProviderStatus,
 } from '../types/settings'
 import { ProviderDetails } from '../components/ProviderDetails'
-import { ModelManagement } from '../components/ModelManagement'
+import { CompanyModelsWorkspace } from './CompanyModelsPage'
 import { AiSettingsShell } from '../components/AiSettingsShell'
 import { SettingsEditor, SettingsEditorSection } from '../components/SettingsEditor'
 import { IconSettings, IconShieldCheck, IconSpark } from '@/components/icons/Icons'
 import '@/modules/ai/shared/AiConsole.css'
 import './AiSettingsPage.css'
+import './AiSettingsDirectory.css'
 import './ProvidersPage.css'
 import {
     testModelConnection,
     type ConnectionTestResult,
 } from '../services/connectionService'
+import { testStoredProviderConnection } from '../services/providerApiService'
 import {
     fetchModelCapabilities,
     type ModelCapabilities,
@@ -61,6 +64,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
     const [managerTarget, setManagerTarget] = useState<HTMLDivElement | null>(null)
     const [modelsRevision, setModelsRevision] = useState(0)
     const [isUpdating, setIsUpdating] = useState(false)
+    const [syncingProviderId, setSyncingProviderId] = useState<string | null>(null)
     const providerMutationRef = useRef(false)
     const [providers, setProviders] = useState<AiProvider[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -148,7 +152,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
     const bulkItems = providers.filter(item => pendingBulk?.ids.includes(item.id))
     const selectedProvider = visibleProviders.find(provider => provider.id === selectedProviderId) ?? visibleProviders[0] ?? null
 
-    function resetForm() {
+    function resetForm(preserveError = false) {
         setEditingId(null)
         setEditingVersion(null)
         setName('')
@@ -158,7 +162,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         setEnabled(true)
         setStatusMenuOpen(false)
         setTestResult(null)
-        setError(null)
+        if (!preserveError) setError(null)
     }
 
     function openCreate() {
@@ -204,8 +208,11 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
 
         try {
             let savedProvider: AiProvider
+            const previous = providers.find(item => item.id === editingId)
+            const shouldSync = Boolean(testResult?.ok && baseUrl.trim() === 'https://openrouter.ai/api/v1' &&
+                (!previous || apiKey.trim() || previous.baseUrl !== baseUrl.trim() || !previous.lastConnectionTest?.ok || !previous.modelCount))
             if (editingId) {
-                if (editingVersion === null) throw new Error('缺少 Provider 版本号，请关闭后重新打开编辑。')
+                if (editingVersion === null) throw new Error('Missing Provider version. Close and reopen the editor.')
                 savedProvider = await updateProvider(editingId, {
                     companyId,
                     name,
@@ -225,13 +232,14 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                 setMessage('Provider created successfully.')
             }
 
-            if (testResult) {
-                recordProviderConnectionTest(companyId, savedProvider.id, baseUrl, modelId, testResult)
-            }
 
+            if (useCompanyStore.getState().companyId !== companyId) return
+            if (testResult?.ok) recordProviderConnectionTest(companyId, savedProvider.id, baseUrl, modelId, testResult)
+            await load(true)
+            if (shouldSync) await syncCatalog(savedProvider)
+            if (useCompanyStore.getState().companyId !== companyId) return
             setFormOpen(false)
-            resetForm()
-            await load()
+            resetForm(true)
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : 'Unable to save provider.')
         } finally {
@@ -243,34 +251,47 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         setTestResult(null)
         setError(null)
 
-        if (!baseUrl.trim() || !apiKey.trim() || !modelId.trim()) {
-            setError('请填写服务地址、API Key 和测试模型 ID。')
+        if (!baseUrl.trim() || (!editingId && !apiKey.trim()) || !modelId.trim()) {
+            setError('Enter the Base URL and test model ID. New Providers also require an API Key.')
+            return
+        }
+
+        const saved = editingId ? providers.find(item => item.id === editingId) : undefined
+        const usesSaved = Boolean(saved && !apiKey.trim() && saved.baseUrl === baseUrl.trim() && saved.version === editingVersion)
+        if (editingId && !apiKey.trim() && !usesSaved) {
+            setError('The URL or version changed. Save and reopen before testing the database key.')
             return
         }
 
         setIsTesting(true)
 
         try {
-            const result = await testModelConnection({
+            const result = usesSaved && saved ? await testStoredProviderConnection(companyId, saved.id, modelId.trim(), saved.version) : await testModelConnection({
                 baseUrl: baseUrl.trim(),
                 apiKey: apiKey.trim(),
                 modelId: modelId.trim(),
             })
 
+            if (useCompanyStore.getState().companyId !== companyId) return
             setTestResult(result)
-            if (editingId) {
-                recordProviderConnectionTest(companyId, editingId, baseUrl, modelId, result)
+            if (usesSaved && saved && providers.some(item => item.id === saved.id && item.version === saved.version)) {
+                recordProviderConnectionTest(companyId, saved.id, baseUrl, modelId, result)
                 await load(true)
+                if (result.ok && saved.baseUrl.trim() === 'https://openrouter.ai/api/v1' && (!saved.lastConnectionTest?.ok || !saved.modelCount)) {
+                    await syncCatalog(saved)
+                }
             }
 
-            if (!result.ok) {
+            if (result.ok && !usesSaved) {
+                setMessage('Connection verified. Save this Provider to sync its model catalog.')
+            } else if (!result.ok) {
                 setError(result.message)
             }
         } catch (caught) {
             setError(
                 caught instanceof Error
                     ? caught.message
-                    : '无法完成模型连接测试。'
+                    : 'Unable to complete the connection test.'
             )
         } finally {
             setIsTesting(false)
@@ -282,12 +303,12 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         setCapabilityError(null)
 
         if (!modelId.trim()) {
-            setCapabilityError('请先填写模型 ID。')
+            setCapabilityError('Enter a model ID first.')
             return
         }
 
         if (baseUrl.trim() !== 'https://openrouter.ai/api/v1') {
-            setCapabilityError('目前只支持读取 OpenRouter 模型能力。')
+            setCapabilityError('Only OpenRouter model capabilities are supported.')
             return
         }
 
@@ -300,11 +321,25 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
             setCapabilityError(
                 caught instanceof Error
                     ? caught.message
-                    : '无法读取模型能力。'
+                    : 'Unable to load model capabilities.'
             )
         } finally {
             setIsLoadingCapabilities(false)
         }
+    }
+
+    async function syncCatalog(provider: AiProvider) {
+        if (providerMutationRef.current || isDeleting || provider.companyId !== currentScopeRef.current) return
+        providerMutationRef.current = true; setIsUpdating(true); setSyncingProviderId(provider.id); setError(null)
+        try {
+            const result = await syncProviderModels(companyId, provider.id)
+            if (useCompanyStore.getState().companyId !== companyId) return
+            setModelsRevision(value => value + 1)
+            await load(true)
+            setMessage(`Catalog synced: ${result.created} new, ${result.updated} updated. Existing enabled states are preserved.`)
+        } catch (caught) {
+            if (useCompanyStore.getState().companyId === companyId) setError(`Provider saved; catalog sync failed. Retry Sync catalog. ${caught instanceof Error ? caught.message : ''}`)
+        } finally { providerMutationRef.current = false; setIsUpdating(false); setSyncingProviderId(null) }
     }
 
     async function toggleProvider(provider: AiProvider) {
@@ -459,6 +494,8 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 onDelete={() => { setDeleteError(null); setPendingDelete(selectedProvider) }}
                                 onManageModels={() => { setManagerStartCreate(false); setManagerBusy(true); setManagerProvider(selectedProvider) }}
                                 onAddModel={() => { setManagerStartCreate(true); setManagerBusy(true); setManagerProvider(selectedProvider) }}
+                                onSync={() => void syncCatalog(selectedProvider)}
+                                syncing={syncingProviderId === selectedProvider.id}
                                 modelsRevision={modelsRevision}
                             /> : null}
                         </div>
@@ -476,7 +513,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                         portalTarget={managerTarget}
                         className="ai-provider-management-drawer"
                     >
-                        <ModelManagement key={`${companyId}:${managerProvider.id}`} providerId={managerProvider.id} initialCreate={managerStartCreate} onBusyChange={setManagerBusy} onClose={closeManager} />
+                        <CompanyModelsWorkspace key={`${companyId}:${managerProvider.id}`} companyId={companyId} providerId={managerProvider.id} initialCreate={managerStartCreate} onBusyChange={setManagerBusy} onClose={closeManager} />
                     </Drawer>
                 ) : null}
             </div>
@@ -623,7 +660,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                     </SettingsEditorSection>
 
                     <SettingsEditorSection title="Model Connection Test" icon={<IconSettings />}>
-                        <p>发送真实模型请求，可能产生 API 使用费用。测试时需要重新填写 API Key。</p>
+                        <p>Sends a real model request and may incur API charges. Leave the key blank to test the saved configuration, or enter a key to test unsaved input.</p>
 
                         <Button
                             type="button"
@@ -642,17 +679,18 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                             >
                                 <strong>{testResult.message}</strong>
                                 {testResult.reply ? (
-                                    <p>模型回答：{testResult.reply}</p>
+                                    <p>Model reply: {testResult.reply}</p>
                                 ) : null}
                             </div>
                         ) : null}
+                        {syncingProviderId ? <p className="ai-provider-sync-status" role="status"><IconRefresh className="ai-catalog-spinning" aria-hidden="true" />Syncing models…</p> : null}
                     </SettingsEditorSection>
 
                     <SettingsEditorSection
                         title="Model Capabilities"
                         icon={<IconSettings />}
                     >
-                        <p>读取 OpenRouter 目录声明的能力，不需要 API Key。</p>
+                        <p>Reads capabilities from the OpenRouter catalog. No API Key is required.</p>
 
                         <Button
                             type="button"
@@ -665,7 +703,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 !modelId.trim()
                             }
                         >
-                            {isLoadingCapabilities ? '读取中…' : '读取能力'}
+                            {isLoadingCapabilities ? 'Loading…' : 'Read capabilities'}
                         </Button>
 
                         {capabilityError ? (
@@ -674,21 +712,21 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
 
                         {capabilities ? (
                             <div role="status">
-                                <p>模型：{modelId.trim()}</p>
+                                <p>Model: {modelId.trim()}</p>
                                 <dl>
-                                    <dt>文字聊天</dt>
-                                    <dd>{capabilities.chat ? '支持' : '不支持'}</dd>
+                                    <dt>Chat</dt>
+                                    <dd>{capabilities.chat ? 'Supported' : 'Not supported'}</dd>
 
-                                    <dt>图片输入</dt>
-                                    <dd>{capabilities.vision ? '支持' : '不支持'}</dd>
+                                    <dt>Vision</dt>
+                                    <dd>{capabilities.vision ? 'Supported' : 'Not supported'}</dd>
 
-                                    <dt>工具调用</dt>
-                                    <dd>{capabilities.toolCalling ? '支持' : '不支持'}</dd>
+                                    <dt>Tool calling</dt>
+                                    <dd>{capabilities.toolCalling ? 'Supported' : 'Not supported'}</dd>
 
-                                    <dt>上下文容量</dt>
+                                    <dt>Context window</dt>
                                     <dd>
                                         {capabilities.contextWindow === null
-                                            ? '未知'
+                                            ? 'Unknown'
                                             : `${capabilities.contextWindow.toLocaleString()} Token`}
                                     </dd>
                                 </dl>

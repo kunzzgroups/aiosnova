@@ -1,4 +1,18 @@
 import type { SaveProviderPayload } from '../types/settings'
+import type { ConnectionTestResult } from './connectionService'
+
+export async function testStoredProviderConnection(
+  companyId: string, providerId: string, modelId: string, version: number,
+): Promise<ConnectionTestResult> {
+  const response = await fetch(`/api/ai/providers/${encodeURIComponent(providerId)}/test-connection`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId, modelId, version }),
+  })
+  await checkResponse(response)
+  const result: ConnectionTestResult = await response.json()
+  if (typeof result.ok !== 'boolean' || typeof result.message !== 'string') throw new Error('Invalid connection test response.')
+  return result
+}
 
 // 对应 Java 返回的 ProviderSummary。
 // 这里没有 API Key，也没有密文。
@@ -16,7 +30,7 @@ export type ProviderSummary = {
 async function checkResponse(response: Response): Promise<void> {
   if (response.ok) return
 
-  let message = `Provider 请求失败，HTTP 状态码：${response.status}`
+  let message = `Provider request failed. HTTP status: ${response.status}`
 
   try {
     const body: unknown = await response.json()

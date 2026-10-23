@@ -1,18 +1,24 @@
 /* Providers follows the shared Agents directory presentation. */
-.ai-settings-main:has(:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page)) {
+.ai-catalog-spinning { animation: ai-catalog-spin 1s linear infinite; }
+.ai-provider-sync-status { display: flex; align-items: center; gap: 0.5rem; font-size: var(--text-sm); color: var(--color-text-muted); }
+.ai-provider-sync-status svg { width: 1rem; height: 1rem; }
+.ai-catalog-sync-copy { color: var(--color-text-muted); font-size: var(--text-xs); }
+@keyframes ai-catalog-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ai-catalog-spinning { animation: none; } }
+.ai-settings-main:has(:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page)) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) {
   padding: 0.85rem;
   box-sizing: border-box;
   height: auto;
   flex: 1 1 0;
 }
 
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) thead th {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) thead th {
   height: 53.5px !important;
   min-height: 53.5px !important;
   box-sizing: border-box !important;
@@ -28,17 +34,17 @@
   background-color: var(--color-bg-muted) !important;
 }
 
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:nth-child(2),
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:nth-child(2),
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:nth-child(3),
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:nth-child(3),
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:nth-child(5),
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:nth-child(5) {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) th:nth-child(2),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) td:nth-child(2),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) th:nth-child(3),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) td:nth-child(3),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) th:nth-child(5),
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) td:nth-child(5) {
   text-align: center;
   vertical-align: middle;
 }
 
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) .identity-pagination-select .sidebar-select__menu {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) .identity-pagination-select .sidebar-select__menu {
   top: auto;
   bottom: calc(100% + 0.5rem);
 }
@@ -49,24 +55,24 @@
 }
 
 @media (max-width: 760px) {
-  :is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) { padding: 0.55rem; }
+  :is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) { padding: 0.55rem; }
 }
 
 /* Center the menu itself, not just the cell's inline text. */
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) thead th:last-child,
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) tbody td:last-child {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) thead th:last-child,
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) tbody td:last-child {
   text-align: center !important;
 }
 
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:last-child > .row-menu {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) td:last-child > .row-menu {
   display: inline-flex;
   vertical-align: middle;
   text-align: left;
 }
 
 /* Actions scrolls horizontally with the rest of the table. */
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:last-child,
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:last-child {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) th:last-child,
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) td:last-child {
   position: relative;
   right: auto;
   width: 7rem;
@@ -74,7 +80,7 @@
   background: var(--color-bg-elevated);
   box-shadow: none;
 }
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) thead th:last-child {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) thead th:last-child {
   position: sticky;
   top: 0;
   z-index: 2;
@@ -93,12 +99,12 @@
 }
 
 /* Keep expanded menus above neighboring rows without fixing the column. */
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) tbody td:last-child {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) tbody td:last-child {
   z-index: 1;
   overflow: visible;
 }
 
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) tbody td:last-child:has(.row-menu__trigger[aria-expanded="true"]) {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) tbody td:last-child:has(.row-menu__trigger[aria-expanded="true"]) {
   z-index: 4;
 }
 
@@ -115,17 +121,17 @@
 .ai-settings-bulk-delete-list li + li { border-top: 1px solid var(--color-border); }
 
 /* Align header and row selection controls on the same horizontal inset. */
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) th:first-child,
-:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table) td:first-child {
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) th:first-child,
+:is(.ai-settings-providers-page, .ai-settings-models-page, .ai-settings-tools-page, .ai-company-models-page) :is(.ai-settings-provider-table, .ai-settings-model-table, .ai-settings-tool-table, .ai-company-model-table) td:first-child {
   padding-inline: 1.5rem !important;
 }
 /* Models and Tools share the Models two-line row density and viewport chrome. */
-.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) {
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page,.ai-company-models-page) {
   --ai-directory-row-height:calc(var(--text-sm) * 1.5 + var(--text-xs) * 1.5 + 1.25rem + 1px);
 }
-.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) .console-table tbody tr { height:var(--ai-directory-row-height); }
-.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) .console-table tbody td { padding-block:.625rem; }
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page,.ai-company-models-page) .console-table tbody tr { height:var(--ai-directory-row-height); }
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page,.ai-company-models-page) .console-table tbody td { padding-block:.625rem; }
 .ai-settings-main .ai-settings-models-page .ai-settings-model-name :is(strong,small) { line-height:1.5; }
 .ai-settings-main .ai-settings-tools-page .ai-settings-tool-name-cell { white-space:nowrap; }
 /* Do not reserve an empty horizontal scrollbar below a table that fits. */
-.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page) > .ui-table-panel > .console-table-wrap { overflow-x:auto; }
+.ai-settings-main :is(.ai-settings-models-page,.ai-settings-tools-page,.ai-company-models-page) > .ui-table-panel > .console-table-wrap { overflow-x:auto; }

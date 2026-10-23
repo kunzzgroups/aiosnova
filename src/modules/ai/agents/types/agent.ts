@@ -12,10 +12,12 @@ export type AgentStatus = 'active' | 'draft' | 'disabled'
 export type AgentModelProvider = 'auto' | 'openai' | 'anthropic' | 'google' | 'azure'
 
 /**
- * Per-agent LLM configuration. `provider: 'auto'` means the router picks the
- * best model for the agent's knowledge; `model` is then empty.
+ * `binding` selects an exact company-scoped database configuration. Without
+ * binding, `provider: 'auto'` follows the Assistant choice; other legacy
+ * provider/model strings require explicit reselection.
  */
 export type AgentModelConfig = {
+  binding?: { providerId: string; modelConfigId: string }
   provider: AgentModelProvider
   model: string
   temperature: number

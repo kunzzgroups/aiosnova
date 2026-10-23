@@ -1,0 +1,59 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useCompanyStore } from '@/stores/companyStore'
+import { Button } from '@/components/ui/Button'
+import { TextField } from '@/components/ui/TextField'
+import { SidebarSelect } from '@/components/navigation/SidebarSelect'
+import { ModelsPagination as SettingsPagination } from '../components/ModelsPagination'
+import { useUsagePagination } from '../hooks/useUsagePagination'
+import { TablePanel } from '@/components/ui/TablePanel'
+import { TableToolbar } from '@/components/ui/TableToolbar'
+import { FlashToasts } from '@/components/ui/FlashToasts'
+import { AiSettingsShell } from '../components/AiSettingsShell'
+import { SettingsDrawer } from '../components/SettingsDrawer'
+import { UsageTrend, compactUsage, usageDate, usageMoney } from '../components/UsageTrend'
+import { fetchSecurityPolicy, type SecurityPolicy } from '../services/securityService'
+import { fetchTools } from '../services/toolsService'
+import type { AiTool } from '../types/tools'
+import { budgetUsage, fetchUsageRecords, usageBreakdown, usagePeriod, usageToday, usageTotals, type UsageGroup, type UsageMetric, type UsageRecord, type UsageRow } from '../services/usageService'
+import { usageWindow, usageComparison, usageExportCsv } from '../services/usagePresentation'
+import '@/modules/ai/shared/AiConsole.css'
+import './AiSettingsPage.css'
+import './UsageCostPage.css'
+
+const groups:UsageGroup[]=['model','agent','user','tool','mcp']
+const groupName=(group:UsageGroup)=>group==='mcp'?'MCP':group[0].toUpperCase()+group.slice(1)
+export function UsageCostPage(){const companyId=useCompanyStore(s=>s.companyId);return <UsageWorkspace key={companyId} companyId={companyId}/>}
+function UsageWorkspace({companyId}:{companyId:string}){
+ const [searchParams,setSearchParams]=useSearchParams()
+ const requestedPeriod=searchParams.get('period')??'30'
+ const initialPeriod=['7','30','60'].includes(requestedPeriod)?requestedPeriod:'30'
+ const navigate=useNavigate(),[records,setRecords]=useState<UsageRecord[]>([]),[tools,setTools]=useState<AiTool[]>([]),[policy,setPolicy]=useState<SecurityPolicy|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState<string|null>(null),[attempt,setAttempt]=useState(0)
+ const [period,setPeriod]=useState(initialPeriod),[compare,setCompare]=useState(false),[metric,setMetric]=useState<UsageMetric>('requests'),[group,setGroup]=useState<UsageGroup>('model'),[query,setQuery]=useState(''),[detail,setDetail]=useState<UsageRow|null>(null),[budgetOpen,setBudgetOpen]=useState(false),[message,setMessage]=useState<string|null>(null)
+ useEffect(()=>{let active=true;setLoading(true);setError(null);void Promise.all([fetchUsageRecords(companyId),fetchSecurityPolicy(companyId),fetchTools(companyId)]).then(([data,saved,currentTools])=>{if(active){setRecords(data);setPolicy(saved.policy);setTools(currentTools)}}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load usage.')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[companyId,attempt])
+ const today=usageToday(),range=usageWindow(Number(period),today),current=useMemo(()=>usagePeriod(records,Number(period),false,today),[records,period,today]),previous=useMemo(()=>usageTotals(usagePeriod(records,Number(period),true,today)),[records,period,today]),totals=useMemo(()=>usageTotals(current),[current])
+ const rows=useMemo(()=>usageBreakdown(current,group,tools),[current,group,tools]),filtered=rows.filter(row=>row.name.toLowerCase().includes(query.trim().toLowerCase())),budget=policy?budgetUsage(records,policy.monthly,today):null
+ const {tableRef,rows:pageRows,pagination}=useUsagePagination(filtered,loading,JSON.stringify([period,group,query]))
+ const metrics=[{label:'Requests',value:totals.requests,previous:previous.requests,format:(n:number)=>Math.round(n).toLocaleString()},{label:'Tokens',value:totals.input+totals.output,previous:previous.input+previous.output,format:compactUsage},{label:'Agent Runs',value:totals.runs,previous:previous.runs,format:(n:number)=>Math.round(n).toLocaleString()},{label:'Estimated Cost',value:totals.cost,previous:previous.cost,format:usageMoney}]
+ function exportCsv(){const csv=usageExportCsv(filtered,group,companyId,range);const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=`sample-usage-${companyId}-${group}-${range.start}-${range.end}.csv`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setMessage('Exported all matching rows for the selected period and breakdown. Costs are mock estimates in MYR.')}
+ useEffect(()=>{setPeriod(initialPeriod);setDetail(null)},[initialPeriod])
+ function changePeriod(value:string){setPeriod(value);setDetail(null);setSearchParams(previous=>{const next=new URLSearchParams(previous);next.set('period',value);return next},{replace:true})}
+ return <AiSettingsShell><FlashToasts message={message} onClearMessage={()=>setMessage(null)}/><div className="ai-usage-page"><div className="ai-usage-toolbar"><SidebarSelect menuPortal id="usage-period" label="Time range" hideLabel options={[{value:'7',label:'Last 7 days'},{value:'30',label:'Last 30 days'},{value:'60',label:'Last 60 days'}]} value={period} onChange={changePeriod}/><label className="ai-usage-compare"><input type="checkbox" checked={compare} onChange={e=>setCompare(e.target.checked)}/>Compare previous period</label><Button variant="secondary" disabled={loading||!!error||!filtered.length} onClick={exportCsv}>Export</Button></div>
+ <div className="ai-usage-scroll">
+ {loading?<p role="status">Loading usage and budget…</p>:error?<div role="alert"><p>{error}</p><Button variant="secondary" onClick={()=>setAttempt(v=>v+1)}>Retry</Button></div>:<>
+ <div className="ai-usage-kpis">{metrics.map(item=><dl key={item.label}><dt>{item.label}</dt><dd>{item.format(item.value)}</dd><small hidden={!compare}>{compare?usageComparison(item.value,item.previous,Number(period)):`Selected ${period} days`}</small></dl>)}</div>
+
+ <div className="ai-usage-middle"><UsageTrend records={current} metric={metric} onMetric={setMetric}/>
+ <section className={'ai-usage-panel ai-usage-budget-panel '+(budget&&policy?(budget.spent>=policy.monthly?'is-over-budget':budget.forecast>policy.monthly?'is-budget-warning':'is-within-budget'):'')}><header><h3>Budget Health</h3><Button variant="ghost" onClick={()=>setBudgetOpen(true)}>View details</Button></header>{policy&&budget?<div className="ai-usage-budget"><small>{new Date(today+'T00:00:00Z').toLocaleDateString(undefined,{month:'long',year:'numeric',timeZone:'UTC'})} · Month to date · independent of time filter</small><dl><div><dt>Monthly budget</dt><dd>{usageMoney(policy.monthly)}</dd></div><div><dt>Spent (estimated)</dt><dd>{usageMoney(budget.spent)}</dd></div><div><dt>{budget.remaining>=0?'Remaining':'Over budget'}</dt><dd>{usageMoney(Math.abs(budget.remaining))}</dd></div></dl><div className="ai-usage-progress" role="progressbar" aria-label="Monthly budget used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100,Math.max(0,budget.used))} aria-valuetext={`${budget.used.toFixed(1)}% used`}><div style={{width:`${Math.min(100,Math.max(0,budget.used))}%`}}/></div><small>{budget.used.toLocaleString('en-MY',{maximumFractionDigits:budget.used>=100?0:1})}% used</small><div className="ai-usage-budget-state"><div><strong>{budget.remaining<0?'Over budget · '+usageMoney(Math.abs(budget.remaining)):budget.spent===policy.monthly?'Budget reached':budget.forecast>policy.monthly?'Forecast over budget':'Within budget'}</strong><small>{policy.behavior==='warn'?'Warn user at limit':'Block new requests at limit'}</small></div><div><small>Month-end forecast</small><strong>{usageMoney(budget.forecast)}</strong></div></div></div>:null}</section></div>
+ <TablePanel className={'ai-usage-breakdown'+(pagination.pageSize===0?' is-auto-pagination':'')}><header className="ai-usage-breakdown-heading"><h3>Usage Breakdown</h3><small>{`${usageDate(range.start)} – ${usageDate(range.end)}`}</small></header><TableToolbar search={<><TextField className="ai-usage-search-wide" type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search breakdown…" aria-label="Search breakdown"/><TextField className="ai-usage-search-compact" type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search…" aria-label="Search breakdown"/></>} filters={<div className="ai-usage-segments" aria-label="Usage breakdown">{groups.map(value=><Button key={value} variant="ghost" aria-pressed={group===value} onClick={()=>{setGroup(value);setQuery('');setDetail(null)}}>By {groupName(value)}</Button>)}</div>}/><div className="console-table-wrap" ref={tableRef} tabIndex={0} aria-label="Scrollable usage breakdown"><table className="console-table ai-usage-table"><thead><tr><th>{groupName(group)}</th><th>Requests</th><th>Tokens</th><th>Est. cost (MYR)</th><th>Error rate</th></tr></thead><tbody>{pageRows.map(row=><tr key={row.id}><td><button type="button" className="ai-usage-row-link" onClick={()=>setDetail(row)}>{row.name}</button>{group==='tool'&&rows.filter(item=>item.name===row.name).length>1?<small className="ai-usage-tool-id" title={row.id}>{row.id}</small>:null}</td><td>{row.requests.toLocaleString()}</td><td>{compactUsage(row.input+row.output)}</td><td>{row.cost.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>{row.requests?(row.errors/row.requests*100).toFixed(2)+'%':'—'}</td></tr>)}{!filtered.length?<tr><td colSpan={5}>{query.trim()?<>No usage matches this search. <Button variant="ghost" onClick={()=>setQuery('')}>Clear search</Button></>:'No usage recorded for this breakdown in the selected period.'}</td></tr>:null}</tbody></table></div><SettingsPagination id="usage-breakdown-pagination" pagesLabel="Usage breakdown pages" {...pagination}/></TablePanel>
+ </>}
+ </div></div>
+ <SettingsDrawer open={!!detail} title={detail?.name??'Usage details'} description={`Mock usage · ${range.start} to ${range.end} · estimated cost in MYR`} closeLabel="Close usage details" onClose={()=>setDetail(null)}>{detail?<UsageDetails rows={[['Requests',detail.requests.toLocaleString()],['Input tokens',detail.input.toLocaleString()],['Output tokens',detail.output.toLocaleString()],['Agent runs',detail.runs.toLocaleString()],['Tool calls',detail.calls.toLocaleString()],['Estimated cost',usageMoney(detail.cost)],['Errors',detail.errors.toLocaleString()]]}/>:null}</SettingsDrawer>
+ <SettingsDrawer open={budgetOpen} title="Budget Health" description="Saved Security & Limits budget · current month" closeLabel="Close budget details" onClose={()=>setBudgetOpen(false)} footer={<Button variant="secondary" onClick={()=>navigate('/ai/ai/ai-settings/security-limits')}>Manage budget</Button>}>{policy&&budget?<><UsageDetails rows={[['Monthly budget',usageMoney(policy.monthly)],['Daily budget',usageMoney(policy.daily)],['Spent (estimated)',usageMoney(budget.spent)],['Remaining',usageMoney(budget.remaining)],['Used',budget.used.toFixed(1)+'%'],['Month-end forecast',usageMoney(budget.forecast)],['When limit reached',policy.behavior==='warn'?'Warn user':'Block new requests']]}/><p className="ai-usage-disclaimer">Forecast uses month-to-date daily average. Budget Health always uses the current month, independent of the usage filter. Costs are seeded mock estimates, independent of configured model pricing, and are not provider invoices. Usage is simulated; no billing or runtime enforcement is connected.</p></>:null}</SettingsDrawer>
+ </AiSettingsShell>
+}
+function UsageDetails({rows}:{rows:[string,string][]}){return <dl className="ai-usage-detail-values">{rows.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+
+
+
+

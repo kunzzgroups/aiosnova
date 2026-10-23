@@ -6,6 +6,7 @@ import type {
   SaveProviderPayload,
 } from '../types/settings'
 import type { ConnectionTestResult } from './connectionService'
+import { fetchModelPreferences } from './modelPreferencesService'
 import {
   createStoredProvider,
   deleteStoredProvider,
@@ -19,6 +20,13 @@ import {
   listStoredModels,
   syncStoredProviderModels,
   setStoredModelEnabled,
+  setStoredModelsEnabled,
+  updateStoredModel,
+  deleteStoredModel,
+  deleteStoredModels,
+  createStoredModel,
+  refreshStoredModelCapabilities,
+  type DeleteStoredModelTarget,
   type StoredModelSummary,
 } from './modelApiService'
 
@@ -29,6 +37,7 @@ export type AssistantModelOption = {
   id: string
   providerId: string
   modelId: string
+  name: string
   label: string
 }
 
@@ -55,18 +64,13 @@ function ensureCompany(companyId: string) {
 
 export async function fetchRuntimeDefaults(companyId: string) {
   ensureCompany(companyId)
-  const enabled = models.filter(model =>
-    model.status === 'enabled' &&
-    (model.type === 'chat' || model.type === 'reasoning') &&
-    model.capabilities?.chat !== false &&
-    providers.some(provider => provider.id === model.providerId && provider.companyId === companyId && provider.enabled && provider.baseUrl.trim() === 'https://openrouter.ai/api/v1')
-  )
-  const model = enabled[0]
+  const [preferences, options] = await Promise.all([fetchModelPreferences(companyId), fetchAssistantModelOptions(companyId)])
+  const model = options.find(option => option.id === preferences.defaultModelConfigId)
   return {
-    provider: model ? providers.find(provider => provider.id === model.providerId)!.name : 'Not configured',
+    provider: model ? providers.find(provider => provider.id === model.providerId)?.name ?? 'Unavailable' : 'Not configured',
     model: model?.name ?? 'Not configured',
     fallbackModel: 'Not configured',
-    routing: model ? 'Enabled models in this company' : 'Not configured',
+    routing: model ? 'Company default model' : preferences.defaultModelConfigId ? 'Company default unavailable' : 'Not configured',
   }
 }
 
@@ -105,8 +109,10 @@ function toAiModel(summary: StoredModelSummary): AiModel {
     capabilitiesCheckedAt:
       summary.capabilitiesCheckedAt ?? undefined,
     capabilityError:
-      summary.capabilityError ??
-      (summary.capabilities ? undefined : '模型能力未知'),
+      (summary.capabilityError && /[\u3400-\u9fff]/.test(summary.capabilityError)
+        ? 'Stored capability metadata is incomplete. Refresh capabilities for details.'
+        : summary.capabilityError) ??
+      (summary.capabilities ? undefined : 'Model capabilities unknown'),
   }
 }
 
@@ -190,7 +196,7 @@ export async function fetchProviders(
   }
 
   if (summaries.some(item => item.companyId !== companyId)) {
-    throw new Error('后端返回了不属于当前公司的 Provider。')
+    throw new Error('The returned Provider belongs to another company.')
   }
 
   if ((providerCacheVersions.get(companyId) ?? 0) !== requestVersion) {
@@ -199,7 +205,7 @@ export async function fetchProviders(
 
   const items = summaries.map(toAiProvider)
 
-  // 替换当前公司的缓存，保留其他公司的缓存。
+  // Replace this company's cache while preserving other companies.
   providers = [
     ...providers.filter(provider => provider.companyId !== companyId),
     ...items,
@@ -225,7 +231,7 @@ export async function createProvider(
   const summary = await createStoredProvider(payload)
 
   if (summary.companyId !== payload.companyId) {
-    throw new Error('新增结果的公司 ID 不一致，请重新加载列表确认。')
+    throw new Error('The created record belongs to another company. Reload to confirm.')
   }
 
   const provider = toAiProvider(summary)
@@ -253,7 +259,7 @@ export async function updateProvider(
   )
 
   if (!existing) {
-    throw new Error('当前公司中未找到该 Provider，请刷新列表。')
+    throw new Error('Provider not found in this company. Reload the list.')
   }
 
   const summary = await updateStoredProvider(
@@ -266,7 +272,7 @@ export async function updateProvider(
     summary.id !== providerId ||
     summary.companyId !== payload.companyId
   ) {
-    throw new Error('后端返回的 Provider 不一致，请刷新列表确认。')
+    throw new Error('Provider response did not match. Reload to confirm.')
   }
 
   const updated = toAiProvider(summary)
@@ -296,7 +302,7 @@ export async function setProviderEnabled(
   )
 
   if (!existing) {
-    throw new Error('当前公司中未找到该 Provider，请刷新列表。')
+    throw new Error('Provider not found in this company. Reload the list.')
   }
 
   const summary = await setStoredProviderEnabled(
@@ -310,7 +316,7 @@ export async function setProviderEnabled(
     summary.id !== providerId ||
     summary.companyId !== companyId
   ) {
-    throw new Error('后端返回的 Provider 不一致，请刷新列表确认。')
+    throw new Error('Provider response did not match. Reload to confirm.')
   }
 
   const updated = toAiProvider(summary)
@@ -373,24 +379,197 @@ export async function fetchProviderModels(
 }
 
 export async function refreshModelCapabilities(
-  _companyId: string,
-  _providerId: string,
-  _id: string,
+  companyId: string,
+  providerId: string,
+  modelConfigId: string,
+  expectedVersion: number,
 ): Promise<AiModel> {
-  throw new Error('单模型能力刷新尚未接入数据库，请使用模型同步功能。')
+  ensureCompany(companyId)
+
+  const provider = providers.find(item =>
+    item.id === providerId &&
+    item.companyId === companyId
+  )
+
+  if (!provider) {
+    throw new Error('Provider not found in this company.')
+  }
+
+  const existing = models.find(item =>
+    item.id === modelConfigId &&
+    item.providerId === providerId
+  )
+
+  if (!existing) {
+    throw new Error('Model not found under this Provider. Reload the list.')
+  }
+
+  if (
+    !Number.isSafeInteger(expectedVersion) ||
+    expectedVersion < 0
+  ) {
+    throw new Error('Invalid model version. Reload the list.')
+  }
+
+  const summary = await refreshStoredModelCapabilities(
+    companyId,
+    providerId,
+    modelConfigId,
+    expectedVersion,
+  )
+
+  if (
+    summary.modelId !== existing.modelId ||
+    summary.name !== existing.name ||
+    summary.status !== existing.status ||
+    !summary.capabilitiesCheckedAt
+  ) {
+    throw new Error('Invalid capability refresh response. Reload the model list to confirm.')
+  }
+
+  const updated = toAiModel(summary)
+
+  models = models.map(item =>
+    item.id === modelConfigId &&
+      item.providerId === providerId
+      ? updated
+      : item
+  )
+
+  return cloneModel(updated)
 }
 
 export async function createModel(
-  _payload: SaveModelPayload,
+  payload: SaveModelPayload,
+  companyId: string,
 ): Promise<AiModel> {
-  throw new Error('模型手动新增尚未接入数据库，请先使用同步功能。')
+  ensureCompany(companyId)
+
+  const provider = providers.find(item =>
+    item.id === payload.providerId &&
+    item.companyId === companyId
+  )
+
+  if (!provider) {
+    throw new Error('Provider not found in this company. Reload the list.')
+  }
+
+  const name = payload.name.trim()
+  const modelId = payload.modelId.trim()
+
+  if (!name || !modelId) {
+    throw new Error('Enter a model name and model ID.')
+  }
+
+  if (
+    !Number.isSafeInteger(payload.contextWindow) ||
+    payload.contextWindow < 0 ||
+    payload.contextWindow > 2147483647
+  ) {
+    throw new Error(
+      'Context window must be an integer from 0 to 2147483647; 0 means unknown.',
+    )
+  }
+
+  const summary = await createStoredModel({
+    companyId,
+    providerId: provider.id,
+    modelId,
+    name,
+    type: payload.type,
+    description: payload.description?.trim() ?? '',
+    contextWindow:
+      payload.contextWindow === 0 ? null : payload.contextWindow,
+  })
+
+  const created = toAiModel(summary)
+
+  models = [
+    ...models.filter(item =>
+      !(item.id === created.id && item.providerId === created.providerId)
+    ),
+    created,
+  ]
+
+  recalcProviderCount(provider.id)
+
+  return cloneModel(created)
 }
 
 export async function updateModel(
-  _modelId: string,
-  _payload: SaveModelPayload,
+  modelConfigId: string,
+  payload: SaveModelPayload,
+  companyId: string,
+  expectedVersion: number,
 ): Promise<AiModel> {
-  throw new Error('模型编辑尚未接入数据库，暂时无法保存。')
+  ensureCompany(companyId)
+
+  const provider = providers.find(item =>
+    item.id === payload.providerId &&
+    item.companyId === companyId
+  )
+
+  if (!provider) {
+    throw new Error('Provider not found in this company. Reload the list.')
+  }
+
+  const existing = models.find(item =>
+    item.id === modelConfigId &&
+    item.providerId === payload.providerId
+  )
+
+  if (!existing) {
+    throw new Error('Model not found under this Provider. Reload the list.')
+  }
+
+  if (
+    !Number.isSafeInteger(expectedVersion) ||
+    expectedVersion < 0
+  ) {
+    throw new Error('Invalid model version. Close the form and reload.')
+  }
+
+  if (payload.modelId.trim() !== existing.modelId) {
+    throw new Error('The external model ID cannot be changed when editing.')
+  }
+
+  if (
+    !Number.isSafeInteger(payload.contextWindow) ||
+    payload.contextWindow < 0 ||
+    payload.contextWindow > 2147483647
+  ) {
+    throw new Error('Context window must be an integer from 0 to 2147483647; 0 means unknown.')
+  }
+
+  const summary = await updateStoredModel(modelConfigId, {
+    companyId,
+    providerId: payload.providerId,
+    name: payload.name.trim(),
+    type: payload.type,
+    enabled: payload.enabled,
+    description: payload.description?.trim() ?? '',
+    contextWindow:
+      payload.contextWindow === 0 ? null : payload.contextWindow,
+    version: expectedVersion,
+  })
+
+  if (
+    summary.modelId !== existing.modelId ||
+    summary.status !== (payload.enabled ? 'enabled' : 'disabled')
+  ) {
+    throw new Error('Model configuration response did not match. Reload to confirm.')
+  }
+
+  const updated = toAiModel(summary)
+
+  models = models.map(item =>
+    item.id === modelConfigId &&
+      item.providerId === payload.providerId
+      ? updated
+      : item
+  )
+
+  return cloneModel(updated)
 }
 
 export async function setModelEnabled(
@@ -409,7 +588,7 @@ export async function setModelEnabled(
   )
 
   if (!provider) {
-    throw new Error('当前公司中未找到该 Provider，请刷新列表。')
+    throw new Error('Provider not found in this company. Reload the list.')
   }
 
   const existing = models.find(
@@ -419,14 +598,14 @@ export async function setModelEnabled(
   )
 
   if (!existing) {
-    throw new Error('当前 Provider 中未找到模型，请刷新列表。')
+    throw new Error('Model not found under this Provider. Reload the list.')
   }
 
   if (
     !Number.isSafeInteger(expectedVersion) ||
     expectedVersion < 0
   ) {
-    throw new Error('模型版本号无效，请刷新列表。')
+    throw new Error('Invalid model version. Reload the list.')
   }
 
   const summary = await setStoredModelEnabled(
@@ -444,7 +623,7 @@ export async function setModelEnabled(
     summary.status !== (enabled ? 'enabled' : 'disabled') ||
     summary.version !== expectedVersion + 1
   ) {
-    throw new Error('后端返回的模型状态不一致，请刷新列表确认。')
+    throw new Error('Model state response did not match. Reload to confirm.')
   }
 
   const updated = toAiModel(summary)
@@ -456,6 +635,16 @@ export async function setModelEnabled(
   )
 
   return cloneModel(updated)
+}
+
+export async function setModelsEnabled(companyId: string, providerId: string, enabled: boolean,
+  targets: { id: string; version: number }[]): Promise<void> {
+  ensureCompany(companyId)
+  if (!providers.some(provider => provider.companyId === companyId && provider.id === providerId)) throw new Error('Provider not found in this company.')
+  if (!targets.length || targets.length > 1000 || new Set(targets.map(target => target.id)).size !== targets.length)
+    throw new Error('Select between 1 and 1,000 distinct models.')
+  await setStoredModelsEnabled(companyId, providerId, enabled, targets)
+  await fetchProviderModels(providerId, companyId)
 }
 
 export function resolveExecutableModel(
@@ -475,11 +664,11 @@ export function resolveExecutableModel(
   )
 
   if (!provider) {
-    throw new Error('当前公司下未找到这个 Provider。')
+    throw new Error('Provider not found in this company.')
   }
 
   if (!provider.enabled) {
-    throw new Error('这个 Provider 已停用，无法调用模型。')
+    throw new Error('This Provider is disabled and cannot run models.')
   }
 
   const model = models.find(
@@ -489,17 +678,34 @@ export function resolveExecutableModel(
   )
 
   if (!model) {
-    throw new Error('这个 Provider 下未找到模型。')
+    throw new Error('Model not found under this Provider.')
   }
 
   if (model.status !== 'enabled') {
-    throw new Error('这个模型未启用，无法执行。')
+    throw new Error('This model is disabled and cannot run.')
   }
 
   return {
     provider: cloneProvider(provider),
     model: cloneModel(model),
   }
+}
+
+export async function fetchCompanyModels(companyId: string): Promise<{ providers: AiProvider[]; items: AiModel[]; capabilityErrors: string[] }> {
+  const result = await fetchProviders(companyId)
+  const groups = await Promise.all(result.items.map(async provider => {
+    const models = await fetchProviderModels(provider.id, companyId)
+    return { ...models, capabilityErrors: models.capabilityErrors.map(message => `${provider.name}: ${message}`) }
+  }))
+  return { providers: result.items, items: groups.flatMap(group => group.items), capabilityErrors: groups.flatMap(group => group.capabilityErrors) }
+}
+
+export function availableCompanyModelOptions(companyProviders: AiProvider[], companyModels: AiModel[]): AssistantModelOption[] {
+  const parents = new Map(companyProviders.filter(provider => provider.enabled && provider.apiKeyMasked && provider.baseUrl.trim() === 'https://openrouter.ai/api/v1').map(provider => [provider.id, provider]))
+  return companyModels.filter(model => parents.has(model.providerId) && model.status === 'enabled' &&
+    (model.type === 'chat' || model.type === 'reasoning') && model.capabilities?.chat === true && model.capabilitiesCheckedAt && !model.capabilityError)
+    .map(model => ({ id: model.id, providerId: model.providerId, modelId: model.modelId, name: model.name, label: `${model.name} (${parents.get(model.providerId)!.name})` }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 }
 
 export async function fetchAssistantModelOptions(
@@ -527,31 +733,65 @@ export async function fetchAssistantModelOptions(
       )
 
       return result.items
-        .filter(
-          model =>
-            model.providerId === provider.id &&
-            model.status === 'enabled' &&
-            (model.type === 'chat' || model.type === 'reasoning') &&
-            model.capabilities?.chat === true,
-        )
-        .map(model => ({
-          id: model.id,
-          providerId: provider.id,
-          modelId: model.modelId,
-          label: `${model.name} (${provider.name})`,
-        }))
     }),
   )
 
-  return groups
-    .flat()
-    .sort((a, b) => a.label.localeCompare(b.label))
+  return availableCompanyModelOptions(availableProviders, groups.flat())
 }
 
 export async function deleteModel(
-  _modelId: string,
+  modelConfigId: string,
+  companyId: string,
+  providerId: string,
+  expectedVersion: number,
 ): Promise<void> {
-  throw new Error('模型删除尚未接入数据库，暂时无法删除。')
+  ensureCompany(companyId)
+
+  const provider = providers.find(item =>
+    item.id === providerId &&
+    item.companyId === companyId
+  )
+
+  if (!provider) {
+    throw new Error('Provider not found in this company. Reload the list.')
+  }
+
+  const existing = models.find(item =>
+    item.id === modelConfigId &&
+    item.providerId === providerId
+  )
+
+  if (!existing) {
+    throw new Error('Model not found under this Provider. Reload the list.')
+  }
+
+  if (existing.status !== 'disabled') {
+    throw new Error('Disable the model before deleting it.')
+  }
+
+  if (
+    !Number.isSafeInteger(expectedVersion) ||
+    expectedVersion < 0
+  ) {
+    throw new Error('Invalid model version. Close the dialog and reload.')
+  }
+
+  await deleteStoredModel(
+    companyId,
+    providerId,
+    modelConfigId,
+    expectedVersion,
+  )
+
+  // 后端确认删除成功后，才移除本地缓存。
+  models = models.filter(item =>
+    !(
+      item.id === modelConfigId &&
+      item.providerId === providerId
+    )
+  )
+
+  recalcProviderCount(providerId)
 }
 
 export async function deleteProviders(
@@ -559,20 +799,20 @@ export async function deleteProviders(
   ids: string[],
 ): Promise<void> {
   ensureCompany(companyId)
-  if (!ids.length || ids.length > 100) throw new Error('请选择 1 到 100 个 Provider。')
+  if (!ids.length || ids.length > 100) throw new Error('Select between 1 and 100 Providers.')
   const uniqueIds = new Set(ids)
-  if (uniqueIds.size !== ids.length) throw new Error('不能重复选择同一个 Provider。')
+  if (uniqueIds.size !== ids.length) throw new Error('Do not select the same Provider twice.')
   const selected = providers.filter(provider => provider.companyId === companyId && uniqueIds.has(provider.id))
-  if (selected.length !== ids.length) throw new Error('选择的 Provider 已改变，请刷新列表后重试。')
-  if (selected.some(provider => provider.enabled)) throw new Error('请先停用所有选中的 Provider。')
+  if (selected.length !== ids.length) throw new Error('Selected Providers changed. Reload and try again.')
+  if (selected.some(provider => provider.enabled)) throw new Error('Disable all selected Providers first.')
   if (models.some(model => uniqueIds.has(model.providerId) && model.usedByAgents > 0)) {
-    throw new Error('请先解除选中 Provider 下模型与 Agent 的关联。')
+    throw new Error('Unassign Agents from the selected Providers before deleting.')
   }
 
   const result = await deleteStoredProviders(companyId, selected.map(provider => ({ id: provider.id, version: provider.version })))
   // 请求成功后使旧列表失效，即使响应数量异常也不能让旧响应恢复记录。
   advanceProviderCache(companyId)
-  if (result.deleted !== selected.length) throw new Error('后端返回的删除数量不一致，请刷新列表确认。')
+  if (result.deleted !== selected.length) throw new Error('Deleted count did not match. Reload to confirm.')
   providers = providers.filter(provider => provider.companyId !== companyId || !uniqueIds.has(provider.id))
   models = models.filter(model => !uniqueIds.has(model.providerId))
 }
@@ -590,11 +830,11 @@ export async function deleteProvider(
   )
 
   if (!existing) {
-    throw new Error('当前公司中未找到该 Provider，请刷新列表。')
+    throw new Error('Provider not found in this company. Reload the list.')
   }
 
   if (existing.enabled) {
-    throw new Error('请先停用 Provider，再删除。')
+    throw new Error('Disable the Provider before deleting it.')
   }
 
   const hasUsedModels = models.some(
@@ -604,7 +844,7 @@ export async function deleteProvider(
   )
 
   if (hasUsedModels) {
-    throw new Error('请先解除该 Provider 下模型与 Agent 的关联。')
+    throw new Error('Unassign Agents from this Provider before deleting.')
   }
 
   await deleteStoredProvider(
@@ -627,10 +867,66 @@ export async function deleteProvider(
 }
 
 export async function deleteModels(
-  _providerId: string,
-  _ids: string[],
+  companyId: string,
+  providerId: string,
+  targets: DeleteStoredModelTarget[],
 ): Promise<void> {
-  throw new Error('模型批量删除尚未接入数据库，暂时无法删除。')
+  ensureCompany(companyId)
+
+  if (targets.length < 1 || targets.length > 100) {
+    throw new Error('Select between 1 and 100 models.')
+  }
+
+  // 复制调用方提供的版本，不能从缓存替换成最新版本。
+  const items = targets.map(item => ({
+    id: item.id,
+    version: item.version,
+  }))
+
+  const ids = new Set(items.map(item => item.id))
+
+  if (ids.size !== items.length) {
+    throw new Error('Do not select the same model twice.')
+  }
+
+  if (items.some(item =>
+    !item.id.trim() ||
+    !Number.isSafeInteger(item.version) ||
+    item.version < 0
+  )) {
+    throw new Error('Invalid model ID or version. Select the models again.')
+  }
+
+  const provider = providers.find(item =>
+    item.id === providerId &&
+    item.companyId === companyId
+  )
+
+  if (!provider) {
+    throw new Error('Provider not found in this company.')
+  }
+
+  const selected = models.filter(item =>
+    item.providerId === providerId &&
+    ids.has(item.id)
+  )
+
+  if (selected.length !== items.length) {
+    throw new Error('Some models no longer exist. Reload and select again.')
+  }
+
+  if (selected.some(item => item.status !== 'disabled')) {
+    throw new Error('Disable all selected models first.')
+  }
+
+  await deleteStoredModels(companyId, providerId, items)
+
+  // 整批请求成功后，才移除缓存。
+  models = models.filter(item =>
+    item.providerId !== providerId || !ids.has(item.id)
+  )
+
+  recalcProviderCount(providerId)
 }
 
 export async function syncProviderModels(
@@ -647,10 +943,10 @@ export async function syncProviderModels(
   try {
     await fetchProviderModels(providerId, companyId)
   } catch (error) {
-    const detail = error instanceof Error ? error.message : '未知错误'
+    const detail = error instanceof Error ? error.message : 'Unknown error'
 
     throw new Error(
-      `数据库同步已完成，但重新加载列表失败，请刷新页面确认：${detail}`,
+      `Database sync completed, but reloading failed. Refresh to confirm: ${detail}`,
     )
   }
 

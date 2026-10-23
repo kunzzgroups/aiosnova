@@ -37,7 +37,7 @@ export type StoredModelSyncResult = {
 async function checkResponse(response: Response): Promise<void> {
   if (response.ok) return
 
-  let message = `模型请求失败，HTTP 状态码：${response.status}`
+  let message = `Model request failed. HTTP status: ${response.status}`
 
   try {
     const body: unknown = await response.json()
@@ -56,6 +56,33 @@ async function checkResponse(response: Response): Promise<void> {
   }
 
   throw new Error(message)
+}
+
+export async function setStoredModelsEnabled(
+  companyId: string, providerId: string, enabled: boolean,
+  items: { id: string; version: number }[],
+): Promise<void> {
+  const response = await fetch('/api/ai/models/bulk-enabled', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId, providerId, enabled, items }),
+  })
+  await checkResponse(response)
+  const result = await response.json()
+  if (result.updated !== items.length) throw new Error('The updated count did not match. Reload the list to confirm.')
+}
+
+export type CompanyModelTarget = { providerId: string; id: string; version: number }
+
+export async function mutateCompanyModels(companyId: string, items: CompanyModelTarget[], action: 'enable' | 'disable' | 'delete'): Promise<void> {
+  const deleting = action === 'delete'
+  const response = await fetch(`/api/ai/models/${deleting ? 'company-bulk-delete' : 'company-bulk-enabled'}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId, items, ...(deleting ? {} : { enabled: action === 'enable' }) }),
+  })
+  await checkResponse(response)
+  const result = await response.json()
+  if (result[deleting ? 'deleted' : 'updated'] !== items.length)
+    throw new Error('The result count did not match. Reload the model list to confirm.')
 }
 
 export async function listStoredModels(
@@ -79,7 +106,7 @@ export async function listStoredModels(
     !Array.isArray(result.items) ||
     result.count !== result.items.length
   ) {
-    throw new Error('后端返回的模型列表格式异常')
+    throw new Error('Invalid model list response.')
   }
 
   if (
@@ -89,7 +116,7 @@ export async function listStoredModels(
         model.providerId !== providerId,
     )
   ) {
-    throw new Error('后端返回了不属于当前公司或 Provider 的模型')
+    throw new Error('Returned models belong to another company or Provider.')
   }
 
   return result
@@ -124,7 +151,7 @@ export async function syncStoredProviderModels(
       warning => typeof warning !== 'string',
     )
   ) {
-    throw new Error('同步响应格式异常，请重新读取模型列表确认结果')
+    throw new Error('Invalid sync response. Reload the model list to confirm.')
   }
 
   return result
@@ -156,6 +183,190 @@ export async function setStoredModelEnabled(
   await checkResponse(response)
 
   const result: StoredModelSummary = await response.json()
+
+  return result
+}
+
+export type UpdateStoredModelInput = {
+  companyId: string
+  providerId: string
+  name: string
+  type: ModelType
+  enabled: boolean
+  description: string
+  contextWindow: number | null
+  version: number
+}
+
+export async function updateStoredModel(
+  modelConfigId: string,
+  input: UpdateStoredModelInput,
+): Promise<StoredModelSummary> {
+  const response = await fetch(
+    `/api/ai/models/${encodeURIComponent(modelConfigId)}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    },
+  )
+
+  await checkResponse(response)
+
+  const result: StoredModelSummary = await response.json()
+
+  if (
+    result.id !== modelConfigId ||
+    result.companyId !== input.companyId ||
+    result.providerId !== input.providerId ||
+    result.version !== input.version + 1
+  ) {
+    throw new Error(
+      'Model configuration response did not match. Reload to confirm.',
+    )
+  }
+
+  return result
+}
+
+export async function deleteStoredModel(
+  companyId: string,
+  providerId: string,
+  modelConfigId: string,
+  version: number,
+): Promise<void> {
+  const params = new URLSearchParams({
+    companyId,
+    providerId,
+    version: String(version),
+  })
+
+  const response = await fetch(
+    `/api/ai/models/${encodeURIComponent(modelConfigId)}?${params}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  await checkResponse(response)
+
+  if (response.status !== 204) {
+    throw new Error('Invalid delete response. Reload the model list to confirm.')
+  }
+}
+
+export type DeleteStoredModelTarget = {
+  id: string
+  version: number
+}
+
+export async function deleteStoredModels(
+  companyId: string,
+  providerId: string,
+  items: DeleteStoredModelTarget[],
+): Promise<{ deleted: number }> {
+  const response = await fetch('/api/ai/models/bulk-delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      companyId,
+      providerId,
+      items,
+    }),
+  })
+
+  await checkResponse(response)
+
+  const result: { deleted: number } = await response.json()
+
+  if (
+    !Number.isSafeInteger(result.deleted) ||
+    result.deleted !== items.length
+  ) {
+    throw new Error('Deleted count did not match the request. Reload to confirm.')
+  }
+
+  return result
+}
+
+export type CreateStoredModelInput = {
+  companyId: string
+  providerId: string
+  modelId: string
+  name: string
+  type: ModelType
+  description: string
+  contextWindow: number | null
+}
+
+export async function createStoredModel(
+  input: CreateStoredModelInput,
+): Promise<StoredModelSummary> {
+  const response = await fetch('/api/ai/models', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  })
+
+  await checkResponse(response)
+
+  const result: StoredModelSummary = await response.json()
+
+  if (
+    response.status !== 201 ||
+    typeof result.id !== 'string' ||
+    !result.id ||
+    result.companyId !== input.companyId ||
+    result.providerId !== input.providerId ||
+    result.modelId !== input.modelId ||
+    result.status !== 'disabled' ||
+    result.version !== 0
+  ) {
+    throw new Error('Invalid create response. Reload the model list to confirm.')
+  }
+
+  return result
+}
+
+export async function refreshStoredModelCapabilities(
+  companyId: string,
+  providerId: string,
+  modelConfigId: string,
+  version: number,
+): Promise<StoredModelSummary> {
+  const response = await fetch(
+    `/api/ai/models/${encodeURIComponent(modelConfigId)}/refresh-capabilities`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        companyId,
+        providerId,
+        version,
+      }),
+    },
+  )
+
+  await checkResponse(response)
+
+  const result: StoredModelSummary = await response.json()
+
+  if (
+    result.id !== modelConfigId ||
+    result.companyId !== companyId ||
+    result.providerId !== providerId ||
+    result.version !== version + 1
+  ) {
+    throw new Error('Invalid capability refresh response. Reload the model list to confirm.')
+  }
 
   return result
 }

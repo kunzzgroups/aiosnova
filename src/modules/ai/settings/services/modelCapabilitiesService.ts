@@ -22,7 +22,7 @@ export async function fetchModelCapabilities(
     const normalizedId = modelId.trim()
 
     if (!normalizedId) {
-        throw new Error('请填写模型 ID。')
+        throw new Error('Enter a model ID.')
     }
 
     const query = new URLSearchParams({
@@ -35,7 +35,7 @@ export async function fetchModelCapabilities(
 
     if (!response.ok) {
         throw new Error(
-            `后端请求失败，HTTP 状态码：${response.status}`
+            `Server request failed. HTTP status: ${response.status}`
         )
     }
 
