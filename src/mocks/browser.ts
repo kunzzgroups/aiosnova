@@ -6,6 +6,7 @@ import { agentHandlers } from '@/mocks/handlers/agentHandlers'
 import { knowledgeHandlers } from '@/mocks/handlers/knowledgeHandlers'
 
 const backendTacHandlers = [
+  http.get('/api/identity/directory', () => passthrough()),
   http.get('/api/identity/organizations/:id/removal-impact', () => passthrough()),
   http.post('/api/identity/organizations/:id/remove', () => passthrough()),
   http.delete('/api/identity/users/:id', () => passthrough()),

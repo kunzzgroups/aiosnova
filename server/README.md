@@ -110,6 +110,22 @@ Deployed HTTP, browser and MySQL integration for this shortcut remain unverified
 
 # Deployed backend profile
 
+Directory reads use `GET /api/identity/directory?companyId=UUID` with optional
+`userId`, in both local and prod. The controller authenticates the backend session
+and delegates to the existing DirectoryService: actor/grants are re-read, company
+access and merchant scope are checked, unrelated users are rejected, owner/phone
+visibility rules are preserved, and responses are `private, no-store`. The legacy
+local directory route remains for compatibility; other local invitation APIs and
+the mock inbox are not exposed in prod. No database migration is needed.
+
+Deploy frontend and backend together and route `/api/identity/directory` to Spring
+Boot. The current employee UI still uses MSW adapters, so its deployed build needs
+`VITE_ENABLE_MOCK=true`; this change does not replace those adapters or implement
+prod invitation sending/profile-edit endpoints. Do not expose the full local
+controller to make those operations available. API reads still require backend
+authorization regardless of frontend mocks. Real database company codes must
+match the current frontend company catalog mapping for those adapters to work.
+
 Use `SPRING_PROFILES_ACTIVE=prod` to load `application-prod.yml`. This profile
 uses Resend explicitly (no mock email fallback) and reads `DB_HOST`, `DB_PORT`
 (default 3306), `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `AUTH_STORAGE_KEY`,
