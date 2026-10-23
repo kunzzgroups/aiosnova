@@ -28,12 +28,16 @@ export type IdentityUser = {
   lastActiveAt: string | null
   createdBy?: string | null
   createdAt: string
-  
+
 }
 
 export type IdentityProfilePayload = Partial<
   Pick<IdentityUser, 'email' | 'displayName' | 'fullName' | 'phone' | 'avatarUrl' | 'language' | 'timezone' | 'status' | 'departmentId' | 'positionId' | 'requireMfa' | 'canInvite' | 'canManageUsers'>
-> & { version?: number; assignments?: InvitationAssignment[] }
+> & {
+  version?: number
+  assignments?: InvitationAssignment[]
+  roleIds?: string[]
+}
 
 export function isIdentityProfileComplete(user: Pick<IdentityUser, 'fullName' | 'phone'>): boolean {
   return user.fullName.trim().length > 0 && user.phone.trim().length > 0

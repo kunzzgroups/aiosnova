@@ -8,7 +8,9 @@ export type SelectFieldProps = {
   label: string
   value: string
   options: { value: string; label: string; disabled?: boolean; parentValue?: string | null; groups?: string[] }[]
-  picker?: { tree?: boolean; hideGroupHeadings?: boolean; searchLabel: string; clearLabel: string; emptyLabel: string; expandLabel: string; collapseLabel: string }
+  picker?: { popupWidth?: number; boundarySelector?: string; tree?: boolean; hideGroupHeadings?: boolean; searchLabel: string; clearLabel: string; emptyLabel: string; expandLabel: string; collapseLabel: string }
+  /** Optional multi-selection for the searchable picker. */
+  multiple?: { values: string[]; summary: string; onToggle: (value: string) => void }
   disabled?: boolean
   onChange: (value: string) => void
 }

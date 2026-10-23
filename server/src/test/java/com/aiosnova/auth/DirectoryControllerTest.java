@@ -43,7 +43,7 @@ class DirectoryControllerTest {
         var sessions = new SessionService(null, null, "merchant") {
             @Override public Actor authenticate(HttpServletRequest request) { return actor; }
         };
-        var controller = new DirectoryController(sessions, new DirectoryService(repository, null));
+        var controller = new DirectoryController(sessions, new DirectoryService(repository, null, null));
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(ResponseStatusException.class,
                 () -> controller.read("foreign-company", null, null)).getStatusCode());
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(ResponseStatusException.class,
