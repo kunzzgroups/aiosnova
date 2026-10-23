@@ -3,6 +3,9 @@ package com.aiosnova.organization;
 import com.aiosnova.auth.AuthRepository;
 import com.aiosnova.auth.AuthSecretService;
 import com.aiosnova.auth.SessionService.Actor;
+import com.aiosnova.organization.OrganizationRepository.Department;
+import com.aiosnova.organization.OrganizationRepository.Position;
+import com.aiosnova.access.PermissionService;
 import com.aiosnova.audit.AuditChanges;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -26,13 +29,15 @@ public class OrganizationService {
     private final AuthSecretService secrets;
     private final ObjectMapper json;
     private final OrganizationAssignmentService assignments;
+    private final PermissionService permissions;
 
-    public OrganizationService(OrganizationRepository repository, AuthRepository auth, AuthSecretService secrets, ObjectMapper json, OrganizationAssignmentService assignments) {
+    public OrganizationService(OrganizationRepository repository, AuthRepository auth, AuthSecretService secrets, ObjectMapper json, OrganizationAssignmentService assignments, PermissionService permissions) {
         this.repository = repository;
         this.auth = auth;
         this.secrets = secrets;
         this.json = json;
         this.assignments = assignments;
+        this.permissions = permissions;
     }
 
     @Transactional(readOnly = true)
@@ -150,7 +155,7 @@ public class OrganizationService {
         return repository.companies(actor.merchantId(), actor.id(), actor.owner()).stream().map(company -> {
             boolean manage = canManage(current, company.id());
             return new CompanyAccess(company.id(), company.code(), company.name(), manage ||
-                    auth.hasCompanyPermission(current.merchantId(), company.id(), current.id(), "organization.read"), manage);
+                    permissions.hasPermission(current, "organization.read"), manage);
         }).toList();
     }
 
@@ -416,7 +421,7 @@ public class OrganizationService {
         if (write && !repository.lockCompany(actor.merchantId(), companyId)) fail(HttpStatus.FORBIDDEN, "org.accessDenied");
         if (repository.companies(actor.merchantId(), actor.id(), actor.owner()).stream().noneMatch(c -> c.id().equals(companyId))) fail(HttpStatus.FORBIDDEN, "org.accessDenied");
         boolean manage = canManage(actor, companyId);
-        if (write ? !manage : !(manage || auth.hasCompanyPermission(actor.merchantId(), companyId, actor.id(), "organization.read"))) fail(HttpStatus.FORBIDDEN, "org.permissionDenied");
+        if (write ? !manage : !(manage || permissions.hasPermission(actor, "organization.read"))) fail(HttpStatus.FORBIDDEN, "org.permissionDenied");
         return actor;
     }
 
@@ -427,7 +432,7 @@ public class OrganizationService {
     }
 
     private boolean canManage(Actor actor, String companyId) {
-        return actor.owner() || auth.hasCompanyPermission(actor.merchantId(), companyId, actor.id(), "organization.manage");
+        return actor.owner() || permissions.hasPermission(actor, "organization.manage");
     }
 
     private String companyFor(Actor actor, String table, String id) {

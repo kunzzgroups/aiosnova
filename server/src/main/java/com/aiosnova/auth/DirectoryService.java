@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import com.aiosnova.access.RoleService;
 import com.aiosnova.audit.AuditChanges;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,10 +16,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class DirectoryService {
     private final AuthRepository repository;
     private final com.aiosnova.organization.OrganizationAssignmentService assignments;
+    private final RoleService roles;
 
-    public DirectoryService(AuthRepository repository, com.aiosnova.organization.OrganizationAssignmentService assignments) {
+    public DirectoryService(AuthRepository repository, com.aiosnova.organization.OrganizationAssignmentService assignments, RoleService roles) {
         this.repository = repository;
         this.assignments = assignments;
+        this.roles = roles;
     }
 
     @Transactional(readOnly = true)
@@ -46,6 +50,9 @@ public class DirectoryService {
         // Re-read grants after taking the merchant lock so revocation and edits cannot race.
         actor = repository.actor(actor.merchantId(), actor.id());
         if (actor == null || !"active".equals(actor.status())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        if (request.roleIds() != null && !actor.owner()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         AuthRepository.DirectoryUser target = repository.directoryUser(actor.merchantId(), userId);
         if (target == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         boolean manager = actor.owner() || actor.manageUsers();
@@ -85,6 +92,9 @@ public class DirectoryService {
                     || repository.accessibleCompanies(actor).stream().noneMatch(company -> company.id().equals(placementCompanyId)))) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         var retainedPlacements = manager ? assignments.retainedPlacements(actor.merchantId(), userId) : java.util.Set.<String>of();
+        if (request.roleIds() != null) {
+            roles.updateUserRoles(actor, userId, request.roleIds());
+        }
         repository.updateProfile(actor.merchantId(), userId, request);
         if (manager && request.placementCompanyId() != null && (request.departmentId() != null || request.positionId() != null)) repository.saveCompanyPlacement(actor.merchantId(), request.placementCompanyId(), userId, departmentId, positionId);
         if (selected != null) repository.replaceCompanies(actor.merchantId(), userId, selected);
@@ -143,7 +153,7 @@ public class DirectoryService {
 
     public record Profile(String email, String fullName, String displayName, String phone, String avatarUrl,
                           String language, String timezone, String status, String departmentId, String positionId,
-                          Boolean requireMfa, Boolean canInvite, Boolean canManageUsers, List<String> companyCodes, String placementCompanyId, Long version) {
+                          Boolean requireMfa, Boolean canInvite, Boolean canManageUsers, List<String> companyCodes, String placementCompanyId, Long version, List<String> roleIds) {
         public Profile {
             if (email != null) email = email.trim().toLowerCase(Locale.ROOT);
             if (fullName != null) fullName = fullName.trim();

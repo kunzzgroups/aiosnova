@@ -251,3 +251,43 @@ export async function updateInvitation(id: string, payload: InvitationPayload) {
     method: 'PATCH', auth: true, body: payload,
   })
 }
+
+export async function fetchUserRoleIds(
+  userId: string,
+  signal?: AbortSignal
+) {
+  return apiRequest<string[]>(
+    `/api/identity/users/${encodeURIComponent(userId)}/roles`,{
+      auth : true, signal 
+    }
+  )
+}
+
+export async function saveUserRoles(
+  userId: string,
+  roleIds: string[]
+) {
+  return apiRequest<void>(
+    `/api/identity/users/${encodeURIComponent(userId)}/roles`,{
+      method: 'PUT',
+      auth: true,
+      body: {roleIds},
+    }
+  )
+}
+
+export type RoleOption = {
+  id: string
+  name: string
+  status: 'enabled' | 'disabled'
+  permissions: string[]
+}
+
+export async function fetchRoleOptions(signal?: AbortSignal) {
+  return apiRequest<RoleOption[]>(
+    `/api/identity/roles`, {
+      auth: true,
+      signal
+    }
+  )
+}
