@@ -1,8 +1,10 @@
 const assert=require('node:assert/strict')
-const {load,clean}=require('./check-settings-companies.cjs')
+const {load,clean,api}=require('./check-settings-companies.cjs')
 const tools=load('src/modules/ai/settings/services/toolsService.ts')
 const mcp=load('src/modules/ai/settings/services/mcpService.ts')
 const settings=load('src/modules/ai/settings/services/settingsService.ts')
+const {testModelConnection}=load('src/modules/ai/settings/services/connectionService.ts')
+const {testStoredProviderConnection}=load('src/modules/ai/settings/services/providerApiService.ts')
 async function main(){
   const company='company-j1'
   const otherTools=clean(await tools.fetchTools('company-j2'))
@@ -27,12 +29,29 @@ async function main(){
   const provider=(await settings.fetchProviders(company)).items[0]
   const before=clean(await settings.fetchProvider(provider.id))
   for(const baseUrl of ['https://','https://?invalid','javascript:alert(1)','https://bad host.test']){
-    const result=await settings.testProviderConnection({companyId:company,providerId:provider.id,baseUrl,outcome:'success'})
+    const result=await testModelConnection({baseUrl,apiKey:'fake-draft-key',modelId:'test/shared-model'})
     assert.equal(result.ok,false)
     assert.deepEqual(clean(await settings.fetchProvider(provider.id)),before)
+    assert.equal(api.calls.at(-1).path,'/api/ai/test-connection')
+    assert(!Object.hasOwn(api.calls.at(-1).body,'providerId'),'unsaved draft must not identify a stored Provider')
   }
+  const sqlBefore=clean(api.providers.get(provider.id))
+  await assert.rejects(()=>testStoredProviderConnection(company,provider.id,'test/shared-model',provider.version+1),/Version conflict/)
+  await assert.rejects(()=>testStoredProviderConnection('company-j2',provider.id,'test/shared-model',provider.version),/not found in this company/)
+  await assert.rejects(()=>settings.updateProvider(provider.id,{companyId:company,name:'Stale edit',baseUrl:provider.baseUrl,enabled:true},provider.version+1),/Version conflict/)
+  assert.deepEqual(clean(api.providers.get(provider.id)),sqlBefore)
+  assert.deepEqual(clean(await settings.fetchProvider(provider.id)),before)
+  const fetchFixture=api.fetch
+  try {
+    api.fetch=async()=>({ok:false,status:503,json:async()=>({message:'Simulated service unavailable'})})
+    await assert.rejects(()=>settings.updateProvider(provider.id,{companyId:company,name:'Failed edit',baseUrl:provider.baseUrl,enabled:true},provider.version),/Simulated service unavailable/)
+    assert.deepEqual(clean(await settings.fetchProvider(provider.id)),before,'failed write must preserve cache')
+    api.fetch=async()=>({ok:true,status:200,json:async()=>({items:[{...api.providers.get(provider.id),companyId:'company-j2'}]})})
+    await assert.rejects(()=>settings.fetchProviders(company),/another company/)
+    assert.deepEqual(clean(await settings.fetchProvider(provider.id)),before,'foreign response must not overwrite cache')
+  } finally { api.fetch=fetchFixture }
   assert.deepEqual(clean(await tools.fetchTools('company-j2')),otherTools)
   assert.deepEqual(clean(await mcp.fetchMcpServers('company-j2')),otherMcp)
-  console.log('Passed: concurrent assignment/edit rejection, preserved assignments, MCP diagnostic reset, invalid URL checks without state mutation and company isolation.')
+  console.log('PASS: concurrent assignments/edits, MCP diagnostic reset, draft isolation, stored verification scope/version guards, failed writes and foreign responses preserve cache; company isolation. Simulated HTTP only.')
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

@@ -10,6 +10,7 @@ type CapabilitiesResponse =
         ok: true
         modelId: string
         capabilities: ModelCapabilities
+        supportsTemperature?: boolean
     }
     | {
         ok: false
@@ -19,6 +20,13 @@ type CapabilitiesResponse =
 export async function fetchModelCapabilities(
     modelId: string
 ): Promise<ModelCapabilities> {
+    return (await fetchModelRuntimeMetadata(modelId)).capabilities
+}
+
+export async function fetchModelRuntimeMetadata(modelId: string): Promise<{
+    capabilities: ModelCapabilities
+    supportsTemperature: boolean
+}> {
     const normalizedId = modelId.trim()
 
     if (!normalizedId) {
@@ -45,5 +53,5 @@ export async function fetchModelCapabilities(
         throw new Error(result.message)
     }
 
-    return result.capabilities
+    return { capabilities: result.capabilities, supportsTemperature: result.supportsTemperature === true }
 }

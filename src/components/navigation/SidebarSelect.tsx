@@ -38,6 +38,8 @@ type SidebarSelectProps = Pick<AriaAttributes, 'aria-invalid' | 'aria-describedb
   open?: boolean
   onOpenChange?: (open: boolean) => void
   menuPortal?: boolean
+  /** Keep the current option visible when reopening a long menu. */
+  scrollSelectedIntoView?: boolean
 }
 
 type NormalizedOption = {
@@ -65,6 +67,7 @@ export function SidebarSelect({
   open: controlledOpen,
   onOpenChange,
   menuPortal = false,
+  scrollSelectedIntoView = false,
 }: SidebarSelectProps) {
   // `open` is potentially controlled. The uncontrolled path keeps its own
   // state under a distinct name; `setOpen` fans out to both the parent (via
@@ -98,6 +101,14 @@ export function SidebarSelect({
     position();window.addEventListener('resize',position);window.addEventListener('scroll',position,true)
     return()=>{window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true)}
   },[open,menuPortal,items.length])
+
+  useLayoutEffect(() => {
+    if (!open || !scrollSelectedIntoView) return
+    const menu = menuRef.current
+    const selectedOption = menu?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!menu || !selectedOption) return
+    menu.scrollTop = Math.max(0, selectedOption.offsetTop - (menu.clientHeight - selectedOption.offsetHeight) / 2)
+  }, [open, value, scrollSelectedIntoView])
 
   // Close on outside click and on Escape.
   useEffect(() => {

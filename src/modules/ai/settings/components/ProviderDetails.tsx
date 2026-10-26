@@ -70,7 +70,7 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
             <dt>Status</dt><dd><button type="button" className={`console-status console-status--${provider.status} console-status--clickable`} disabled={busy} onClick={onToggle}>{connectionStatusLabel(provider.status)}</button></dd>
           </dl>
           <div className="ai-provider-connection-actions ai-provider-connection-check">
-            <div className="ai-provider-connection-summary"><span aria-hidden="true"><IconClock/></span><div><strong>{provider.lastConnectionTest?.message ?? 'Not tested in this session'}</strong><small>{provider.lastConnectionTest ? `${provider.lastConnectionTest.modelId} · ${new Date(provider.lastConnectionTest.checkedAt).toLocaleString()}` : 'Enter a test model ID. Leave API Key blank to test the saved database key.'}</small><small>This is the last test for one model, not all models. Results are session-only; the enabled state is saved separately.</small></div></div>
+            <div className="ai-provider-connection-summary"><span aria-hidden="true"><IconClock/></span><div><strong>{provider.lastConnectionTest?.message ?? 'Not verified'}</strong><small>{provider.lastConnectionTest ? `${provider.lastConnectionTest.modelId} · ${new Date(provider.lastConnectionTest.checkedAt).toLocaleString()}` : 'Enter a test model ID. Leave API Key blank to test the saved database key.'}</small><small>The verification result is saved for this configuration and test model. Provider enablement is controlled separately.</small></div></div>
             <Button variant="secondary" disabled={busy || !provider.enabled} onClick={onEdit}>Test Connection</Button>
           </div>
         </div>

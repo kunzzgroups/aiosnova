@@ -364,7 +364,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
     setName(model.name)
     setModelId(model.modelId)
     setType(model.type)
-    setContextWindow(model.contextWindow ?? 0)
+    setContextWindow(model.configuredContextWindow ?? 0)
     setEnabled(model.status !== 'disabled')
     setDescription(model.description)
     setError(null)
@@ -409,7 +409,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
       contextWindow > 2147483647
     ) {
       setError(
-        'Context window must be an integer from 0 to 2147483647; 0 means unknown.',
+        'Context window must be an integer from 0 to 2147483647; 0 follows the catalog.',
       )
       return
     }
@@ -1108,7 +1108,7 @@ export function ModelManagement({ providerId, initialCreate = false, onBusyChang
             </FormField>
 
             <FormField
-              label="Context Window (0 = unknown)"
+              label="Context Window (0 = follow catalog)"
               htmlFor="model-context-window"
             >
               <TextField

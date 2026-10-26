@@ -5,8 +5,9 @@
  * linked to. Given a question, it scans the agent's linked bases for
  * matching documents and returns them as evidence.
  *
- * In the mock this is a keyword match; the real backend swaps the body for
- * a vector search while keeping the same signature.
+ * Reads the stored Agent/Knowledge catalog. Matching here remains a metadata
+ * keyword match; unindexed documents are excluded. Vector retrieval belongs to
+ * the ingestion/search backend.
  *
  * Permission: the caller passes the ACTIVE company. Only ACTIVE agents owned
  * by that company are searched, and only bases visible from that company are
@@ -15,12 +16,8 @@
 
 import type { AssistantSource, SourceType } from '../types/assistant'
 import { documentIsRetrievable } from '@/modules/ai/knowledge/types/knowledge'
-import {
-  effectiveAgentIdsForDocument,
-  getMockState,
-  listBasesVisibleFrom,
-} from '@/modules/ai/mock/mockStore'
-import { MOCK_USER } from '@/modules/ai/mock/permissions'
+import { fetchAgent } from '@/modules/ai/agents/services/agentService'
+import { fetchKnowledgeBases, fetchKnowledgeBase } from '@/modules/ai/knowledge/services/knowledgeService'
 
 export type RetrieveEvidencePayload = {
   agentId: string
@@ -42,42 +39,20 @@ export async function retrieveEvidence(
     return { sources: [], scanned: 0, matched: 0, scope: '' }
   }
 
-  const state = getMockState()
-
-  // Service-level guard: UI filtering is not sufficient.
-  const agent = state.agents.find(
-    (item) =>
-      item.id === payload.agentId &&
-      item.companyId === payload.activeCompanyId &&
-      item.status === 'active',
-  )
-
-  if (!agent) {
+  const { agent } = await fetchAgent(payload.agentId, payload.activeCompanyId)
+  if (agent.companyId !== payload.activeCompanyId || agent.status !== 'active') {
     return { sources: [], scanned: 0, matched: 0, scope: '' }
   }
-
   const assignedBaseIds = new Set(agent.knowledgeBaseIds)
-
-  // Respect the same company-read rule as the Knowledge service.
-  const bases = listBasesVisibleFrom(MOCK_USER, payload.activeCompanyId).filter(
-    (base) => assignedBaseIds.has(base.id),
-  )
-
-  if (bases.length === 0) {
-    return { sources: [], scanned: 0, matched: 0, scope: '' }
-  }
-
-  const baseIds = new Set(bases.map((base) => base.id))
-  const baseById = new Map(bases.map((base) => [base.id, base]))
-
-  // Only READY + ACTIVE-mode documents are searchable, and the selected agent
-  // must be present in the document's EFFECTIVE assignment (override beats base).
-  const documents = state.documents
-    .filter((doc) => baseIds.has(doc.baseId))
-    .filter(documentIsRetrievable)
-    .filter((doc) =>
-      effectiveAgentIdsForDocument(doc.id).agentIds.includes(agent.id),
-    )
+  const { items } = await fetchKnowledgeBases(payload.activeCompanyId)
+  const bases = items.filter(base => assignedBaseIds.has(base.id))
+  const baseById = new Map(bases.map(base => [base.id, base]))
+  const details = await Promise.all(bases.map(base => fetchKnowledgeBase(base.id, payload.activeCompanyId)))
+  // Stored catalog metadata is not an indexed document. Never cite unprocessed uploads.
+  const documents = details.flatMap(detail => detail.documents.filter(doc =>
+    documentIsRetrievable(doc) && doc.chunkCount > 0 && Boolean(doc.lastIndexedAt) &&
+    detail.effective.find(link => link.documentId === doc.id)?.agentIds.includes(agent.id),
+  ))
 
   // Score by keyword overlap with the question. Match against BOTH the
   // document title (weight 2) and the base name (weight 1).

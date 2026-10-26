@@ -494,9 +494,9 @@
 
 .ai-composer {
   position: relative;
-  max-width: 46rem;
+  max-width: 52rem;
   margin: 0 auto;
-  padding: 0.75rem 0.9rem;
+  padding: 1rem;
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-bg-elevated);
@@ -512,7 +512,8 @@
 .ai-composer__input {
   display: block;
   width: 100%;
-  max-height: 9rem;
+  min-height: 5.25rem;
+  max-height: 12rem;
   border: 0;
   background: transparent;
   color: var(--color-text);
@@ -529,13 +530,16 @@
 }
 
 .ai-composer__foot {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto auto;
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
   padding: 0.35rem 0.5rem 0.45rem;
 }
+.ai-composer__foot > .ai-composer__spacer { display: none; }
+.ai-composer-disclaimer { max-width: 52rem; margin: 0.65rem auto 0; text-align: center; font-size: var(--text-xs); line-height: 1.6; color: var(--color-text-muted); }
 
 .ai-composer__spacer {
   flex: 1;
@@ -676,19 +680,19 @@
 /* --- composer context controls (agent pill inside the composer) ----------- */
 
 .ai-composer__foot .sidebar-select {
-  width: auto;
+  width: 100%;
   flex: none;
 }
 
 .ai-composer__foot .sidebar-select__trigger {
   height: auto;
-  min-height: 1.75rem;
+  min-height: 2rem;
   padding: 0 0.4rem 0 0.7rem;
   border-color: transparent;
-  border-radius: 999px;
-  background: transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-muted);
   box-shadow: none;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -1191,12 +1195,12 @@
   max-width: 100%;
   align-items: center;
   gap: 0.3rem;
-  min-height: 1.75rem;
+  min-height: 2rem;
   padding: 0 0.4rem 0 0.7rem;
   border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-muted);
+  color: var(--color-text);
   font: inherit;
   font-size: 11.5px;
   font-weight: 600;
@@ -1240,8 +1244,7 @@
   padding: 0.5rem;
   font-size: var(--text-xs);
 }
-.ai-model-picker__browse button,
-.ai-model-picker__browse select {
+.ai-model-picker__browse > button {
   min-width: 0;
   max-width: 100%;
   color: var(--color-text);
@@ -1425,10 +1428,30 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 .ai-model-picker__selected-mark { flex-shrink: 0; margin-left: auto; color: var(--color-brand); font-size: 0.9rem; }
-.ai-model-picker__browse button { cursor: pointer; border: 1px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text); border-radius: var(--radius-sm); padding: 0.35rem 0.55rem; }
-.ai-model-picker__browse button:hover { background: var(--color-bg-muted); }
-.ai-model-picker__browse button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.ai-model-picker__browse > button { cursor: pointer; border: 1px solid var(--color-border); background: var(--color-bg-elevated); color: var(--color-text); border-radius: var(--radius-sm); padding: 0.35rem 0.55rem; }
+.ai-model-picker__browse > button:hover { background: var(--color-bg-muted); }
+.ai-model-picker__browse > button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
 .ai-model-picker__browse > span { color: var(--color-text-muted); font-size: var(--text-xs); }
+
+.ai-model-picker__browse > .ai-model-picker__vendor {
+  width: 11rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.ai-model-picker__vendor .sidebar-select__trigger {
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.ai-model-picker__vendor .sidebar-select__option[aria-selected='true']::after {
+  content: '✓';
+  margin-left: auto;
+  padding-left: 0.5rem;
+  color: var(--color-brand);
+}
 
 .ai-model-picker__option:hover {
   background: var(--color-bg-muted);
@@ -1611,10 +1634,10 @@
 
 .ai-composer__foot > .attach-menu { flex-shrink: 0; }
 
-@container assistant-composer (max-width: 34rem) {
+@container assistant-composer (max-width: 40rem) {
   .ai-composer__foot {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
     gap: 0.4rem;
   }
 
@@ -1629,4 +1652,12 @@
     width: 100%;
     max-width: 100%;
   }
+}
+@container assistant-composer (max-width: 26rem) {
+  .ai-composer__foot { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .ai-composer__foot > .ai-model-picker { grid-column: 1 / 3; }
+  .ai-composer__foot > .ai-pill-select { grid-row: 2; }
+  .ai-composer__foot > .attach-menu { grid-column: 3; grid-row: 1; }
+  .ai-composer__foot > .ai-send { grid-column: 3; grid-row: 2; }
+  .ai-composer__foot .sidebar-select__menu { min-width: 0; width: max(100%, 10rem); max-width: 100%; }
 }

@@ -82,13 +82,14 @@ function mkBase(
   category: string,
   kind: KnowledgeBaseKind,
   companyId: string,
-  allowedCompanyIds?: string[],
+  _legacyAllowedCompanyIds?: string[],
 ): SeedKnowledgeBase {
   return {
     id,
     merchantId: DEMO_MERCHANT_ID,
     companyId,
-    allowedCompanyIds: allowedCompanyIds ?? [companyId],
+    // Company Knowledge is private; template visibility controls distribution.
+    allowedCompanyIds: [companyId],
     name,
     description,
     category,
@@ -269,7 +270,8 @@ const RAW_AGENTS: RawAgent[] = [
     category: 'HR',
     status: 'active',
     createdAt: NOW,
-    knowledgeBaseIds: ['kb-hr', 'kb-j2-sop'],
+    // J1 content must first be adopted as a new J2-owned base.
+    knowledgeBaseIds: ['kb-j2-sop'],
     model: { provider: 'auto', model: '', temperature: 0.3, topP: 1, maxTokens: 2048 },
   },
   {

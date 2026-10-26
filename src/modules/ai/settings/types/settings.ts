@@ -33,6 +33,8 @@ export type AiModel = {
   type: ModelType
   status: ModelStatus
   contextWindow: number | null
+  catalogContextWindow?: number | null
+  configuredContextWindow?: number | null
   usedByAgents: number
   description: string
   capabilities?: ModelCapabilities

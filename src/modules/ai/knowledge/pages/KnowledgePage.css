@@ -2256,6 +2256,33 @@
 
 
 /* Document actions use the shared System IconButton dimensions. */
+.knowledge-detail-directory .console-table--knowledge-documents {
+  min-width: 62rem;
+}
+
+.knowledge-detail-directory .console-table--knowledge-documents td.console-table__status {
+  /* The badge has its own fixed width; do not render a second cell ellipsis. */
+  text-overflow: clip;
+}
+
+.knowledge-detail-directory .knowledge-document-agents .console-chips {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.knowledge-detail-directory .knowledge-document-agents .console-chip {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.knowledge-detail-directory .knowledge-document-agents .console-chip > span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .knowledge-detail-page .console-table--knowledge-documents th.console-table__actions,
 .knowledge-detail-page .console-table--knowledge-documents td.console-table__actions {
   text-align: center;

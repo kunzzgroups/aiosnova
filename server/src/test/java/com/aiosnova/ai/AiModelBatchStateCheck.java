@@ -19,7 +19,7 @@ public class AiModelBatchStateCheck {
         return row(id, "p", known, status, version);
     }
     private static AiModelRepository.ModelSummary row(String id, String provider, boolean known, String status, long version) {
-        return new AiModelRepository.ModelSummary(id, "company-j1", provider, "test/" + id, id, "chat", status, "", 32,
+        return new AiModelRepository.ModelSummary(id, "company-j1", provider, "test/" + id, id, "chat", status, "", 32, 32, null,
                 known ? new ModelCapabilities(true, false, false, 32) : null,
                 known ? Instant.parse("2026-01-01T00:00:00Z") : null, known ? null : "Unknown", version);
     }

@@ -46,6 +46,7 @@ import {
   addKnowledgeDataSource,
   addKnowledgeSkill,
   fetchKnowledgeBase,
+  userCanWriteKnowledge,
   setDocumentAgents,
   setKnowledgeBaseAgents,
   updateKnowledgeDocumentMode,
@@ -152,6 +153,8 @@ export function KnowledgeBaseDetailPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const activeCompanyId = useCompanyStore((state) => state.companyId)
+  const canWriteKnowledge = userCanWriteKnowledge(activeCompanyId ?? '')
+  const loadRequest = useRef(0)
   const [detail, setDetail] = useState<KnowledgeBaseDetail | null>(null)
   const [agents, setAgents] = useState<AgentListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -205,19 +208,26 @@ export function KnowledgeBaseDetailPage() {
   const [dsKind, setDsKind] = useState<'table' | 'api' | 'database'>('table')
   const [dsFile, setDsFile] = useState<File[]>([])
   const [dsConfig, setDsConfig] = useState<KeyValuePair[]>([])
+  useEffect(() => {
+    setAddOpen(false); setPendingDeleteDocument(null); setPendingDeleteSkill(null); setPendingDeleteDataSource(null)
+  }, [activeCompanyId])
   const highlightDocumentId = searchParams.get('highlight')
   const load = useCallback(async () => {
+    const request = ++loadRequest.current
     setIsLoading(true)
     setError(null)
     try {
-      setDetail(await fetchKnowledgeBase(baseId))
+      const result = await fetchKnowledgeBase(baseId, activeCompanyId ?? '')
+      if (request !== loadRequest.current) return
+      setDetail(result)
     } catch {
+      if (request !== loadRequest.current) return
       setDetail(null)
       setError(t('ai.knowledge.errLoadBase'))
     } finally {
-      setIsLoading(false)
+      if (request === loadRequest.current) setIsLoading(false)
     }
-  }, [baseId, t])
+  }, [baseId, activeCompanyId, t])
   useEffect(() => {
     void load()
   }, [load])
@@ -895,7 +905,7 @@ export function KnowledgeBaseDetailPage() {
     return () => window.clearTimeout(handle)
   }, [highlightDocumentId, tab, visible])
   async function toggleBaseAgent(agentId: string) {
-    if (!detail || isSaving) return
+    if (!detail || isSaving || !canWriteKnowledge) return
     const current = detail.baseAgentIds
     const next = current.includes(agentId)
       ? current.filter((id) => id !== agentId)
@@ -911,7 +921,7 @@ export function KnowledgeBaseDetailPage() {
     }
   }
   async function toggleDocumentAgent(documentId: string, agentId: string) {
-    if (isSaving) return
+    if (isSaving || !canWriteKnowledge) return
     const current = effectiveByDocument.get(documentId)?.agentIds ?? []
     const next = current.includes(agentId)
       ? current.filter((id) => id !== agentId)
@@ -927,7 +937,7 @@ export function KnowledgeBaseDetailPage() {
     }
   }
   async function clearDocumentOverride(documentId: string) {
-    if (isSaving) return
+    if (isSaving || !canWriteKnowledge) return
     setIsSaving(true)
     try {
       await setDocumentAgents(documentId, null)
@@ -1204,6 +1214,7 @@ export function KnowledgeBaseDetailPage() {
           name: skillName,
           description: skillDescription,
           inputSchema,
+          file: skillFile[0],
           agentIds: inheritAgents ? null : docAgentIds,
         })
       } else {
@@ -1219,6 +1230,7 @@ export function KnowledgeBaseDetailPage() {
           name: dsName,
           kind: dsKind,
           config,
+          file: dsFile[0],
           agentIds: inheritAgents ? null : docAgentIds,
         })
       }
@@ -1391,7 +1403,7 @@ export function KnowledgeBaseDetailPage() {
                 />
               }
               actions={
-                <Button onClick={openAddSource}>
+                <Button style={!canWriteKnowledge ? { display: 'none' } : undefined} onClick={openAddSource}>
                   <IconPlus />
                   {t('ai.knowledge.addSource')}
                 </Button>
@@ -1409,12 +1421,12 @@ export function KnowledgeBaseDetailPage() {
             <div className="console-table-wrap" ref={documentTableRef} tabIndex={0} aria-label={t('ai.knowledge.tabDocuments')}>
               <table className={`console-table console-table--fixed console-table--knowledge-documents${documentPageSize === 0 ? ' console-table--auto-fit' : ''}`}>
                 <colgroup>
-                  <col style={{ width: '31%' }} />
-                  <col style={{ width: '13%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '27%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '7%' }} />
+                  <col />
+                  <col style={{ width: '7rem' }} />
+                  <col style={{ width: '7.5rem' }} />
+                  <col style={{ width: '16rem' }} />
+                  <col style={{ width: '9rem' }} />
+                  <col style={{ width: '6rem' }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -1445,7 +1457,7 @@ export function KnowledgeBaseDetailPage() {
                         <td>
                           <span className="console-table__name">
                             {document.kind === 'file' ? <IconPaperclip /> : <IconFolder />}
-                            <span>{document.title}</span>
+                            <span title={document.title}>{document.title}</span>
                           </span>
                           {document.fileUrl ? (
                             <a
@@ -1462,11 +1474,11 @@ export function KnowledgeBaseDetailPage() {
                         <td className="console-table__muted">
                           {t(TYPE_LABEL_KEY[document.type])}
                         </td>
-                        <td>
+                        <td className="console-table__status">
                           {(() => {
                             const displayStatus =
                               getDocumentDisplayStatus(document)
-                            const canChangeMode = document.status === 'ready'
+                            const canChangeMode = canWriteKnowledge && document.status === 'ready'
 
                             return (
                               <button
@@ -1498,7 +1510,7 @@ export function KnowledgeBaseDetailPage() {
                             )
                           })()}
                         </td>
-                        <td>
+                        <td className="knowledge-document-agents">
                           {agentIds.length === 0 ? (
                             <span className="console-chip console-chip--muted">{t('ai.knowledge.noAgentsReach')}</span>
                           ) : (
@@ -1507,8 +1519,9 @@ export function KnowledgeBaseDetailPage() {
                               title={agentIds.map(id => agentName(id)).filter(Boolean).join(', ')}
                             >
                               {agentIds.slice(0, MAX_CHIPS).map((id) => (
-                                <span className="console-chip console-chip--link" key={id}>
-                                  {agentName(id) || t('ai.knowledge.unknownAgent', 'Unknown Agent')}
+                                <span className="console-chip console-chip--link" key={id}
+                                  title={agentName(id) || t('ai.knowledge.unknownAgent', 'Unknown Agent')}>
+                                  <span>{agentName(id) || t('ai.knowledge.unknownAgent', 'Unknown Agent')}</span>
                                 </span>
                               ))}
                               {agentIds.length > MAX_CHIPS && (
@@ -1532,6 +1545,7 @@ export function KnowledgeBaseDetailPage() {
                               )}
                               variant="danger"
                               disabled={isDeletingDocument}
+                              style={!canWriteKnowledge ? { display: 'none' } : undefined}
                               onClick={() => setPendingDeleteDocument(document)}
                             >
                               <IconTrash />
@@ -1602,7 +1616,7 @@ export function KnowledgeBaseDetailPage() {
                 />
               }
               actions={
-                <Button onClick={openAddSource}>
+                <Button style={!canWriteKnowledge ? { display: 'none' } : undefined} onClick={openAddSource}>
                   <IconPlus />
                   {t('ai.knowledge.addSource')}
                 </Button>
@@ -1676,7 +1690,7 @@ export function KnowledgeBaseDetailPage() {
                         <td className="console-table__status">
                           {(() => {
                             const displayStatus = getSkillDisplayStatus(skill)
-                            const canChangeMode = skill.status === 'ready'
+                            const canChangeMode = canWriteKnowledge && skill.status === 'ready'
                             return (
                               <button
                                 type="button"
@@ -1719,6 +1733,7 @@ export function KnowledgeBaseDetailPage() {
                               )}
                               variant="danger"
                               disabled={isDeletingSkill}
+                              style={!canWriteKnowledge ? { display: 'none' } : undefined}
                               onClick={() => setPendingDeleteSkill(skill)}
                             >
                               <IconTrash />
@@ -1796,7 +1811,7 @@ export function KnowledgeBaseDetailPage() {
                 />
               }
               actions={
-                <Button onClick={openAddSource}>
+                <Button style={!canWriteKnowledge ? { display: 'none' } : undefined} onClick={openAddSource}>
                   <IconPlus />
                   {t('ai.knowledge.addSource')}
                 </Button>
@@ -1880,7 +1895,7 @@ export function KnowledgeBaseDetailPage() {
                         <td className="console-table__status">
                           {(() => {
                             const displayStatus = getDataSourceDisplayStatus(ds)
-                            const canChangeMode = ds.status === 'connected'
+                            const canChangeMode = canWriteKnowledge && ds.status === 'connected'
                             return (
                               <button
                                 type="button"
@@ -1923,6 +1938,7 @@ export function KnowledgeBaseDetailPage() {
                               )}
                               variant="danger"
                               disabled={isDeletingDataSource}
+                              style={!canWriteKnowledge ? { display: 'none' } : undefined}
                               onClick={() => setPendingDeleteDataSource(ds)}
                             >
                               <IconTrash />
@@ -1991,7 +2007,7 @@ export function KnowledgeBaseDetailPage() {
               {filteredAgents.map((agent) => {
                 const selected = visibleBaseAgentIds.includes(agent.id)
                 return (
-                  <AgentAssignmentChoice key={agent.id} name={agent.name} checked={selected} disabled={isSaving || isLoading} onChange={() => void toggleBaseAgent(agent.id)} />
+                  <AgentAssignmentChoice key={agent.id} name={agent.name} checked={selected} disabled={isSaving || isLoading || !canWriteKnowledge} onChange={() => void toggleBaseAgent(agent.id)} />
                 )
               })}
 
@@ -2260,6 +2276,7 @@ export function KnowledgeBaseDetailPage() {
                               <td className="console-table__actions">
                                 <Button
                                   variant="secondary"
+                                  style={!canWriteKnowledge ? { display: 'none' } : undefined}
                                   onClick={() =>
                                     setExpandedDocumentId(
                                       expanded ? null : document.id,
@@ -2301,7 +2318,7 @@ export function KnowledgeBaseDetailPage() {
                                             <input
                                               type="checkbox"
                                               checked={selected}
-                                              disabled={isSaving}
+                                              disabled={isSaving || !canWriteKnowledge}
                                               onChange={() =>
                                                 void toggleDocumentAgent(
                                                   document.id,
@@ -2326,6 +2343,7 @@ export function KnowledgeBaseDetailPage() {
                                       <div className="console-form__actions">
                                         <Button
                                           variant="ghost"
+                                          disabled={!canWriteKnowledge || isSaving}
                                           onClick={() =>
                                             void clearDocumentOverride(
                                               document.id,

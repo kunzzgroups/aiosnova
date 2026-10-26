@@ -512,7 +512,7 @@ public class AiModelStateService {
                 if (!providerConfig.enabled()) {
                         throw new ResponseStatusException(
                                         HttpStatus.CONFLICT,
-                                        "This Provider is disabled and cannot run models.");
+                                        "This Provider is disabled. Enable it in AI Settings to continue.");
                 }
 
                 var model = models.findByExternalId(
@@ -526,7 +526,7 @@ public class AiModelStateService {
                 if (!"enabled".equals(model.status())) {
                         throw new ResponseStatusException(
                                         HttpStatus.CONFLICT,
-                                        "This model is disabled and cannot run.");
+                                        "This model is disabled. Enable it in AI Settings to continue.");
                 }
 
                 requireKnownCapabilities(model);

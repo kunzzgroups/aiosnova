@@ -48,7 +48,7 @@ import {
   type AssistantPreferences,
 } from '../preferences'
 import { AssistantSettingsDrawer } from '../components/AssistantSettingsDrawer'
-import { fetchModelCapabilities } from
+import { fetchModelRuntimeMetadata } from
   '@/modules/ai/settings/services/modelCapabilitiesService'
 
 import { assertModelCapabilities } from
@@ -72,7 +72,6 @@ const THREADS_STORAGE_KEY = 'aios.ai.threads.v3'
 const AUTO_AGENT_ID = 'auto'
 
 const SYSTEM_PROMPT = 'You are a helpful assistant.'
-const DEFAULT_TEMPERATURE = 0.7
 
 
 
@@ -83,7 +82,7 @@ function pickDefaultAgentId(agents: AgentListItem[]): string | null {
 }
 
 type PanelState = { history: boolean; evidence: boolean }
-type PopoverId = 'model' | 'agent' | null
+type PopoverId = 'model' | 'agent' | 'creativity' | null
 
 function readPanelState(): PanelState {
   const narrow = window.matchMedia('(max-width: 1180px)').matches
@@ -243,8 +242,6 @@ function AiModelPicker(props: {
   shortLabels: Record<string, string>
   accountLabels: Record<string, string>
   vendors: Record<string, string>
-  temperature: number
-  onTemperatureChange: (next: number) => void
   open: boolean
   onOpenChange: (open: boolean) => void
   onChange: (id: string) => void
@@ -260,8 +257,6 @@ function AiModelPicker(props: {
     shortLabels,
     accountLabels,
     vendors,
-    temperature,
-    onTemperatureChange,
     open,
     onOpenChange,
     onChange,
@@ -273,6 +268,7 @@ function AiModelPicker(props: {
   const [query, setQuery] = useState('')
   const [browseAll, setBrowseAll] = useState(false)
   const [vendor, setVendor] = useState('all')
+  const [vendorOpen, setVendorOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -280,6 +276,7 @@ function AiModelPicker(props: {
       setQuery('')
       setBrowseAll(false)
       setVendor('all')
+      setVendorOpen(false)
       return
     }
     const handle = window.setTimeout(() => inputRef.current?.focus(), 0)
@@ -290,7 +287,12 @@ function AiModelPicker(props: {
   const items = assistantModelMenuIds({ all, recommended, value, query, vendor, vendors, labels, browseAll })
 
   return (
-    <div className="ai-model-picker" data-popover>
+    <div className="ai-model-picker" data-popover onKeyDown={event => {
+      if (event.key === 'Escape' && vendorOpen) {
+        event.stopPropagation()
+        setVendorOpen(false)
+      }
+    }}>
       <button
         type="button"
         className={[
@@ -322,19 +324,6 @@ function AiModelPicker(props: {
 
       {open ? (
         <div className="ai-model-picker__menu" role="dialog">
-          <div className="ai-model-picker__temperature">
-            <span className="ai-model-picker__label">Temp</span>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.1}
-              value={temperature}
-              aria-label="Temperature"
-              onChange={(event) => onTemperatureChange(Number(event.target.value))}
-            />
-            <span className="ai-model-picker__value">{temperature.toFixed(1)}</span>
-          </div>
 
           <div className="ai-model-picker__search">
             <IconSearch />
@@ -348,13 +337,21 @@ function AiModelPicker(props: {
           </div>
 
           <div className="ai-model-picker__browse">
-            <button type="button" onClick={() => { setBrowseAll(!browseAll); setVendor('all'); setQuery('') }}>
+            <button type="button" onClick={() => { setBrowseAll(!browseAll); setVendor('all'); setQuery(''); setVendorOpen(false) }}>
               {browseAll ? 'Recommended' : `All models (${all.length})`}
             </button>
-            {browseAll || needle ? <select aria-label="Filter models by vendor" value={vendor} onChange={event => setVendor(event.target.value)}>
-              <option value="all">All vendors</option>
-              {MODEL_VENDORS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select> : <span>Recommended</span>}
+            {browseAll || needle ? <SidebarSelect
+              label="Filter models by vendor"
+              hideLabel
+              className="ai-model-picker__vendor"
+              value={vendor}
+              options={[{ value: 'all', label: 'All vendors' }, ...MODEL_VENDORS]}
+              onChange={setVendor}
+              open={vendorOpen}
+              onOpenChange={setVendorOpen}
+              menuPortal
+              scrollSelectedIntoView
+            /> : <span>Recommended</span>}
           </div>
           <ul className="ai-model-picker__list" role="listbox">
             {items.length === 0 ? (
@@ -450,7 +447,8 @@ export function AiAssistantPage() {
       `${option.label} · ${option.modelId}`,
     ])
   )
-  const [temperature, setTemperature] = useState<number>(DEFAULT_TEMPERATURE)
+  const [temperature, setTemperature] = useState<number | undefined>(0.2)
+  const [temperatureSupport, setTemperatureSupport] = useState<{ modelId: string; supported: boolean; loading: boolean }>({ modelId: '', supported: false, loading: false })
   const modelShortLabels = Object.fromEntries(
     currentModelOptions.map(option => [option.id, option.name])
   )
@@ -510,6 +508,21 @@ export function AiAssistantPage() {
       fromAgent: false,
     }
   }, [agentId, activeAgents, model, modelOptions, modelsCompanyId, companyId])
+
+  const effectiveOption = currentModelOptions.find(option => option.id === effectiveModel.id)
+  const effectiveExternalId = effectiveOption?.modelId ?? ''
+  const temperatureAgent = agentId !== AUTO_AGENT_ID ? activeAgents.find(agent => agent.id === agentId) : undefined
+  const temperatureLocked = temperatureAgent?.model?.temperature != null
+  const supportsTemperature = temperatureSupport.modelId === effectiveExternalId && temperatureSupport.supported && !temperatureSupport.loading
+  useEffect(() => {
+    let active = true
+    setOpenPopover(null)
+    setTemperatureSupport({ modelId: effectiveExternalId, supported: false, loading: !!effectiveExternalId })
+    if (effectiveExternalId) void fetchModelRuntimeMetadata(effectiveExternalId).then(metadata => {
+      if (active) setTemperatureSupport({ modelId: effectiveExternalId, supported: metadata.supportsTemperature, loading: false })
+    }).catch(() => { if (active) setTemperatureSupport({ modelId: effectiveExternalId, supported: false, loading: false }) })
+    return () => { active = false }
+  }, [effectiveExternalId, companyId])
 
   const announcement =
     pendingQuestion !== null
@@ -661,7 +674,7 @@ export function AiAssistantPage() {
     }
     function handleDoc(event: MouseEvent) {
       const target = event.target as HTMLElement
-      if (target.closest('[data-popover]')) {
+      if (target.closest('[data-popover], .ai-model-picker__vendor')) {
         return
       }
       setOpenPopover(null)
@@ -912,7 +925,8 @@ export function AiAssistantPage() {
 
       const attachments = await Promise.all(files.map(readFileForLLM))
 
-      const capabilities = await fetchModelCapabilities(selectedModel)
+      const metadata = await fetchModelRuntimeMetadata(selectedModel)
+      const capabilities = metadata.capabilities
 
       assertModelCapabilities(capabilities, {
         hasImages: attachments.some(file => file.kind === 'image'),
@@ -971,7 +985,7 @@ export function AiAssistantPage() {
           companyId,
           providerId: selectedOption.providerId,
           modelId: selectedModel,
-          temperature: selectedTemperature,
+          ...(metadata.supportsTemperature && selectedTemperature !== undefined ? { temperature: selectedTemperature } : {}),
           messages: [
             { role: 'system', content: systemWithContext },
             ...history,
@@ -1732,7 +1746,7 @@ export function AiAssistantPage() {
               <textarea
                 ref={inputRef}
                 className="ai-composer__input"
-                rows={1}
+                rows={3}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
@@ -1749,8 +1763,6 @@ export function AiAssistantPage() {
                   shortLabels={modelShortLabels}
                   accountLabels={modelAccountLabels}
                   vendors={modelVendors}
-                  temperature={temperature}
-                  onTemperatureChange={setTemperature}
                   open={openPopover === 'model'}
                   onOpenChange={(next) => setOpenPopover(next ? 'model' : null)}
                   onChange={(id) => {
@@ -1772,7 +1784,7 @@ export function AiAssistantPage() {
                     hideLabel
                     value={agentId}
                     options={[
-                      { value: AUTO_AGENT_ID, label: t('ai.assistant.agentAuto', 'Auto') },
+                      { value: AUTO_AGENT_ID, label: t('ai.assistant.agentAutoLabel', 'Auto') },
                       ...activeAgents.map((agent) => ({
                         value: agent.id,
                         label: agent.name,
@@ -1782,6 +1794,21 @@ export function AiAssistantPage() {
                     open={openPopover === 'agent'}
                     onOpenChange={(next) => setOpenPopover(next ? 'agent' : null)}
                   />
+                </div>
+
+                <div className="ai-pill-select ai-creativity-select" data-popover>
+                  <SidebarSelect id="ai-creativity" label="Creativity" hideLabel
+                    value={!supportsTemperature || temperatureLocked ? 'default' : temperature === undefined ? 'default' : String(temperature)}
+                    options={[
+                      { value: 'default', label: t('ai.assistant.creativityDefault', 'Default') },
+                      { value: '0.2', label: t('ai.assistant.creativityLow', 'Low') },
+                      { value: '0.7', label: t('ai.assistant.creativityMedium', 'Medium') },
+                      { value: '1.1', label: t('ai.assistant.creativityHigh', 'High') },
+                    ]}
+                    disabled={!supportsTemperature || temperatureLocked || pendingQuestion !== null}
+                    title={temperatureLocked ? 'Creativity is managed by the selected Agent.' : temperatureSupport.loading ? 'Checking model parameters…' : !supportsTemperature ? 'Temperature support is unavailable. Model defaults will be used.' : 'Controls response variation, not accuracy.'}
+                    onChange={value => { const next = value === 'default' ? undefined : Number(value); temperatureRef.current = next; setTemperature(next) }}
+                    open={openPopover === 'creativity'} onOpenChange={next => setOpenPopover(next ? 'creativity' : null)} />
                 </div>
 
                 <span className="ai-composer__spacer" />
@@ -1822,6 +1849,7 @@ export function AiAssistantPage() {
                 )}
               </div>
             </div>
+            <p className="ai-composer-disclaimer">{t('ai.assistant.disclaimer', 'AIOS NOVA can make mistakes. Verify important information.')}</p>
           </div>
         </section>
 

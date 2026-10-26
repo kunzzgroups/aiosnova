@@ -45,6 +45,7 @@ export type ModelSyncResult = {
   created: number
   updated: number
   capabilityWarnings: string[]
+  reloadWarning?: string
 }
 
 // 写入完成后，旧列表响应不能覆盖当前缓存；同公司并发读取共用请求。
@@ -101,6 +102,8 @@ function toAiModel(summary: StoredModelSummary): AiModel {
     status: summary.status,
     description: summary.description,
     contextWindow: summary.contextWindow,
+    catalogContextWindow: summary.catalogContextWindow,
+    configuredContextWindow: summary.configuredContextWindow,
 
     // 模型与 Agent 的实际关联统计尚未接入。
     usedByAgents: 0,
@@ -124,12 +127,61 @@ function slugify(value: string) {
     .replace(/(^-|-$)/g, '')
 }
 
+function providerUtcTime(value: string | null): string | null {
+  if (!value) return null
+
+  // Java LocalDateTime represents UTC in this database configuration.
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+    ? value
+    : `${value}Z`
+}
+
 function toAiProvider(summary: ProviderSummary): AiProvider {
   const previous = providers.find(provider =>
-    provider.id === summary.id && provider.companyId === summary.companyId &&
-    provider.version === summary.version && provider.baseUrl === summary.baseUrl &&
+    provider.id === summary.id &&
+    provider.companyId === summary.companyId &&
+    provider.version === summary.version &&
+    provider.baseUrl === summary.baseUrl &&
     provider.enabled === summary.enabled,
   )
+
+  const checkedAt = providerUtcTime(summary.verificationCheckedAt)
+
+  const currentResult =
+    summary.hasApiKey &&
+    Number.isSafeInteger(summary.connectionRevision) &&
+    summary.verificationRevision !== null &&
+    summary.verificationRevision === summary.connectionRevision &&
+    Boolean(checkedAt && summary.verificationModelId) &&
+    (
+      summary.verificationStatus === 'verified' ||
+      summary.verificationStatus === 'failed'
+    )
+
+  const verified =
+    currentResult && summary.verificationStatus === 'verified'
+
+  const status: AiProvider['status'] = !summary.enabled
+    ? 'disabled'
+    : !currentResult
+      ? 'not_verified'
+      : verified
+        ? 'connected'
+        : 'error'
+
+  const lastConnectionTest =
+    currentResult && checkedAt
+      ? {
+        ok: verified,
+        message: verified
+          ? 'Model connection successful.'
+          : summary.verificationErrorMessage ??
+          'Model verification failed.',
+        modelId: summary.verificationModelId ?? '',
+        checkedAt,
+      }
+      : undefined
+
   return {
     id: summary.id,
     companyId: summary.companyId,
@@ -139,10 +191,13 @@ function toAiProvider(summary: ProviderSummary): AiProvider {
     baseUrl: summary.baseUrl,
     apiKeyMasked: summary.hasApiKey ? '••••••••••••••••' : '',
     enabled: summary.enabled,
-    status: summary.enabled ? previous?.status ?? 'not_verified' : 'disabled',
-    lastTestedAt: previous?.lastTestedAt ?? null,
-    lastConnectionTest: previous?.lastConnectionTest,
+    status,
+    lastTestedAt: currentResult ? checkedAt : null,
+    lastConnectionTest,
+
+    // Activity remains a local display history, not a verification source.
     activity: previous?.activity,
+
     modelCount: models.filter(
       model => model.providerId === summary.id,
     ).length,
@@ -935,6 +990,7 @@ export async function syncProviderModels(
 ): Promise<ModelSyncResult> {
   ensureCompany(companyId)
 
+  // This request writes the catalog to the database.
   const result = await syncStoredProviderModels(
     companyId,
     providerId,
@@ -942,13 +998,14 @@ export async function syncProviderModels(
 
   try {
     await fetchProviderModels(providerId, companyId)
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : 'Unknown error'
-
-    throw new Error(
-      `Database sync completed, but reloading failed. Refresh to confirm: ${detail}`,
-    )
+    return result
+  } catch (caught) {
+    // The write succeeded. A failed reload is not a failed sync.
+    return {
+      ...result,
+      reloadWarning: caught instanceof Error
+        ? caught.message
+        : 'Unable to reload the model list.',
+    }
   }
-
-  return result
 }

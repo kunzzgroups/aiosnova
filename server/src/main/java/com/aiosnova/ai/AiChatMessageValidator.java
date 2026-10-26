@@ -28,7 +28,7 @@ public class AiChatMessageValidator {
 
     public record ValidatedChat(
             String modelId,
-            double temperature,
+            Double temperature,
             List<Map<String, Object>> messages,
             boolean hasImages) {
     }
@@ -46,14 +46,12 @@ public class AiChatMessageValidator {
             throw badRequest("Provide a valid model ID.");
         }
 
-        double temperature = request.temperature() == null
-            ? 0.7
-            : request.temperature();
+        Double temperature = request.temperature();
 
         if (
-            !Double.isFinite(temperature) ||
+            temperature != null && (!Double.isFinite(temperature) ||
             temperature < 0 ||
-            temperature > 2
+            temperature > 2)
         ) {
             throw badRequest("Temperature must be between 0 and 2.");
         }

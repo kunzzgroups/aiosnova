@@ -61,6 +61,13 @@ public class OpenRouterModelService {
 
     public ModelCapabilities loadCapabilities(String modelId)
         throws IOException, InterruptedException {
+        return loadMetadata(modelId).capabilities();
+    }
+
+    public record ModelMetadata(ModelCapabilities capabilities, boolean supportsTemperature) {}
+
+    public ModelMetadata loadMetadata(String modelId)
+        throws IOException, InterruptedException {
 
         if (modelId == null || modelId.isBlank()) {
             throw new IllegalArgumentException("Enter a model ID.");
@@ -73,7 +80,14 @@ public class OpenRouterModelService {
             String currentId = model.path("id").asString("");
 
             if (targetId.equals(currentId)) {
-                return parseCapabilities(model);
+                boolean supportsTemperature = false;
+                JsonNode parameters = model.path("supported_parameters");
+                if (parameters.isArray()) {
+                    for (JsonNode parameter : parameters) {
+                        if ("temperature".equals(parameter.asString(""))) supportsTemperature = true;
+                    }
+                }
+                return new ModelMetadata(parseCapabilities(model), supportsTemperature);
             }
         }
 

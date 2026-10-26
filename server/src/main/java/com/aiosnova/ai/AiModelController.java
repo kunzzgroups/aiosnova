@@ -21,13 +21,13 @@ public class AiModelController {
         @RequestParam("modelId") String modelId
     ) {
         try {
-            ModelCapabilities capabilities =
-                modelService.loadCapabilities(modelId);
+            var metadata = modelService.loadMetadata(modelId);
 
             return Map.of(
                 "ok", true,
                 "modelId", modelId.trim(),
-                "capabilities", capabilities
+                "capabilities", metadata.capabilities(),
+                "supportsTemperature", metadata.supportsTemperature()
             );
 
         } catch (IllegalArgumentException error) {

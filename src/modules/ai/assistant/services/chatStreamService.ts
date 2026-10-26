@@ -29,7 +29,7 @@ export async function streamAssistantChat(
     signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
+      Accept: 'text/event-stream, application/json',
     },
     body: JSON.stringify(input),
   })
@@ -42,6 +42,8 @@ export async function streamAssistantChat(
 
       if (isObject(body) && typeof body.message === 'string') {
         message = body.message
+      } else if (isObject(body) && typeof body.detail === 'string') {
+        message = body.detail
       }
     } catch {
       // 没有 JSON 正文时，使用状态码提示。

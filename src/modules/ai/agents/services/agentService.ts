@@ -1,254 +1,49 @@
-/**
- * Agent service.
- *
- * Mock-backed for now. The important invariant is enforced here as well as in
- * the UI/mock relation helpers: only ACTIVE agents can hold effective
- * Knowledge Base assignments.
- */
-
-import { DEMO_MERCHANT_ID } from '@/mocks/data/identity'
-import { ApiError } from '@/services/httpClient'
-import { fetchAssistantModelOptions } from '../../settings/services/settingsService'
-import { resolveAgentModelOption } from './agentModelSelection'
-import {
-  getMockState,
-  nextId,
-  toAgentListItem,
-} from '@/modules/ai/mock/mockStore'
-import type {
-  AgentDetail,
-  AgentListItem,
-  AgentModelConfig,
-  AgentStatus,
-} from '../types/agent'
-
-const USE_MOCK = true
+/** Stored Agent CRUD. All reads and writes go to Java; no Mock fallback. */
+import { apiRequest, ApiError } from '@/services/httpClient'
+import type { AgentDetail, AgentListItem, AgentModelConfig, AgentStatus } from '../types/agent'
 
 type CreateAgentPayload = {
-  name: string
-  description: string
-  companyId: string
-  category?: string
-  status?: Extract<AgentStatus, 'active' | 'draft'>
-  knowledgeBaseIds: string[]
-  model?: AgentModelConfig
+  name: string; description: string; companyId: string; category?: string
+  status?: Extract<AgentStatus, 'active' | 'draft'>; knowledgeBaseIds: string[]; model?: AgentModelConfig
 }
-
 type UpdateAgentPayload = {
-  name?: string
-  description?: string
-  category?: string
-  status?: AgentStatus
-  knowledgeBaseIds?: string[]
-  model?: AgentModelConfig
+  companyId: string; version: number | undefined; name?: string; description?: string
+  category?: string; status?: AgentStatus; knowledgeBaseIds?: string[]; model?: AgentModelConfig
 }
+export type AgentKnowledgeBase = { id: string; name: string; companyId: string; documentCount: number }
 
-function visibleAgents(companyId: string) {
-  const state = getMockState()
-  return state.agents.filter((agent) => agent.companyId === companyId)
+function expectedVersion(version: number | undefined) {
+  if (!Number.isSafeInteger(version) || version === undefined || version < 0)
+    throw new ApiError('Reload this Agent before saving or deleting it.', 409)
+  return version
 }
-
-function assignableBaseIds(
-  companyId: string,
-  requestedIds: string[],
-): string[] {
-  const state = getMockState()
-  const requested = new Set(requestedIds)
-
-  return state.bases
-    .filter((base) => base.companyId === companyId)
-    .filter((base) => requested.has(base.id))
-    .map((base) => base.id)
-}
-
-function effectiveKnowledgeBaseIds(
-  agent: { status: AgentStatus; companyId: string; knowledgeBaseIds: string[] },
-): string[] {
-  if (agent.status !== 'active') return []
-  return assignableBaseIds(agent.companyId, agent.knowledgeBaseIds)
-}
-
-export async function fetchAgents(
-  companyId: string,
-): Promise<{ items: AgentListItem[] }> {
-  if (USE_MOCK) {
-    return {
-      items: visibleAgents(companyId).map((agent) => ({
-        ...toAgentListItem(agent),
-        knowledgeBaseIds: effectiveKnowledgeBaseIds(agent),
-        knowledgeBaseCount: effectiveKnowledgeBaseIds(agent).length,
-      })),
-    }
+function normalize(agent: AgentListItem): AgentListItem {
+  return {
+    ...agent,
+    createdAt: /(?:Z|[+-]\d\d:\d\d)$/.test(agent.createdAt) ? agent.createdAt : `${agent.createdAt}Z`,
+    model: agent.model ? { ...agent.model, binding: agent.model.binding ?? undefined } : undefined,
   }
-
-  throw new ApiError('Agent API is not connected.', 501)
 }
-
-export async function fetchAgent(agentId: string): Promise<AgentDetail> {
-  if (USE_MOCK) {
-    const state = getMockState()
-    const agent = state.agents.find((item) => item.id === agentId)
-
-    if (!agent) {
-      throw new ApiError(`Agent ${agentId} not found.`, 404)
-    }
-
-    const knowledgeBaseIds = effectiveKnowledgeBaseIds(agent)
-
-    return {
-      agent: {
-        ...toAgentListItem(agent),
-        knowledgeBaseIds,
-        knowledgeBaseCount: knowledgeBaseIds.length,
-      },
-      knowledgeBaseIds,
-    }
-  }
-
-  throw new ApiError('Agent API is not connected.', 501)
+export async function fetchAgents(companyId: string): Promise<{ items: AgentListItem[] }> {
+  const result = await apiRequest<{ items: AgentListItem[] }>(`/api/ai/agents?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
+  return { items: result.items.map(normalize) }
 }
-
-export async function createAgent(
-  payload: CreateAgentPayload,
-): Promise<AgentListItem> {
-  if (USE_MOCK) {
-    if (payload.model?.binding || payload.model && payload.model.provider !== 'auto') {
-      resolveAgentModelOption(payload.model, await fetchAssistantModelOptions(payload.companyId))
-    }
-    const state = getMockState()
-    const now = new Date().toISOString()
-
-    const initialStatus = payload.status ?? 'active'
-
-    const agent = {
-      id: nextId('agent'),
-      merchantId: DEMO_MERCHANT_ID,
-      companyId: payload.companyId,
-      name: payload.name.trim(),
-      description: payload.description,
-      category: payload.category?.trim() || 'General',
-      status: initialStatus,
-      createdAt: now,
-      knowledgeBaseIds:
-        initialStatus === 'active'
-          ? assignableBaseIds(payload.companyId, payload.knowledgeBaseIds)
-          : [],
-      model: payload.model
-        ? structuredClone(payload.model)
-        : {
-            provider: 'auto' as const,
-            model: '',
-            temperature: 0.3,
-            topP: 1,
-            maxTokens: 2048,
-          },
-    }
-
-    state.agents.push(agent)
-
-    return {
-      ...toAgentListItem(agent),
-      knowledgeBaseIds: [...agent.knowledgeBaseIds],
-      knowledgeBaseCount: agent.knowledgeBaseIds.length,
-    }
-  }
-
-  throw new ApiError('Agent API is not connected.', 501)
+export async function fetchAgent(agentId: string, companyId: string): Promise<AgentDetail> {
+  const detail = await apiRequest<AgentDetail>(`/api/ai/agents/${encodeURIComponent(agentId)}?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
+  return { ...detail, agent: normalize(detail.agent) }
 }
-
-export async function updateAgent(
-  agentId: string,
-  patch: UpdateAgentPayload,
-): Promise<AgentListItem> {
-  if (USE_MOCK) {
-    const state = getMockState()
-    const agent = state.agents.find((item) => item.id === agentId)
-
-    if (!agent) {
-      throw new ApiError(`Agent ${agentId} not found.`, 404)
-    }
-
-    if (patch.model?.binding || patch.model && patch.model.provider !== 'auto') {
-      resolveAgentModelOption(patch.model, await fetchAssistantModelOptions(agent.companyId))
-    }
-
-    if (patch.name !== undefined) {
-      agent.name = patch.name.trim() || agent.name
-    }
-
-    if (patch.description !== undefined) {
-      agent.description = patch.description
-    }
-
-    if (patch.category !== undefined) {
-      agent.category = patch.category
-    }
-
-    if (patch.model !== undefined) {
-      agent.model = structuredClone(patch.model)
-    }
-
-    const nextStatus = patch.status ?? agent.status
-    agent.status = nextStatus
-
-    /*
-     * Assignment invariant:
-     * - non-active agent => no Knowledge assignments
-     * - active agent => only bases owned by the same company are accepted
-     */
-    if (nextStatus !== 'active') {
-      agent.knowledgeBaseIds = []
-    } else if (patch.knowledgeBaseIds !== undefined) {
-      agent.knowledgeBaseIds = assignableBaseIds(
-        agent.companyId,
-        patch.knowledgeBaseIds,
-      )
-    } else {
-      // Also clean up any stale IDs from older mock data.
-      agent.knowledgeBaseIds = assignableBaseIds(
-        agent.companyId,
-        agent.knowledgeBaseIds,
-      )
-    }
-
-    const knowledgeBaseIds = [...agent.knowledgeBaseIds]
-
-    return {
-      ...toAgentListItem(agent),
-      knowledgeBaseIds,
-      knowledgeBaseCount: knowledgeBaseIds.length,
-    }
-  }
-
-  throw new ApiError('Agent API is not connected.', 501)
+export async function fetchAgentKnowledgeBases(companyId: string): Promise<{ items: AgentKnowledgeBase[] }> {
+  return apiRequest(`/api/ai/agents/knowledge-bases?companyId=${encodeURIComponent(companyId)}`, { cache: 'no-store' })
 }
-
-export async function deleteAgent(agentId: string): Promise<void> {
-  if (USE_MOCK) {
-    const state = getMockState()
-    const agent = state.agents.find((item) => item.id === agentId)
-
-    if (!agent) return
-
-    // Base-level assignments are projected from each Agent's knowledgeBaseIds,
-    // so removing the Agent removes those relationships immediately.
-    state.agents = state.agents.filter((item) => item.id !== agentId)
-
-    // Remove the Agent from every explicit document override. Keep [] when the
-    // deleted Agent was the last override entry so the document does not
-    // unexpectedly fall back to base-level inheritance.
-    for (const [documentId, assignedAgentIds] of state.documentOverrides) {
-      if (!assignedAgentIds.includes(agentId)) continue
-
-      state.documentOverrides.set(
-        documentId,
-        assignedAgentIds.filter((id) => id !== agentId),
-      )
-    }
-
-    return
-  }
-
-  throw new ApiError('Agent API is not connected.', 501)
+export async function createAgent(payload: CreateAgentPayload): Promise<AgentListItem> {
+  return normalize(await apiRequest<AgentListItem>('/api/ai/agents', { method: 'POST', body: payload }))
+}
+export async function updateAgent(agentId: string, patch: UpdateAgentPayload): Promise<AgentListItem> {
+  return normalize(await apiRequest<AgentListItem>(`/api/ai/agents/${encodeURIComponent(agentId)}`, {
+    method: 'PATCH', body: { ...patch, version: expectedVersion(patch.version) },
+  }))
+}
+export async function deleteAgent(agentId: string, companyId: string, version: number | undefined): Promise<void> {
+  await apiRequest(`/api/ai/agents/${encodeURIComponent(agentId)}?companyId=${encodeURIComponent(companyId)}&version=${expectedVersion(version)}`, { method: 'DELETE' })
 }
 

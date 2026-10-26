@@ -30,6 +30,7 @@ import {
   canPromote,
   canEditTemplate,
   canDeleteTemplate,
+  canViewTemplate,
   type User,
 } from './permissions'
 
@@ -247,22 +248,15 @@ export function toBaseListItem(
 /* ================================================================== */
 
 /**
- * Bases visible while acting as `activeCompanyId`:
- *   - owned by the active company, OR
- *   - owned by another company and shared with the active company.
- *
- * This is what the Knowledge screen shows. A user who is a member of A and B
- * but is currently "in" A does NOT see B's private bases.
+ * Knowledge belongs to the active company only. Distribution to another
+ * company requires an authorized template adoption into a new local base.
  */
 export function listBasesVisibleFrom(
   user: User,
   activeCompanyId: string,
 ): SeedKnowledgeBase[] {
-  return state.bases.filter((base) => {
-    if (base.companyId === activeCompanyId) return true
-    if (!canRead(user, base)) return false
-    return canReadAsCompany(base, activeCompanyId)
-  })
+  return state.bases.filter(base => base.merchantId === user.merchantId
+    && canRead(user, base) && canReadAsCompany(base, activeCompanyId))
 }
 
 /** All bases the user may read, regardless of active company. */
@@ -274,20 +268,21 @@ export function listBasesForUser(user: User): SeedKnowledgeBase[] {
 export function listTemplatesForCompany(
   user: User,
   activeCompanyId: string,
+  includeOversight = false,
 ): SeedTemplate[] {
   return state.templates
     .filter(
       (tpl) =>
-        canRead(user, tpl) && tpl.allowedCompanyIds.includes(activeCompanyId),
+        canViewTemplate(user, tpl, activeCompanyId, includeOversight),
     )
-    .map((tpl) => ({ ...tpl, allowedCompanyIds: [...tpl.allowedCompanyIds] }))
+    .map(tpl => structuredClone(tpl))
 }
 
 /** Every template the user can see from any of their companies. */
 export function listTemplatesForUser(user: User): SeedTemplate[] {
   return state.templates
-    .filter((tpl) => canRead(user, tpl))
-    .map((tpl) => ({ ...tpl, allowedCompanyIds: [...tpl.allowedCompanyIds] }))
+    .filter(tpl => user.memberships.some(m => canViewTemplate(user, tpl, m.companyId, true)))
+    .map(tpl => structuredClone(tpl))
 }
 
 /* ================================================================== */
@@ -330,10 +325,10 @@ export function adoptTemplate(
   if (!template) {
     throw new TemplateError(`Template ${payload.templateId} not found`)
   }
-  if (!canRead(user, template)) {
+  if (!canViewTemplate(user, template, payload.companyId)) {
     throw new TemplateError('You do not have permission to view this template.')
   }
-  if (!template.allowedCompanyIds.includes(payload.companyId)) {
+  if (template.ownerCompanyId !== payload.companyId && !template.allowedCompanyIds.includes(payload.companyId)) {
     throw new TemplateError(
       'This template is not shared with the selected company.',
     )
@@ -389,7 +384,7 @@ export function adoptTemplate(
       baseId,
       name: skill.name,
       description: skill.description,
-      inputSchema: skill.inputSchema,
+      inputSchema: skill.inputSchema ? structuredClone(skill.inputSchema) : undefined,
       status: 'ready',
       updatedAt: now,
     })
@@ -460,7 +455,7 @@ export function promoteBaseToTemplate(
     ownerCompanyId: base.companyId,
     allowedCompanyIds:
       payload.allowedCompanyIds && payload.allowedCompanyIds.length > 0
-        ? [...payload.allowedCompanyIds]
+        ? [...new Set([base.companyId, ...payload.allowedCompanyIds])]
         : [base.companyId],
   }
 
@@ -474,7 +469,7 @@ export function promoteBaseToTemplate(
     template.skills = skills.map((s) => ({
       name: s.name,
       description: s.description,
-      inputSchema: s.inputSchema,
+      inputSchema: s.inputSchema ? structuredClone(s.inputSchema) : undefined,
     }))
   }
 
@@ -539,7 +534,7 @@ export function updateTemplate(
   if (!template) {
     throw new TemplateError(`Template ${payload.templateId} not found`)
   }
-  if (!canRead(user, template)) {
+  if (!user.memberships.some(m => canViewTemplate(user, template, m.companyId))) {
     throw new TemplateError('You do not have permission to view this template.')
   }
   if (!canEditTemplate(user, template)) {
@@ -560,7 +555,7 @@ export function updateTemplate(
   if (payload.allowedCompanyIds !== undefined) {
     // De-dup and never allow an empty list (a template with nobody seeing
     // it is effectively deleted; use deleteTemplate for that).
-    const next = [...new Set(payload.allowedCompanyIds)]
+    const next = [...new Set([template.ownerCompanyId, ...payload.allowedCompanyIds])]
     if (next.length === 0) {
       throw new TemplateError('A template must be visible to at least one company.')
     }
@@ -579,7 +574,7 @@ export function deleteTemplate(user: User, templateId: string): void {
     throw new TemplateError(`Template ${templateId} not found`)
   }
   const template = state.templates[index]
-  if (!canRead(user, template)) {
+  if (!user.memberships.some(m => canViewTemplate(user, template, m.companyId))) {
     throw new TemplateError('You do not have permission to view this template.')
   }
   // Delete is stricter than edit: admin of the owner only.

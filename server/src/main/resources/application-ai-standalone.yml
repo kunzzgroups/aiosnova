@@ -13,6 +13,10 @@ spring:
   sql:
     init:
       mode: never
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
 
 server:
   address: 127.0.0.1
@@ -29,5 +33,12 @@ management:
       show-details: never
 
 ai:
+  knowledge:
+    # Local standalone policy matching existing company roles; never supplied by the browser.
+    company-roles: ${AI_KNOWLEDGE_COMPANY_ROLES:company-j1=admin,company-j2=editor,company-retail=editor,company-wholesale=viewer}
+    template-overseer-company: ${AI_TEMPLATE_OVERSEER_COMPANY:company-j1}
+  agents:
+    # Local standalone tenant scope; replace with authenticated scope when integrating Core.
+    merchant-id: ${AI_MERCHANT_ID:merchant-acme}
   credentials:
     storage-key: ${AI_STORAGE_KEY}

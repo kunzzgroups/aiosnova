@@ -25,6 +25,15 @@ export type ProviderSummary = {
   enabled: boolean
   hasApiKey: boolean
   version: number
+
+  connectionRevision: number
+  verificationStatus: 'not_verified' | 'verified' | 'failed'
+  verificationRevision: number | null
+  verificationModelId: string | null
+  verificationCheckedAt: string | null
+  verificationLastSuccessAt: string | null
+  verificationErrorCode: string | null
+  verificationErrorMessage: string | null
 }
 
 async function checkResponse(response: Response): Promise<void> {

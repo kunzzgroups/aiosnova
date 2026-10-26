@@ -17,6 +17,8 @@ export type StoredModelSummary = {
   status: ModelStatus
   description: string
   contextWindow: number | null
+  catalogContextWindow: number | null
+  configuredContextWindow: number | null
   capabilities: ModelCapabilities | null
   capabilitiesCheckedAt: string | null
   capabilityError: string | null

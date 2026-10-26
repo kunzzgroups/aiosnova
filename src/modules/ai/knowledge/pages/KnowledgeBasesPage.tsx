@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
@@ -24,6 +24,7 @@ import {
   updateKnowledgeDocumentMode,
   updateKnowledgeSkillMode,
   updateKnowledgeDataSourceMode,
+  userCanWriteKnowledge,
 } from '../services/knowledgeService'
 import {
   adoptKnowledgeTemplate,
@@ -94,6 +95,8 @@ export function KnowledgeBasesPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingVersion, setEditingVersion] = useState<number | undefined>()
+  const loadRequest = useRef(0)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [kind, setKind] = useState<KnowledgeBaseKind | ''>('')
@@ -128,6 +131,7 @@ export function KnowledgeBasesPage() {
   const [contentQuery, setContentQuery] = useState('')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const load = useCallback(async () => {
+    const request = ++loadRequest.current
     setIsLoading(true)
     setError(null)
     try {
@@ -135,20 +139,26 @@ export function KnowledgeBasesPage() {
         fetchKnowledgeBases(companyId),
         fetchAgents(companyId),
       ])
+      if (request !== loadRequest.current || useCompanyStore.getState().companyId !== companyId) return
       setBases(basesResult.items)
       setAgents(agentsResult.items)
     } catch {
+      if (request !== loadRequest.current || useCompanyStore.getState().companyId !== companyId) return
       setBases([])
       setAgents([])
       setError(t('ai.knowledge.errLoadBases'))
     } finally {
-      setIsLoading(false)
+      if (request === loadRequest.current && useCompanyStore.getState().companyId === companyId) setIsLoading(false)
     }
   }, [companyId, t])
   useEffect(() => {
     void load()
   }, [load])
-  const canUseTemplates = useMemo(() => userCanSeeTemplates(companyId), [companyId])
+  const canUseTemplates = userCanSeeTemplates(companyId)
+  const canWriteKnowledge = userCanWriteKnowledge(companyId)
+  useEffect(() => {
+    setFormOpen(false); setTemplateOpen(false); setPendingPromote(null); setPendingDelete(null)
+  }, [companyId])
   const activeAgents = useMemo(
     () => agents.filter((agent) => agent.status === 'active'),
     [agents],
@@ -274,7 +284,7 @@ export function KnowledgeBasesPage() {
     }
     let cancelled = false
     setIsLoadingDetail(true)
-    fetchKnowledgeBase(selectedBaseId)
+    fetchKnowledgeBase(selectedBaseId, companyId)
       .then((result) => {
         if (!cancelled) {
           setDetail(result)
@@ -293,7 +303,7 @@ export function KnowledgeBasesPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedBaseId, t])
+  }, [selectedBaseId, companyId, t])
   const selectedBase = useMemo(
     () => visibleBases.find((base) => base.id === selectedBaseId) ?? null,
     [visibleBases, selectedBaseId],
@@ -381,13 +391,14 @@ export function KnowledgeBasesPage() {
   async function refreshWorkspaceKnowledge() {
     await load()
     if (!selectedBaseId) return
-    const refreshed = await fetchKnowledgeBase(selectedBaseId)
-    setDetail(refreshed)
+    const refreshed = await fetchKnowledgeBase(selectedBaseId, companyId)
+    if (useCompanyStore.getState().companyId === companyId) setDetail(refreshed)
   }
   async function changeContentMode(
     itemId: string,
     currentMode: KnowledgeManualMode,
   ) {
+    if (!canWriteKnowledge) return
     const next = nextKnowledgeManualMode(currentMode)
     setError(null)
     try {
@@ -452,6 +463,7 @@ export function KnowledgeBasesPage() {
     setSearchParams(next, { replace: true })
   }
   function openCreate() {
+    setEditingVersion(undefined)
     setEditingId(null)
     setName('')
     setDescription('')
@@ -461,6 +473,7 @@ export function KnowledgeBasesPage() {
     setFormOpen(true)
   }
   function openRename(base: KnowledgeBaseListItem) {
+    setEditingVersion(base.version)
     setEditingId(base.id)
     setName(base.name)
     setDescription(base.description)
@@ -503,7 +516,7 @@ export function KnowledgeBasesPage() {
     setError(null)
     try {
       if (editingId) {
-        await updateKnowledgeBase(editingId, { name, description })
+        await updateKnowledgeBase(editingId, { name, description, version: editingVersion })
         setMessage(t('ai.knowledge.msgUpdated'))
       } else {
         await createKnowledgeBase({
@@ -531,7 +544,7 @@ export function KnowledgeBasesPage() {
     setIsDeleting(true)
     setDeleteError(null)
     try {
-      await deleteKnowledgeBase(pendingDelete.id)
+      await deleteKnowledgeBase(pendingDelete.id, pendingDelete.version)
       setMessage(t('ai.knowledge.msgDeleted'))
       setPendingDelete(null)
       setDeleteError(null)
@@ -553,6 +566,7 @@ export function KnowledgeBasesPage() {
     setIsLoadingTemplates(true)
     fetchTemplates(companyId)
       .then((result) => {
+        if (useCompanyStore.getState().companyId !== companyId) return
         setTemplates(result.items)
         const first = result.items[0]
         if (first) {
@@ -561,8 +575,8 @@ export function KnowledgeBasesPage() {
           setAdoptCategory(first.category)
         }
       })
-      .catch(() => setTemplates([]))
-      .finally(() => setIsLoadingTemplates(false))
+      .catch(() => { if (useCompanyStore.getState().companyId === companyId) setTemplates([]) })
+      .finally(() => { if (useCompanyStore.getState().companyId === companyId) setIsLoadingTemplates(false) })
   }
   function pickTemplate(template: TemplateListItem) {
     setSelectedTemplateId(template.id)
@@ -615,6 +629,7 @@ export function KnowledgeBasesPage() {
     try {
       const result = await promoteKnowledgeBaseToTemplate({
         baseId: pendingPromote.id,
+        version: pendingPromote.version,
         name: promoteName.trim() || undefined,
         allowedCompanyIds: promoteVisibility,
       })
@@ -700,10 +715,10 @@ export function KnowledgeBasesPage() {
               </Button>
             </>
           ) : null}
-          <Button onClick={openCreate}>
+          {canWriteKnowledge && <Button onClick={openCreate}>
             <IconPlus />
             {t('ai.knowledge.create')}
-          </Button>
+          </Button>}
         </div>
       </div>
       {activeAgent ? (
@@ -790,7 +805,7 @@ export function KnowledgeBasesPage() {
                             <strong>{base.name}</strong>
                           </span>
                         </button>
-                        <RowMenu
+                        {canWriteKnowledge && <RowMenu
                           label={t('ai.knowledge.rowActions', { name: base.name })}
                           items={[
                             {
@@ -817,7 +832,7 @@ export function KnowledgeBasesPage() {
                               },
                             },
                           ]}
-                        />
+                        />}
                       </div>
                     )
                   })}
@@ -878,6 +893,7 @@ export function KnowledgeBasesPage() {
                 />
                 <Button
                   variant="secondary"
+                  style={!canWriteKnowledge ? { display: 'none' } : undefined}
                   onClick={() =>
                     void navigate(
                       `/ai/ai/knowledge/${selectedBase.id}/${tabForKind(selectedBaseKind)}`,
@@ -983,7 +999,7 @@ export function KnowledgeBasesPage() {
                               const displayStatus =
                                 displayStatusForItem(item)
                               if (
-                                displayStatus === 'failed' ||
+                                !canWriteKnowledge || displayStatus === 'failed' ||
                                 displayStatus === 'processing'
                               ) {
                                 return (
@@ -995,9 +1011,7 @@ export function KnowledgeBasesPage() {
                                         : 'System is processing this item'
                                     }
                                   >
-                                    {displayStatus === 'failed'
-                                      ? 'Failed'
-                                      : 'Processing'}
+                                    {t(STATUS_LABEL_KEY[displayStatus], STATUS_LABEL_FALLBACK[displayStatus])}
                                   </span>
                                 )
                               }
@@ -1145,14 +1159,14 @@ export function KnowledgeBasesPage() {
                   </div>
                 </dl>
               </section>
-              <Button
+              {canWriteKnowledge && <Button
                 variant="secondary"
                 className="knowledge-detail-edit"
                 onClick={() => openRename(detail.base)}
               >
                 <IconSettings />
                 Edit knowledge base
-              </Button>
+              </Button>}
             </>
           ) : (
             <div className="knowledge-workspace-empty">

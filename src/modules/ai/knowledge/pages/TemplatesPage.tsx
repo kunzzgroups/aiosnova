@@ -61,17 +61,22 @@ export function TemplatesPage() {
     const [isDeleting, setIsDeleting] = useState(false)
     const [deleteError, setDeleteError] = useState<string | null>(null)
 
+    const loadRequest = useRef(0)
+    useEffect(() => { setEditOpen(false); setEditing(null); setPendingDelete(null) }, [companyId])
     const load = useCallback(async () => {
+        const request = ++loadRequest.current
         setIsLoading(true)
         setError(null)
         try {
             const result = await fetchTemplatesForCompany(companyId)
+            if (request !== loadRequest.current) return
             setTemplates(result.items)
         } catch {
+            if (request !== loadRequest.current) return
             setTemplates([])
             setError(t('ai.knowledge.errLoadTemplates', 'Unable to load templates.'))
         } finally {
-            setIsLoading(false)
+            if (request === loadRequest.current) setIsLoading(false)
         }
     }, [companyId, t])
     useEffect(() => {
@@ -220,6 +225,7 @@ export function TemplatesPage() {
         try {
             await updateKnowledgeTemplate({
                 templateId: editing.id,
+                version: editing.version,
                 name: editName.trim(),
                 description: editDescription.trim(),
                 category: editCategory.trim(),
@@ -243,7 +249,7 @@ export function TemplatesPage() {
         setIsDeleting(true)
         setDeleteError(null)
         try {
-            await deleteKnowledgeTemplate(pendingDelete.id)
+            await deleteKnowledgeTemplate(pendingDelete.id, pendingDelete.version)
             setMessage(t('ai.knowledge.msgTemplateDeleted', 'Template deleted.'))
             setPendingDelete(null)
             await load()

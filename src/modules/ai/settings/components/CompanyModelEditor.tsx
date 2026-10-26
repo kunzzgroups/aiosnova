@@ -15,7 +15,7 @@ export function CompanyModelEditor({ companyId, providers, target, initialProvid
   const [name, setName] = useState(target?.name ?? '')
   const [modelId, setModelId] = useState(target?.modelId ?? '')
   const [type, setType] = useState<ModelType>(target?.type ?? 'chat')
-  const [context, setContext] = useState(String(target?.contextWindow ?? 0))
+  const [context, setContext] = useState(String(target?.configuredContextWindow ?? 0))
   const [enabled, setEnabled] = useState(target?.status === 'enabled')
   const [description, setDescription] = useState(target?.description ?? '')
   const [busy, setBusy] = useState(false)
@@ -25,7 +25,7 @@ export function CompanyModelEditor({ companyId, providers, target, initialProvid
     if (busy || useCompanyStore.getState().companyId !== companyId) return
     const contextWindow = Number(context)
     if (!providerId || !name.trim() || !modelId.trim()) { setError('Select a Provider and enter a model name and ID.'); return }
-    if (!Number.isSafeInteger(contextWindow) || contextWindow < 0 || contextWindow > 2147483647) { setError('Enter a valid context window; 0 means unknown.'); return }
+    if (!Number.isSafeInteger(contextWindow) || contextWindow < 0 || contextWindow > 2147483647) { setError('Enter a valid context window; 0 follows the catalog.'); return }
     setBusy(true); setError('')
     try {
       const payload = { providerId, name, modelId, type, contextWindow, enabled, description }
@@ -44,7 +44,7 @@ export function CompanyModelEditor({ companyId, providers, target, initialProvid
       <FormField label="Model name" htmlFor="company-model-name"><TextField id="company-model-name" value={name} onChange={event => setName(event.target.value)} disabled={busy} autoFocus /></FormField>
       <FormField label="Model ID" htmlFor="company-model-id"><TextField id="company-model-id" value={modelId} onChange={event => setModelId(event.target.value)} disabled={busy || !!target} placeholder="vendor/model-id" /></FormField>
       <FormField label="Type" htmlFor="company-model-type"><SidebarSelect menuPortal id="company-model-type" label="Type" hideLabel value={type} options={['chat', 'reasoning', 'embedding', 'other'].map(value => ({ value, label: value }))} onChange={value => setType(value as ModelType)} disabled={busy} /></FormField>
-      <FormField label="Context window (0 = unknown)" htmlFor="company-model-context"><TextField id="company-model-context" type="number" min="0" max="2147483647" step="1" value={context} onChange={event => setContext(event.target.value)} disabled={busy} /></FormField>
+      <FormField label="Context window (0 = follow catalog)" htmlFor="company-model-context"><TextField id="company-model-context" type="number" min="0" max="2147483647" step="1" value={context} onChange={event => setContext(event.target.value)} disabled={busy} /></FormField>
       <FormField label="Status" htmlFor="company-model-status"><SidebarSelect menuPortal id="company-model-status" label="Status" hideLabel value={enabled ? 'enabled' : 'disabled'} options={[{ value: 'enabled', label: 'Enabled' }, { value: 'disabled', label: 'Disabled' }]} onChange={value => setEnabled(value === 'enabled')} disabled={busy || !target} /></FormField>
       {!target ? <p>New models are disabled until their capabilities are confirmed.</p> : null}
       <FormField label="Description" htmlFor="company-model-description"><TextField id="company-model-description" value={description} onChange={event => setDescription(event.target.value)} disabled={busy} /></FormField>

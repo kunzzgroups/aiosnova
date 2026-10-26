@@ -30,6 +30,8 @@ public class AiModelRepository {
                         String status,
                         String description,
                         Integer contextWindow,
+                        Integer catalogContextWindow,
+                        Integer configuredContextWindow,
                         ModelCapabilities capabilities,
                         Instant capabilitiesCheckedAt,
                         String capabilityError,
@@ -52,6 +54,7 @@ public class AiModelRepository {
                                                     status,
                                                     description,
                                                     context_window,
+                                                    catalog_context_window,
                                                     capability_chat,
                                                     capability_vision,
                                                     capability_tool_calling,
@@ -92,7 +95,7 @@ public class AiModelRepository {
                                                     model_type,
                                                     status,
                                                     description,
-                                                    context_window,
+                                                    catalog_context_window,
                                                     capability_chat,
                                                     capability_vision,
                                                     capability_tool_calling,
@@ -134,6 +137,7 @@ public class AiModelRepository {
                                 """
                                                 UPDATE ai_models
                                                 SET
+                                                    catalog_context_window = ?,
                                                     capability_chat = ?,
                                                     capability_vision = ?,
                                                     capability_tool_calling = ?,
@@ -146,6 +150,7 @@ public class AiModelRepository {
                                                   AND model_id = ?
                                                   AND version = ?
                                                 """,
+                                capabilities == null ? null : capabilities.contextWindow(),
                                 capabilities == null ? null : capabilities.chat(),
                                 capabilities == null ? null : capabilities.vision(),
                                 capabilities == null ? null : capabilities.toolCalling(),
@@ -258,6 +263,7 @@ public class AiModelRepository {
                                                     status,
                                                     description,
                                                     context_window,
+                                                    catalog_context_window,
                                                     capability_chat,
                                                     capability_vision,
                                                     capability_tool_calling,
@@ -280,9 +286,17 @@ public class AiModelRepository {
         private ModelSummary readModel(ResultSet result)
                         throws SQLException {
 
-                Integer contextWindow = result.getObject(
+                Integer configuredContextWindow = result.getObject(
                                 "context_window",
                                 Integer.class);
+
+                Integer catalogContextWindow = result.getObject(
+                                "catalog_context_window",
+                                Integer.class);
+
+                Integer contextWindow = effectiveContextWindow(
+                                configuredContextWindow,
+                                catalogContextWindow);
 
                 Boolean chat = nullableBoolean(result, "capability_chat");
                 Boolean vision = nullableBoolean(result, "capability_vision");
@@ -295,7 +309,7 @@ public class AiModelRepository {
                                         chat,
                                         vision,
                                         tools,
-                                        contextWindow);
+                                        catalogContextWindow);
                 }
 
                 LocalDateTime checkedAt = result.getObject(
@@ -312,12 +326,29 @@ public class AiModelRepository {
                                 result.getString("status"),
                                 result.getString("description"),
                                 contextWindow,
+                                catalogContextWindow,
+                                configuredContextWindow,
                                 capabilities,
                                 checkedAt == null
                                                 ? null
                                                 : checkedAt.toInstant(ZoneOffset.UTC),
                                 result.getString("capability_error"),
                                 result.getLong("version"));
+        }
+
+        private static Integer effectiveContextWindow(
+                        Integer configured,
+                        Integer catalog) {
+
+                if (configured == null) {
+                        return catalog;
+                }
+
+                if (catalog == null) {
+                        return configured;
+                }
+
+                return Math.min(configured, catalog);
         }
 
         private Boolean nullableBoolean(

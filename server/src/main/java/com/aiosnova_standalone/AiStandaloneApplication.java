@@ -25,6 +25,15 @@ import com.aiosnova.ai.AiModelSyncService;
 import com.aiosnova.ai.AiModelStateService;
 import com.aiosnova.ai.AiModelPreferencesService;
 import com.aiosnova.ai.AiModelPreferencesController;
+import com.aiosnova.ai.AiAgentRepository;
+import com.aiosnova.ai.AiMigrationToolsConfiguration;
+import com.aiosnova.ai.AiAgentWriteService;
+import com.aiosnova.ai.AiKnowledgeAccess;
+import com.aiosnova.ai.AiKnowledgeRepository;
+import com.aiosnova.ai.AiKnowledgeService;
+import com.aiosnova.ai.AiKnowledgeController;
+import com.aiosnova.ai.AiAgentService;
+import com.aiosnova.ai.AiAgentController;
 
 @Configuration
 @EnableAutoConfiguration
@@ -46,7 +55,16 @@ import com.aiosnova.ai.AiModelPreferencesController;
     AiModelSyncService.class,
     AiModelStateService.class,
     AiModelPreferencesService.class,
-    AiModelPreferencesController.class
+    AiModelPreferencesController.class,
+    AiAgentRepository.class,
+    AiMigrationToolsConfiguration.class,
+    AiAgentWriteService.class,
+    AiKnowledgeAccess.class,
+    AiKnowledgeRepository.class,
+    AiKnowledgeService.class,
+    AiKnowledgeController.class,
+    AiAgentService.class,
+    AiAgentController.class,
 })
 public class AiStandaloneApplication {
 

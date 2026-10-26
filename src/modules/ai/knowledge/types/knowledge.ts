@@ -63,6 +63,7 @@ export type KnowledgeDocumentType = 'contract' | 'invoice' | 'policy' | 'record'
 
 export type KnowledgeBase = {
   id: string
+  version?: number
   merchantId: string
   /** Owning company. Write permission is gated by this. */
   companyId: string
@@ -81,6 +82,7 @@ export type KnowledgeBase = {
 
 export type KnowledgeDocument = {
   id: string
+  version?: number
   baseId: string
   kind: KnowledgeDocumentKind
   type: KnowledgeDocumentType
@@ -102,6 +104,7 @@ export type KnowledgeDocument = {
 /** A callable capability inside a `kind: 'skill'` base. */
 export type KnowledgeSkill = {
   id: string
+  version?: number
   baseId: string
   name: string
   description: string
@@ -116,6 +119,7 @@ export type KnowledgeSkill = {
 /** A structured source inside a `kind: 'data'` base. */
 export type KnowledgeDataSource = {
   id: string
+  version?: number
   baseId: string
   name: string
   kind: 'table' | 'api' | 'database'

@@ -9,7 +9,9 @@ async function main() {
   })
   globalThis.window = { setTimeout: callback => setTimeout(callback, 0) }
   const service = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'))
-  const row = (id, companyId = 'company-j1', enabled = false) => ({ id, companyId, enabled, version: 2, name: id, providerType: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1', hasApiKey: true })
+  const row = (id, companyId = 'company-j1', enabled = false) => ({ id, companyId, enabled, version: 2, name: id, providerType: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1', hasApiKey: true,
+    connectionRevision: 0, verificationStatus: 'not_verified', verificationRevision: null, verificationModelId: null,
+    verificationCheckedAt: null, verificationLastSuccessAt: null, verificationErrorCode: null, verificationErrorMessage: null })
   let rows = [row('a'), row('b'), row('c', 'company-j2'), row('enabled', 'company-j1', true)]
   const calls = []
   let conflict = false
@@ -59,9 +61,17 @@ async function main() {
   conflict = false
 
   service.recordProviderConnectionTest('company-j1', 'enabled', 'https://openrouter.ai/api/v1', 'fake/model', { ok: true, message: 'Connected' })
+  assert.equal((await service.fetchProvider('enabled')).status, 'connected', 'local diagnostic is only temporary')
+  await service.fetchProviders('company-j1')
+  assert.equal((await service.fetchProvider('enabled')).status, 'not_verified')
+  assert.equal((await service.fetchProvider('enabled')).lastConnectionTest, undefined)
+  assert.equal((await service.fetchProvider('enabled')).lastTestedAt, null)
+  const persisted = rows.find(row => row.id === 'enabled')
+  Object.assign(persisted, { verificationStatus: 'verified', verificationRevision: 0, verificationModelId: 'fake/model', verificationCheckedAt: '2026-10-26T08:00:00Z', verificationLastSuccessAt: '2026-10-26T08:00:00Z' })
   await service.fetchProviders('company-j1')
   assert.equal((await service.fetchProvider('enabled')).status, 'connected')
-  console.log('PASS: unchanged database records retain session diagnostics')
+  assert.equal((await service.fetchProvider('enabled')).lastConnectionTest.modelId, 'fake/model')
+  console.log('PASS: database verification overrides session diagnostics and restores persisted results')
 
   await assert.rejects(service.updateProvider('a', { companyId: 'company-j1', name: 'Old form', baseUrl: 'https://openrouter.ai/api/v1', enabled: false }, 1), /Version conflict/)
   console.log('PASS: edit submits the form version instead of a newer cache version')

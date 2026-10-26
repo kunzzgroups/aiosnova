@@ -29,6 +29,8 @@ export type User = {
   userId: string
   merchantId: string
   memberships: Membership[]
+  /** Explicit Mock-only global template oversight; active company must match. */
+  templateLibraryAdminCompanyId?: string
 }
 
 /**
@@ -44,6 +46,7 @@ export type User = {
 export const MOCK_USER: User = {
   userId: 'user-demo',
   merchantId: DEMO_MERCHANT_ID,
+  templateLibraryAdminCompanyId: 'company-j1',
   memberships: [
     { companyId: 'company-j1', role: 'admin' },
     { companyId: 'company-j2', role: 'editor' },
@@ -67,6 +70,8 @@ export function canRead(
   user: User,
   resource: { allowedCompanyIds?: string[]; companyId?: string },
 ): boolean {
+  // Company Knowledge is private. Cross-company distribution uses templates.
+  if (resource.companyId) return user.memberships.some(m => m.companyId === resource.companyId)
   const allowed =
     resource.allowedCompanyIds && resource.allowedCompanyIds.length > 0
       ? resource.allowedCompanyIds
@@ -88,6 +93,7 @@ export function canReadAsCompany(
   resource: { allowedCompanyIds?: string[]; companyId?: string },
   activeCompanyId: string,
 ): boolean {
+  if (resource.companyId) return resource.companyId === activeCompanyId
   if (resource.companyId && resource.companyId === activeCompanyId) return true
 
   const allowed =
@@ -98,6 +104,24 @@ export function canReadAsCompany(
         : []
 
   return allowed.includes(activeCompanyId)
+}
+
+export function canUseTemplates(user: User, companyId: string): boolean {
+  return canWriteToCompany(user, companyId)
+}
+
+export function canOverseeTemplates(user: User, companyId: string): boolean {
+  return user.templateLibraryAdminCompanyId === companyId && roleIn(user, companyId) === 'admin'
+}
+
+export function canViewTemplate(user: User,
+  template: { ownerCompanyId: string; allowedCompanyIds: string[] },
+  companyId: string, includeOversight = false): boolean {
+  if (!canUseTemplates(user, companyId)) return false
+  if (template.ownerCompanyId === companyId || template.allowedCompanyIds.includes(companyId)) return true
+  // Owner-only templates remain private even from global oversight.
+  const shared = template.allowedCompanyIds.some(id => id !== template.ownerCompanyId)
+  return includeOversight && shared && canOverseeTemplates(user, companyId)
 }
 
 /** Can the user write to this company's resources? editor or admin only. */

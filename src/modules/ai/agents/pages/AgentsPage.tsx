@@ -11,11 +11,9 @@ import { TextField } from '@/components/ui/TextField'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { useCompanyStore } from '@/stores/companyStore'
-import { fetchKnowledgeBases } from '@/modules/ai/knowledge/services/knowledgeService'
-import type { KnowledgeBaseListItem } from '@/modules/ai/knowledge/types/knowledge'
 import { ApiError } from '@/services/httpClient'
 import { fetchAssistantModelOptions, type AssistantModelOption } from '@/modules/ai/settings/services/settingsService'
-import { createAgent, deleteAgent, fetchAgent, fetchAgents, updateAgent } from '../services/agentService'
+import { createAgent, deleteAgent, fetchAgent, fetchAgents, updateAgent, fetchAgentKnowledgeBases, type AgentKnowledgeBase } from '../services/agentService'
 import { IconPlus, IconPencil, IconTrash } from '@/components/icons/Icons'
 import { TablePanel } from '@/components/ui/TablePanel'
 import { TablePagination } from '@/components/ui/TablePagination'
@@ -46,7 +44,7 @@ export function AgentsPage() {
   const baseIdFilter = searchParams.get('baseId')
 
   const [agents, setAgents] = useState<AgentListItem[]>([])
-  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseListItem[]>([])
+  const [knowledgeBases, setKnowledgeBases] = useState<AgentKnowledgeBase[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -59,6 +57,10 @@ export function AgentsPage() {
   const [createStatus, setCreateStatus] = useState<Extract<AgentStatus, 'active' | 'draft'>>('active')
   const [selectedBaseIds, setSelectedBaseIds] = useState<string[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [formReady, setFormReady] = useState(false)
+  const [editSnapshot, setEditSnapshot] = useState<AgentListItem | null>(null)
+  const editRequest = useRef(0)
+  const loadRequest = useRef(0)
   const [pendingDeleteAgent, setPendingDeleteAgent] = useState<AgentListItem | null>(null)
   const [isDeletingAgent, setIsDeletingAgent] = useState(false)
 
@@ -70,8 +72,8 @@ export function AgentsPage() {
     [agents, editingId],
   )
   const canAssignKnowledge =
-    editingAgent !== null
-      ? editingAgent.status === 'active'
+    (editSnapshot ?? editingAgent) !== null
+      ? (editSnapshot ?? editingAgent)?.status === 'active'
       : createStatus === 'active'
 
   const [provider, setProvider] = useState<'auto' | 'specific'>('auto')
@@ -95,7 +97,10 @@ export function AgentsPage() {
     return () => { active = false }
   }, [companyId, formOpen])
 
-  useEffect(() => { setFormOpen(false); setEditingId(null) }, [companyId])
+  useEffect(() => {
+    editRequest.current++
+    setFormOpen(false); setEditingId(null); setEditSnapshot(null); setFormReady(false); setPendingDeleteAgent(null)
+  }, [companyId])
   const [temperature, setTemperature] = useState(0.3)
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
@@ -107,21 +112,25 @@ export function AgentsPage() {
   const autoFitRowMeasurement = useRef({ width: 0, height: 0 })
 
   const load = useCallback(async () => {
+    const request = ++loadRequest.current
     setIsLoading(true)
     setError(null)
+    setAgents([]); setKnowledgeBases([])
     try {
       const [agentsResult, basesResult] = await Promise.all([
         fetchAgents(companyId),
-        fetchKnowledgeBases(companyId),
+        fetchAgentKnowledgeBases(companyId),
       ])
+      if (request !== loadRequest.current || useCompanyStore.getState().companyId !== companyId) return
       setAgents(agentsResult.items)
       setKnowledgeBases(basesResult.items)
     } catch {
+      if (request !== loadRequest.current || useCompanyStore.getState().companyId !== companyId) return
       setAgents([])
       setKnowledgeBases([])
       setError(t('ai.agents.errLoad'))
     } finally {
-      setIsLoading(false)
+      if (request === loadRequest.current && useCompanyStore.getState().companyId === companyId) setIsLoading(false)
     }
   }, [companyId, t])
 
@@ -254,6 +263,8 @@ export function AgentsPage() {
   }
 
   function openCreate() {
+    editRequest.current++
+    setEditSnapshot(null); setFormReady(true)
     setEditingId(null)
     setName('')
     setDescription('')
@@ -265,6 +276,8 @@ export function AgentsPage() {
   }
 
   async function openEdit(agent: AgentListItem) {
+    const request = ++editRequest.current
+    setEditSnapshot(null); setFormReady(false)
     setEditingId(agent.id)
     setName(agent.name)
     setDescription(agent.description)
@@ -274,15 +287,21 @@ export function AgentsPage() {
     setError(null)
     setFormOpen(true)
     try {
-      const detail = await fetchAgent(agent.id)
+      const detail = await fetchAgent(agent.id, companyId)
+      if (request !== editRequest.current || useCompanyStore.getState().companyId !== companyId) return
+      setName(detail.agent.name); setDescription(detail.agent.description)
+      setEditSnapshot(detail.agent); setFormReady(true)
       setSelectedBaseIds(detail.knowledgeBaseIds)
       resetModelFields(detail.agent.model)
     } catch {
+      if (request !== editRequest.current) return
       setError(t('ai.agents.errLoad'))
     }
   }
 
   function closeForm() {
+    editRequest.current++
+    setFormReady(false); setEditSnapshot(null)
     setFormOpen(false)
     setEditingId(null)
   }
@@ -311,6 +330,8 @@ export function AgentsPage() {
 
     try {
       await updateAgent(agentId, {
+        companyId,
+        version: agents.find(agent => agent.id === agentId)?.version,
         status: next,
         ...(next === 'active' ? {} : { knowledgeBaseIds: [] }),
       })
@@ -329,7 +350,7 @@ export function AgentsPage() {
     try {
       const deletedAgentId = pendingDeleteAgent.id
 
-      await deleteAgent(deletedAgentId)
+      await deleteAgent(deletedAgentId, pendingDeleteAgent.companyId, pendingDeleteAgent.version)
       setPendingDeleteAgent(null)
       setMessage(t('ai.agents.msgDeleted', 'Agent deleted.'))
 
@@ -353,6 +374,7 @@ export function AgentsPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    if (!formReady || isSaving) return
     if (!name.trim()) {
       setError(t('ai.agents.errNameRequired'))
       return
@@ -371,14 +393,17 @@ export function AgentsPage() {
         model: selected?.modelId ?? '',
         binding: selected ? { providerId: selected.providerId, modelConfigId: selected.id } : undefined,
         temperature,
-        topP: 1,
-        maxTokens: 2048,
+        topP: editSnapshot?.model?.topP ?? 1,
+        maxTokens: editSnapshot?.model?.maxTokens ?? 2048,
       }
       if (editingId) {
         await updateAgent(editingId, {
+          companyId,
+          version: editSnapshot?.version,
           name,
           description,
-          knowledgeBaseIds: canAssignKnowledge ? selectedBaseIds : [],
+          ...(JSON.stringify([...selectedBaseIds].sort()) !== JSON.stringify([...(editSnapshot?.knowledgeBaseIds ?? [])].sort())
+            ? { knowledgeBaseIds: canAssignKnowledge ? selectedBaseIds : [] } : {}),
           model: modelPayload,
         })
         setMessage(t('ai.agents.msgUpdated'))
@@ -611,7 +636,7 @@ export function AgentsPage() {
         closeLabel={t('common.dismiss')}
         footer={
           <>
-            <Button type="submit" form={AGENT_FORM_ID} disabled={isSaving}>
+            <Button type="submit" form={AGENT_FORM_ID} disabled={isSaving || !formReady}>
               {isSaving
                 ? t('ai.agents.saving')
                 : editingId
@@ -794,7 +819,7 @@ export function AgentsPage() {
               items={baseItems}
               selected={selectedBaseIds}
               onToggle={toggleBase}
-              emptyLabel={t('ai.agents.noKnowledgeBases')}
+              emptyLabel={t('ai.agents.noStoredKnowledgeBases', 'No saved knowledge bases in this company yet.')}
               noMatchLabel={t('ai.agents.knowledgeSearchNoMatch')}
               searchPlaceholder={t('ai.agents.knowledgeSearchPlaceholder')}
               searchAriaLabel={t('ai.agents.knowledgeSearchAria')}

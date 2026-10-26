@@ -86,6 +86,8 @@ public class AiChatServiceCheck {
                     "enabled",
                     "",
                     32000,
+                    32000,
+                    null,
                     new ModelCapabilities(true, true, false, 32000),
                     java.time.Instant.parse("2026-01-01T00:00:00Z"),
                     null,

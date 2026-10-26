@@ -18,7 +18,6 @@ import {
     deleteProvider,
     deleteProviders,
     fetchProviders,
-    recordProviderConnectionTest,
     setProviderEnabled,
     syncProviderModels,
     updateProvider,
@@ -78,6 +77,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
     const currentScopeRef = useRef(companyId)
     currentScopeRef.current = companyId
     useEffect(() => { setPendingBulk(null); setBulkError(null); setPendingDelete(null); setSelectedProviderId(null); setManagerProvider(null); setManagerBusy(false) }, [companyId])
+    const verificationSubmittingRef = useRef(false)
     const [pendingDelete, setPendingDelete] = useState<AiProvider | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
     const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -110,23 +110,63 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         setCapabilityError(null)
     }, [modelId, baseUrl, formOpen])
 
+    const providerBusy =
+        isLoading ||
+        isDeleting ||
+        isSaving ||
+        isTesting ||
+        isLoadingCapabilities ||
+        isUpdating
+
     const loadSequence = useRef(0)
-    const load = useCallback(async (background = false) => {
-        const request = ++loadSequence.current
-        if (!background) setIsLoading(true)
-        setError(null)
-        try {
-            const result = await fetchProviders(companyId)
-            if (request !== loadSequence.current || currentScopeRef.current !== companyId) return
-            setProviders(result.items)
-        } catch (caught) {
-            if (request !== loadSequence.current || currentScopeRef.current !== companyId) return
-            setProviders([])
-            setError(caught instanceof Error ? caught.message : 'Unable to load providers.')
-        } finally {
-            if (request === loadSequence.current && currentScopeRef.current === companyId) setIsLoading(false)
-        }
-    }, [companyId])
+    const load = useCallback(
+        async (background = false): Promise<AiProvider[] | null> => {
+            const request = ++loadSequence.current
+
+            if (!background) setIsLoading(true)
+            setError(null)
+
+            try {
+                const result = await fetchProviders(companyId)
+
+                if (
+                    request !== loadSequence.current ||
+                    currentScopeRef.current !== companyId
+                ) {
+                    return null
+                }
+
+                setProviders(result.items)
+                return result.items
+            } catch (caught) {
+                if (
+                    request !== loadSequence.current ||
+                    currentScopeRef.current !== companyId
+                ) {
+                    return null
+                }
+
+                // Keep the existing display if a background reload fails.
+                if (!background) setProviders([])
+
+                setError(
+                    caught instanceof Error
+                        ? caught.message
+                        : 'Unable to load providers.',
+                )
+
+                return null
+            } finally {
+                if (
+                    request === loadSequence.current &&
+                    currentScopeRef.current === companyId
+                ) {
+                    setIsLoading(false)
+                }
+            }
+        },
+        [companyId],
+    )
 
     useEffect(() => {
         void load()
@@ -166,6 +206,14 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
     }
 
     function openCreate() {
+        if (
+            providerBusy ||
+            verificationSubmittingRef.current ||
+            providerMutationRef.current
+        ) {
+            return
+        }
+
         resetForm()
         setFormOpen(true)
     }
@@ -185,7 +233,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
     }
 
     function closeForm() {
-        if (isSaving || isTesting || isLoadingCapabilities) return
+        if (isSaving || isTesting || isLoadingCapabilities || isUpdating) return
         setFormOpen(false)
         resetForm()
     }
@@ -207,13 +255,9 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         setError(null)
 
         try {
-            let savedProvider: AiProvider
-            const previous = providers.find(item => item.id === editingId)
-            const shouldSync = Boolean(testResult?.ok && baseUrl.trim() === 'https://openrouter.ai/api/v1' &&
-                (!previous || apiKey.trim() || previous.baseUrl !== baseUrl.trim() || !previous.lastConnectionTest?.ok || !previous.modelCount))
             if (editingId) {
                 if (editingVersion === null) throw new Error('Missing Provider version. Close and reopen the editor.')
-                savedProvider = await updateProvider(editingId, {
+                await updateProvider(editingId, {
                     companyId,
                     name,
                     baseUrl,
@@ -222,7 +266,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                 }, editingVersion)
                 setMessage('Provider updated successfully.')
             } else {
-                savedProvider = await createProvider({
+                await createProvider({
                     companyId,
                     name,
                     baseUrl,
@@ -234,9 +278,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
 
 
             if (useCompanyStore.getState().companyId !== companyId) return
-            if (testResult?.ok) recordProviderConnectionTest(companyId, savedProvider.id, baseUrl, modelId, testResult)
             await load(true)
-            if (shouldSync) await syncCatalog(savedProvider)
             if (useCompanyStore.getState().companyId !== companyId) return
             setFormOpen(false)
             resetForm(true)
@@ -248,57 +290,163 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
     }
 
     async function handleTestConnection() {
+        if (
+            verificationSubmittingRef.current ||
+            providerMutationRef.current ||
+            isSaving ||
+            isDeleting ||
+            isLoadingCapabilities
+        ) {
+            return
+        }
+
         setTestResult(null)
         setError(null)
+        setMessage(null)
 
-        if (!baseUrl.trim() || (!editingId && !apiKey.trim()) || !modelId.trim()) {
-            setError('Enter the Base URL and test model ID. New Providers also require an API Key.')
+        if (
+            !baseUrl.trim() ||
+            !modelId.trim() ||
+            (!editingId && !apiKey.trim())
+        ) {
+            setError(
+                'Enter the Base URL and test model ID. ' +
+                'New Providers also require an API Key.',
+            )
             return
         }
 
-        const saved = editingId ? providers.find(item => item.id === editingId) : undefined
-        const usesSaved = Boolean(saved && !apiKey.trim() && saved.baseUrl === baseUrl.trim() && saved.version === editingVersion)
+        const saved = editingId
+            ? providers.find(item => item.id === editingId)
+            : undefined
+
+        const usesSaved = Boolean(
+            saved &&
+            !apiKey.trim() &&
+            saved.baseUrl === baseUrl.trim() &&
+            saved.version === editingVersion,
+        )
+
         if (editingId && !apiKey.trim() && !usesSaved) {
-            setError('The URL or version changed. Save and reopen before testing the database key.')
+            setError(
+                'The URL or version changed. Save and reopen before testing the database key.',
+            )
             return
         }
 
+        verificationSubmittingRef.current = true
         setIsTesting(true)
 
         try {
-            const result = usesSaved && saved ? await testStoredProviderConnection(companyId, saved.id, modelId.trim(), saved.version) : await testModelConnection({
+            if (usesSaved && saved) {
+                const result = await testStoredProviderConnection(
+                    companyId,
+                    saved.id,
+                    modelId.trim(),
+                    saved.version,
+                )
+
+                if (useCompanyStore.getState().companyId !== companyId) {
+                    return
+                }
+
+                setTestResult(result)
+
+                const hasVersion =
+                    'providerVersion' in result &&
+                    typeof result.providerVersion === 'number' &&
+                    Number.isSafeInteger(result.providerVersion) &&
+                    result.providerVersion >= 0
+
+                if (hasVersion) {
+                    setEditingVersion(result.providerVersion as number)
+                }
+
+                const refreshed = await load(true)
+
+                if (useCompanyStore.getState().companyId !== companyId) {
+                    return
+                }
+
+                if (!result.ok) {
+                    setError(result.message)
+                    return
+                }
+
+                setMessage('Verification succeeded.')
+
+                const current = refreshed?.find(
+                    item => item.id === saved.id,
+                )
+
+                if (!hasVersion || !current) {
+                    setError(
+                        'Verification succeeded, but the latest Provider could not be confirmed. ' +
+                        'Refresh the page, then retry Sync catalog.',
+                    )
+                    return
+                }
+
+                if (
+                    current.version !== result.providerVersion ||
+                    current.status !== 'connected'
+                ) {
+                    setError(
+                        'Provider configuration changed after verification. ' +
+                        'Reload before syncing.',
+                    )
+                    return
+                }
+
+                await syncCatalog(current, true)
+                return
+            }
+
+            // Draft tests do not establish stored verification.
+            const result = await testModelConnection({
                 baseUrl: baseUrl.trim(),
                 apiKey: apiKey.trim(),
                 modelId: modelId.trim(),
             })
 
-            if (useCompanyStore.getState().companyId !== companyId) return
-            setTestResult(result)
-            if (usesSaved && saved && providers.some(item => item.id === saved.id && item.version === saved.version)) {
-                recordProviderConnectionTest(companyId, saved.id, baseUrl, modelId, result)
-                await load(true)
-                if (result.ok && saved.baseUrl.trim() === 'https://openrouter.ai/api/v1' && (!saved.lastConnectionTest?.ok || !saved.modelCount)) {
-                    await syncCatalog(saved)
-                }
+            if (useCompanyStore.getState().companyId !== companyId) {
+                return
             }
 
-            if (result.ok && !usesSaved) {
-                setMessage('Connection verified. Save this Provider to sync its model catalog.')
-            } else if (!result.ok) {
+            setTestResult(result)
+
+            if (result.ok) {
+                setMessage(
+                    'Draft connection test succeeded. Save, reopen, and verify the saved Provider to sync models.',
+                )
+            } else {
                 setError(result.message)
             }
         } catch (caught) {
+            if (useCompanyStore.getState().companyId !== companyId) {
+                return
+            }
+
             setError(
                 caught instanceof Error
                     ? caught.message
-                    : 'Unable to complete the connection test.'
+                    : 'Unable to complete verification.',
             )
         } finally {
+            verificationSubmittingRef.current = false
             setIsTesting(false)
         }
     }
 
     async function handleLoadCapabilities() {
+        if (
+            providerBusy ||
+            verificationSubmittingRef.current ||
+            providerMutationRef.current
+        ) {
+            return
+        }
+
         setCapabilities(null)
         setCapabilityError(null)
 
@@ -328,18 +476,89 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
         }
     }
 
-    async function syncCatalog(provider: AiProvider) {
-        if (providerMutationRef.current || isDeleting || provider.companyId !== currentScopeRef.current) return
-        providerMutationRef.current = true; setIsUpdating(true); setSyncingProviderId(provider.id); setError(null)
+    async function syncCatalog(
+        provider: AiProvider,
+        afterVerification = false,
+    ) {
+        if (
+            providerMutationRef.current ||
+            isDeleting ||
+            provider.companyId !== currentScopeRef.current ||
+            useCompanyStore.getState().companyId !== companyId
+        ) {
+            return
+        }
+
+        providerMutationRef.current = true
+        setIsUpdating(true)
+        setSyncingProviderId(provider.id)
+        setError(null)
+
         try {
-            const result = await syncProviderModels(companyId, provider.id)
-            if (useCompanyStore.getState().companyId !== companyId) return
+            const result = await syncProviderModels(
+                companyId,
+                provider.id,
+            )
+
+            if (useCompanyStore.getState().companyId !== companyId) {
+                return
+            }
+
             setModelsRevision(value => value + 1)
-            await load(true)
-            setMessage(`Catalog synced: ${result.created} new, ${result.updated} updated. Existing enabled states are preserved.`)
+
+            const refreshed = await load(true)
+
+            if (useCompanyStore.getState().companyId !== companyId) {
+                return
+            }
+
+            const prefix = afterVerification
+                ? 'Verification succeeded. '
+                : ''
+
+            const capabilityNote = result.capabilityWarnings.length
+                ? ` ${result.capabilityWarnings.length} capability warnings.`
+                : ''
+
+            setMessage(
+                `${prefix}Catalog synced: ${result.created} new, ` +
+                `${result.updated} updated. Existing enabled states are preserved.` +
+                capabilityNote,
+            )
+
+            const warnings = [
+                result.reloadWarning,
+                refreshed === null
+                    ? 'Unable to reload the Provider list.'
+                    : undefined,
+            ].filter(Boolean)
+
+            if (warnings.length) {
+                setError(
+                    'Catalog sync completed, but some lists could not be refreshed. ' +
+                    'Refresh the page to confirm. ' +
+                    warnings.join(' '),
+                )
+            }
         } catch (caught) {
-            if (useCompanyStore.getState().companyId === companyId) setError(`Provider saved; catalog sync failed. Retry Sync catalog. ${caught instanceof Error ? caught.message : ''}`)
-        } finally { providerMutationRef.current = false; setIsUpdating(false); setSyncingProviderId(null) }
+            if (useCompanyStore.getState().companyId !== companyId) {
+                return
+            }
+
+            const prefix = afterVerification
+                ? 'Verification succeeded. '
+                : ''
+
+            setError(
+                `${prefix}Catalog sync could not be confirmed. ` +
+                'Retry Sync catalog. ' +
+                (caught instanceof Error ? caught.message : ''),
+            )
+        } finally {
+            providerMutationRef.current = false
+            setIsUpdating(false)
+            setSyncingProviderId(null)
+        }
     }
 
     async function toggleProvider(provider: AiProvider) {
@@ -459,7 +678,10 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                         <div className="ai-settings-empty ai-settings-providers-empty">
                             <strong>No providers found</strong>
                             <p>Try a different filter or add a provider.</p>
-                            <Button onClick={openCreate}>Add Provider</Button>
+                            <Button onClick={openCreate} disabled={providerBusy}>
+                                <IconPlus />
+                                Add Provider
+                            </Button>
                         </div>
                     ) : (
                         <div className="ai-provider-workspace">
@@ -488,7 +710,13 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 key={`${companyId}:${selectedProvider.id}`}
                                 provider={selectedProvider}
                                 companyId={companyId}
-                                busy={isDeleting || isLoading || isUpdating}
+                                busy={
+                                    isDeleting ||
+                                    isLoading ||
+                                    isUpdating ||
+                                    isTesting ||
+                                    isSaving
+                                }
                                 onEdit={() => openEdit(selectedProvider)}
                                 onToggle={() => void toggleProvider(selectedProvider)}
                                 onDelete={() => { setDeleteError(null); setPendingDelete(selectedProvider) }}
@@ -555,14 +783,14 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                 title={editingId ? 'Edit Provider' : 'Add Provider'}
                 description="Configure the model provider connection used by AI Agents."
                 onClose={closeForm}
-                busy={isSaving || isTesting || isLoadingCapabilities}
+                busy={isSaving || isTesting || isLoadingCapabilities || isUpdating}
                 closeLabel="Close"
                 footer={
                     <>
                         <Button
                             type="submit"
                             form={PROVIDER_FORM_ID}
-                            disabled={isSaving || isTesting || isLoadingCapabilities}
+                            disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
                         >
                             {isSaving ? 'Saving…' : 'Save'}
                         </Button>
@@ -570,7 +798,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                             type="button"
                             variant="ghost"
                             onClick={closeForm}
-                            disabled={isSaving || isTesting || isLoadingCapabilities}
+                            disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
                         >
                             Cancel
                         </Button>
@@ -596,7 +824,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
                                 placeholder="OpenAI"
-                                disabled={isSaving || isTesting || isLoadingCapabilities}
+                                disabled={providerBusy}
                                 autoFocus
                             />
                         </FormField>
@@ -609,7 +837,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 value={baseUrl}
                                 onChange={(event) => { setBaseUrl(event.target.value); setTestResult(null) }}
                                 placeholder="https://api.example.com"
-                                disabled={isSaving || isTesting || isLoadingCapabilities}
+                                disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
                             />
                         </FormField>
 
@@ -621,7 +849,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 onChange={(event) => { setApiKey(event.target.value); setTestResult(null) }}
                                 placeholder={editingId ? 'Leave blank to keep current key' : 'Enter API key'}
                                 autoComplete="new-password"
-                                disabled={isSaving || isTesting || isLoadingCapabilities}
+                                disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
                             />
                         </FormField>
 
@@ -634,7 +862,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                     setTestResult(null)
                                 }}
                                 placeholder="deepseek/deepseek-v4.1-flash-1017"
-                                disabled={isSaving || isTesting || isLoadingCapabilities}
+                                disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
                             />
                         </FormField>
 
@@ -654,7 +882,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                     { value: 'disabled', label: 'Disabled' },
                                 ]}
                                 onChange={(value) => setEnabled(value === 'enabled')}
-                                disabled={isSaving || isTesting || isLoadingCapabilities}
+                                disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
                             />
                         </FormField>
                     </SettingsEditorSection>
@@ -666,7 +894,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                             type="button"
                             variant="secondary"
                             onClick={() => void handleTestConnection()}
-                            disabled={isSaving || isTesting || isLoadingCapabilities || !baseUrl.trim()}
+                            disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating || !baseUrl.trim()}
                         >
                             {isTesting ? 'Testing…' : 'Test Connection'}
                         </Button>
@@ -696,12 +924,7 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                             type="button"
                             variant="secondary"
                             onClick={() => void handleLoadCapabilities()}
-                            disabled={
-                                isSaving ||
-                                isTesting ||
-                                isLoadingCapabilities ||
-                                !modelId.trim()
-                            }
+                            disabled={providerBusy || !modelId.trim()}
                         >
                             {isLoadingCapabilities ? 'Loading…' : 'Read capabilities'}
                         </Button>

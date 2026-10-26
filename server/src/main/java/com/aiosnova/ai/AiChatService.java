@@ -144,6 +144,14 @@ public class AiChatService {
                 validated.messages(), validated.temperature());
     }
 
+    static Map<String, Object> streamRequestBody(AiChatMessageValidator.ValidatedChat validated) {
+        var body = new HashMap<String, Object>(Map.of(
+                "model", validated.modelId(), "messages", validated.messages(),
+                "stream", true, "max_tokens", 2048));
+        if (validated.temperature() != null) body.put("temperature", validated.temperature());
+        return body;
+    }
+
     public InputStream openChatStream(
             AiChatMessagesRequest input) {
 
@@ -158,12 +166,7 @@ public class AiChatService {
                 input.companyId(),
                 input.providerId());
 
-        var requestBody = Map.of(
-                "model", validated.modelId(),
-                "messages", validated.messages(),
-                "temperature", validated.temperature(),
-                "stream", true,
-                "max_tokens", 2048);
+        var requestBody = streamRequestBody(validated);
 
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -177,7 +180,6 @@ public class AiChatService {
                             jsonMapper.writeValueAsString(requestBody),
                             StandardCharsets.UTF_8))
                     .build();
-
             var response = transport.openStream(request);
 
             if (response.statusCode() != 200) {

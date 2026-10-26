@@ -43,6 +43,8 @@ export type AiAgent = {
   category?: string
   status: AgentStatus
   createdAt: string
+  /** Database concurrency token; legacy Mock rows have no token. */
+  version?: number
   /** Optional so existing rows still type-check; service applies the default. */
   model?: AgentModelConfig
 }
