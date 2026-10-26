@@ -43,8 +43,8 @@ public class RoleController {
         return service.listRoles(sessions.authenticate(request));
     }
 
-    @GetMapping ("/permissions")
-    public List<RoleRepository.PermissionItem> listPermissions(HttpServletRequest request){
+    @GetMapping("/permissions")
+    public List<RoleRepository.PermissionItem> listPermissions(HttpServletRequest request) {
         return service.listPermissions(sessions.authenticate(request));
     }
 
@@ -72,14 +72,36 @@ public class RoleController {
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping ("/roles/{id}/permissions")
-    public ResponseEntity<Void> updateRolePermissions(@PathVariable("id") String id, @Valid @RequestBody UpdateRolePermissions input, HttpServletRequest request){
+    @PutMapping("/roles/{id}/permissions")
+    public ResponseEntity<Void> updateRolePermissions(@PathVariable("id") String id,
+            @Valid @RequestBody UpdateRolePermissions input, HttpServletRequest request) {
         service.updateRolePermissions(sessions.authenticate(request), id, input.permissionIds());
 
         return ResponseEntity.noContent().build();
     }
 
-    public record UpdateRolePermissions(@NotNull List<@NotBlank String> permissionIds){
+    @PutMapping("/users/{id}/roles")
+    public ResponseEntity<Void> updateUserRoles(
+            @PathVariable("id") String id,
+            @Valid @RequestBody UpdateUserRoles input,
+            HttpServletRequest request) {
+        service.updateUserRoles(sessions.authenticate(request), id, input.roleIds());
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping ("/users/{id}/roles")
+    public List<String> userRoleIds(
+        @PathVariable ("id") String id,
+        HttpServletRequest request
+    ){
+        return service.userRoleIds(sessions.authenticate(request), id);
+    }
+
+    public record UpdateUserRoles(@NotNull List<@NotBlank String> roleIds) {
+    }
+
+    public record UpdateRolePermissions(@NotNull List<@NotBlank String> permissionIds) {
     }
 
     public record UpdateRoleStatus(@NotBlank String status) {

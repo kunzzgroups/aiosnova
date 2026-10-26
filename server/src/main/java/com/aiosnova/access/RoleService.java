@@ -2,6 +2,7 @@ package com.aiosnova.access;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -243,11 +244,25 @@ public class RoleService {
             SessionService.Actor actor,
             String userId,
             List<String> roleIds) {
+
+        auth.merchantOwner(actor.merchantId());
+        actor = auth.actor(actor.merchantId(), actor.id());
+
+        if (actor == null || !"active".equals(actor.status())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
         if (!actor.owner()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         if (roleIds == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "roleIds is required");
+        }
+        AuthRepository.DirectoryUser target = auth.directoryUser(actor.merchantId(), userId);
+
+        if (target == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "User not found");
         }
 
         int originalCount = roleIds.size();
@@ -256,6 +271,47 @@ public class RoleService {
         if (originalCount != uniqueCount) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role IDs must not contain duplicates");
         }
+
+        for (String roleId : roleIds){
+            if (roleId == null || roleId.isBlank()) {
+               throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role ID must not be blank");
+            }
+
+            RoleRepository.RoleSummary role = repository.lockRole(actor.merchantId(), roleId);
+
+            if(role == null){
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role not found in current merchant");
+            }
+        }
+        List<String> beforeRoleIds = repository.userRoleIds(actor.merchantId(), userId);
+        repository.deleteUserRoles(actor.merchantId(), userId);
+        
+        for(String roleId : roleIds){
+            repository.insertUserRole(UUID.randomUUID().toString(), actor.merchantId(), userId, roleId);
+        }
+
+        List<String> afterRoleIds = repository.userRoleIds(actor.merchantId(), userId);
+
+        Map<String, Object> changes = AuditChanges.between(
+            Map.of("roleIds", beforeRoleIds),
+            Map.of("roleIds", afterRoleIds)
+        );
+
+        if (!changes.isEmpty()){
+            auth.audit(actor.merchantId(), actor.id(), "identity.user.roles.updated", "user", userId, changes);
+        }
+    }
+
+    public List<String> userRoleIds(SessionService.Actor actor, String userId){
+        if (!actor.owner()){
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        AuthRepository.DirectoryUser target = auth.directoryUser(actor.merchantId(), userId);
+        
+        if(target == null){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        return repository.userRoleIds(actor.merchantId(), userId);
     }
 
     public record RoleListItem(String id, String name, String status, LocalDateTime createdAt, long peopleCount,

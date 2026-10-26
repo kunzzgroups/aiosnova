@@ -9,7 +9,7 @@ import './SearchableSelectField.css'
 type Option=SelectFieldProps['options'][number]
 type Row={ option:Option; depth:number; group?:string; children:boolean }
 
-export function SearchableSelectField({ id,label,value,options,disabled,onChange,picker }:SelectFieldProps) {
+export function SearchableSelectField({ id,label,value,options,disabled,onChange,picker,multiple }:SelectFieldProps) {
   const [open,setOpen]=useState(false)
   const [search,setSearch]=useState('')
   const [expanded,setExpanded]=useState<Set<string>>(new Set())
@@ -53,7 +53,11 @@ export function SearchableSelectField({ id,label,value,options,disabled,onChange
 
   function close(restore=false) { setOpen(false);if(restore) trigger.current?.focus() }
   function toggle(option:Option) { setExpanded(current=>{const next=new Set(current);if(next.has(option.value)) next.delete(option.value);else next.add(option.value);return next}) }
-  function choose(option:Option) { if(!option.disabled){onChange(option.value);close(true)} }
+  function choose(option:Option) {
+    if(option.disabled) return
+    if(multiple) multiple.onToggle(option.value)
+    else {onChange(option.value);close(true)}
+  }
   function focusRows() { return Array.from(list.current?.querySelectorAll<HTMLElement>('[data-picker-row]:not([aria-disabled="true"])')||[]) }
 
   useEffect(()=>{
@@ -65,48 +69,55 @@ export function SearchableSelectField({ id,label,value,options,disabled,onChange
       return next
     })
     popup.current?.showPopover()
+    const boundary=picker?.boundarySelector ? root.current?.closest(picker.boundarySelector) : null
     function position() {
       const rect=trigger.current?.getBoundingClientRect();if(!rect) return
       const viewport=window.visualViewport
-      const bottom=(viewport?.offsetTop||0)+(viewport?.height||window.innerHeight)
+      const boundaryRect=boundary?.getBoundingClientRect()
+      const top=Math.max(viewport?.offsetTop||0,boundaryRect?.top??0)
+      const bottom=Math.min((viewport?.offsetTop||0)+(viewport?.height||window.innerHeight),boundaryRect?.bottom??Infinity)
       const right=(viewport?.offsetLeft||0)+(viewport?.width||window.innerWidth)
-      const below=bottom-rect.bottom-16,above=rect.top-(viewport?.offsetTop||0)-16
+      const below=bottom-rect.bottom-16,above=rect.top-top-16
       const down=below>=Math.min(320,above)
       const height=Math.max(0,Math.min(320,down?below:above))
-      const width=Math.min(rect.width,right-16)
+      const width=Math.min(picker?.popupWidth??rect.width,right-16)
       setBounds({left:Math.max(8,Math.min(rect.left,right-width-8)),top:down?rect.bottom+8:rect.top-8,width,height,up:!down})
     }
-    position();input.current?.focus()
+    position();input.current?.focus({preventScroll:true})
     function outside(event:PointerEvent) { if(!root.current?.contains(event.target as Node)) close() }
     document.addEventListener('pointerdown',outside)
     window.addEventListener('resize',position)
     window.addEventListener('scroll',position,true)
     window.visualViewport?.addEventListener('resize',position)
-    return ()=>{popup.current?.hidePopover();document.removeEventListener('pointerdown',outside);window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true);window.visualViewport?.removeEventListener('resize',position)}
-  },[open])
+    window.visualViewport?.addEventListener('scroll',position)
+    const resizeObserver=boundary ? new ResizeObserver(position) : null
+    if(boundary) resizeObserver?.observe(boundary)
+    return ()=>{popup.current?.hidePopover();resizeObserver?.disconnect();document.removeEventListener('pointerdown',outside);window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true);window.visualViewport?.removeEventListener('resize',position);window.visualViewport?.removeEventListener('scroll',position)}
+  },[open,picker?.boundarySelector,picker?.popupWidth])
   useEffect(()=>{if(disabled) setOpen(false)},[disabled])
 
   function renderRow(row:Row,index:number) {
-    const { option,depth,children }=row,selected=option.value===value,isExpanded=Boolean(query)||expanded.has(option.value)
+    const { option,depth,children }=row,selected=multiple ? multiple.values.includes(option.value) : option.value===value,isExpanded=Boolean(query)||expanded.has(option.value)
     return <div key={option.value+'-'+index} className="ui-picker__row" role={tree?'treeitem':'option'} aria-label={!tree&&row.group ? option.label+' — '+row.group : option.label} aria-level={tree?depth+1:undefined} aria-expanded={tree&&children?isExpanded:undefined} aria-selected={selected} aria-disabled={option.disabled||undefined} tabIndex={selected?0:-1} data-picker-row data-value={option.value} style={{paddingLeft:12+depth*18}} onClick={()=>choose(option)} onKeyDown={event=>{
       if(event.key==='Enter'||event.key===' '){event.preventDefault();choose(option)}
       if(tree&&event.key==='ArrowRight'){event.preventDefault();if(children&&!isExpanded) toggle(option);else if(children){const items=focusRows();items[items.indexOf(event.currentTarget)+1]?.focus()}}
       if(tree&&event.key==='ArrowLeft'){event.preventDefault();if(children&&isExpanded&&!query) toggle(option);else focusRows().find(item=>item.dataset.value===option.parentValue)?.focus()}
     }}>
       {tree ? children ? <button type="button" className="ui-picker__expand" tabIndex={-1} aria-label={(isExpanded?picker!.collapseLabel:picker!.expandLabel)+' '+option.label} aria-expanded={isExpanded} onClick={event=>{event.stopPropagation();if(!query) toggle(option);event.currentTarget.closest<HTMLElement>('[data-picker-row]')?.focus()}}><IconChevron style={{transform:isExpanded?'rotate(90deg)':undefined}} aria-hidden="true" /></button> : <span className="ui-picker__spacer" /> : null}
-      <span className="ui-picker__copy"><span>{option.label}</span>{!tree&&row.group?<small>{row.group}</small>:null}</span>{selected?<IconCircleCheck className="ui-picker__check" aria-hidden="true" />:null}
+      {multiple ? <span className="ui-picker__checkbox" aria-hidden="true">{selected ? '✓' : ''}</span> : null}
+      <span className="ui-picker__copy"><span>{option.label}</span>{!tree&&row.group?<small>{row.group}</small>:null}</span>{selected&&!multiple?<IconCircleCheck className="ui-picker__check" aria-hidden="true" />:null}
     </div>
   }
 
   return <div className="ui-select-field" ref={root}>
-    <button type="button" id={id} ref={trigger} className="ui-select-field__trigger" aria-label={label} aria-expanded={open} aria-haspopup="dialog" aria-controls={id+'-picker'} disabled={disabled} onClick={()=>setOpen(current=>!current)} onKeyDown={event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();setOpen(true)}}}><span>{options.find(option=>option.value===value)?.label||value}</span><IconChevron aria-hidden="true" /></button>
+    <button type="button" id={id} ref={trigger} className="ui-select-field__trigger" aria-label={label} aria-expanded={open} aria-haspopup="dialog" aria-controls={id+'-picker'} disabled={disabled} onClick={()=>setOpen(current=>!current)} onKeyDown={event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();setOpen(true)}}}><span>{multiple?.summary ?? (options.find(option=>option.value===value)?.label||value)}</span><IconChevron aria-hidden="true" /></button>
     {open?<div ref={popup} id={id+'-picker'} popover="manual" role="dialog" aria-label={label} className="ui-picker" style={{left:bounds.left,top:bounds.top,width:bounds.width,maxHeight:bounds.height,transform:bounds.up?'translateY(-100%)':undefined}} onKeyDown={event=>{
       if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close(true)}
       else if(event.key==='Tab'&&((!event.shiftKey&&(event.target as HTMLElement).hasAttribute('data-picker-row'))||(event.shiftKey&&event.target===input.current))){trigger.current?.focus();close()}
       else if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)&&event.target!==input.current){event.preventDefault();const items=focusRows(),index=items.indexOf(document.activeElement as HTMLElement);const next=event.key==='Home'?0:event.key==='End'?items.length-1:Math.max(0,Math.min(items.length-1,index+(event.key==='ArrowDown'?1:-1)));items[next]?.focus()}
     }}>
       <div className="ui-picker__search" ref={node=>{input.current=node?.querySelector('input')||null}}><TextField value={search} aria-label={picker!.searchLabel} placeholder={picker!.searchLabel} onChange={event=>setSearch(event.target.value)} onKeyDown={event=>{if(event.key==='ArrowDown'){event.preventDefault();focusRows()[0]?.focus()}}} /><IconButton variant="ghost" label={picker!.clearLabel} disabled={!search} onClick={()=>{setSearch('');input.current?.focus()}}><IconX aria-hidden="true" /></IconButton></div>
-      <div className="ui-picker__results" ref={list} role={tree?'tree':'listbox'} aria-label={label}>
+      <div className="ui-picker__results" ref={list} role={tree?'tree':'listbox'} aria-label={label} aria-multiselectable={multiple ? true : undefined}>
         {none?<div className="ui-picker__none" role="presentation">{renderRow({option:none,depth:0,children:false},-1)}</div>:null}
         {rows.map((row,index)=><div key={row.option.value+'-'+index} role="presentation">{!tree&&!picker?.hideGroupHeadings&&row.group&&row.group!==rows[index-1]?.group?<div className="ui-picker__group" role="presentation">{row.group}</div>:null}{renderRow(row,index)}</div>)}
         {!rows.length?<p className="ui-picker__empty" role="status">{picker!.emptyLabel}</p>:null}

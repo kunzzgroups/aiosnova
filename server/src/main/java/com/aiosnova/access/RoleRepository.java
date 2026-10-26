@@ -150,18 +150,40 @@ public class RoleRepository {
                 """, (rs, rowNum) -> rs.getString("role_id"), merchantId, userId);
     }
 
-    public int deleteUserRoles(String merchantId, String userId){
+    public int deleteUserRoles(String merchantId, String userId) {
         return jdbc.update("""
-            DELETE FROM user_roles
-            WHERE merchant_id = ? AND user_id = ?
-            """, merchantId, userId);
+                DELETE FROM user_roles
+                WHERE merchant_id = ? AND user_id = ?
+                """, merchantId, userId);
     }
 
-    public void insertUserRole(String id, String merchantId, String userId, String roleId){
+    public void insertUserRole(String id, String merchantId, String userId, String roleId) {
         jdbc.update("""
-            INSERT INTO user_roles (id, merchant_id, user_id, role_id)
-            VALUES (?, ?, ?, ?)
-            """, id, merchantId, userId, roleId);
+                INSERT INTO user_roles (id, merchant_id, user_id, role_id)
+                VALUES (?, ?, ?, ?)
+                """, id, merchantId, userId, roleId);
+    }
+
+    public boolean hasRolePermission(String merchantId, String userId, String permissionCode) {
+        return Boolean.TRUE.equals(
+                jdbc.queryForObject(
+                        """
+                        SELECT EXISTS (
+                            SELECT 1 FROM user_roles ur
+                                JOIN roles r
+                                ON r.id = ur.role_id AND r.merchant_id = ur.merchant_id
+                                JOIN role_permissions rp ON rp.role_id = r.id
+                                JOIN permissions p on p.id = rp.permission_id
+                                WHERE ur.merchant_id = ?
+                                AND ur.user_id = ?
+                                AND r.status = 'enabled'
+                                AND p.code = ?
+                                )
+                        """,
+                        Boolean.class,
+                        merchantId,
+                        userId,
+                        permissionCode));
     }
 
     public record PermissionItem(String id, String code, String permissionName) {
