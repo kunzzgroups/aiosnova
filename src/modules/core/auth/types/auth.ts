@@ -6,6 +6,7 @@ export type AuthUser = {
   profileComplete: boolean
   isOwner?: boolean
   canManageUsers?: boolean
+  permissions?: string[]
 }
 
 export type LoginSuccessResponse = {

@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.aiosnova.access.PermissionService;
 import com.aiosnova.access.RoleService;
 import com.aiosnova.audit.AuditChanges;
 import org.springframework.http.HttpStatus;
@@ -17,11 +18,13 @@ public class DirectoryService {
     private final AuthRepository repository;
     private final com.aiosnova.organization.OrganizationAssignmentService assignments;
     private final RoleService roles;
+    private final PermissionService permissions;
 
-    public DirectoryService(AuthRepository repository, com.aiosnova.organization.OrganizationAssignmentService assignments, RoleService roles) {
+    public DirectoryService(AuthRepository repository, com.aiosnova.organization.OrganizationAssignmentService assignments, RoleService roles, PermissionService permissions) {
         this.repository = repository;
         this.assignments = assignments;
         this.roles = roles;
+        this.permissions = permissions;
     }
 
     @Transactional(readOnly = true)
@@ -50,13 +53,20 @@ public class DirectoryService {
         // Re-read grants after taking the merchant lock so revocation and edits cannot race.
         actor = repository.actor(actor.merchantId(), actor.id());
         if (actor == null || !"active".equals(actor.status())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        if (request.roleIds() != null && !actor.owner()) {
+        if (request.roleIds() != null
+                && !actor.owner()
+                && !permissions.hasPermission(actor, "roles.assign")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         AuthRepository.DirectoryUser target = repository.directoryUser(actor.merchantId(), userId);
         if (target == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         boolean manager = actor.owner() || actor.manageUsers();
-        if (!manager && !actor.id().equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        if (!manager
+                && !actor.id().equals(userId)
+                && !(request.rolesOnly()
+                        && permissions.hasPermission(actor, "roles.assign"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         if (!manager && (request.companyCodes() != null || request.departmentId() != null || request.positionId() != null
                 || request.requireMfa() != null || request.canInvite() != null || request.placementCompanyId() != null)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         if (!actor.owner() && (request.canManageUsers() != null || request.status() != null)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -161,6 +171,25 @@ public class DirectoryService {
             if (phone != null) phone = phone.trim();
             if (departmentId != null) departmentId = departmentId.trim();
             if (positionId != null) positionId = positionId.trim();
+        }
+
+        public boolean rolesOnly() {
+            return roleIds != null
+                    && email == null
+                    && fullName == null
+                    && displayName == null
+                    && phone == null
+                    && avatarUrl == null
+                    && language == null
+                    && timezone == null
+                    && status == null
+                    && departmentId == null
+                    && positionId == null
+                    && requireMfa == null
+                    && canInvite == null
+                    && canManageUsers == null
+                    && companyCodes == null
+                    && placementCompanyId == null;
         }
     }
 }

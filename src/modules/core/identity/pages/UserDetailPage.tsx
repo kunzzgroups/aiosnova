@@ -14,6 +14,7 @@ import { isIdentityProfileComplete, type IdentityUser, type InvitationOptions } 
 import {
   fetchUser, fetchUsers, fetchInvitationOptions, updateUser, type MembershipWithLabels, fetchRoleOptions, fetchUserRoleIds, type RoleOption
 } from '@/modules/core/identity/services/identityService'
+import { hasPermission } from '@/modules/core/auth/utils/permissions'
 import { fetchInvitationOrganization } from '@/modules/core/identity/services/organizationService'
 import { RoleSelection } from '../components/RoleSelection'
 import './IdentityPage.css'
@@ -37,6 +38,7 @@ export function UserDetailPage() {
   const navigate = useNavigate()
   const setShellHeader = useContext(AppShellHeaderContext)
   const sessionUser = useAuthStore(state => state.user)
+  const canAssignRoles = hasPermission(sessionUser, 'roles.assign')
   const companyId = useCompanyStore(state => state.companyId)
   const accessToken = useAuthStore(state => state.accessToken)
   const loadGeneration = useRef(0)
@@ -64,7 +66,8 @@ export function UserDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedProfile, setSavedProfile] = useState<ProfileSnapshot | null>(null)
   const canManage = isOwner || isAdmin
-  const canEdit = canManage || sessionUser?.id === userId
+  const canEditProfile = canManage || sessionUser?.id === userId
+  const canEdit = canEditProfile || canAssignRoles
   const department = options?.departments.find(item => item.id === departmentId)
   const currentPlacement = memberships.find(item => item.companyId === companyId)
   const departmentInactive = currentPlacement?.organizationId === departmentId && currentPlacement.organizationInactive && !currentPlacement.organizationDeleted
@@ -84,7 +87,7 @@ export function UserDetailPage() {
   const removedCompanies = savedProfile?.companyIds.filter(id => !companyIds.includes(id)).length ?? 0
   const companiesChanged = canManage && (addedCompanies > 0 || removedCompanies > 0)
   const inviteChanged = canManage && savedProfile !== null && canInvite !== savedProfile.canInvite
-  const profileChanged = savedProfile !== null && (
+  const profileChanged = canEditProfile && savedProfile !== null && (
     email.trim().toLowerCase() !== savedProfile.email ||
     fullName.trim() !== savedProfile.fullName ||
     phone.trim() !== savedProfile.phone ||
@@ -94,9 +97,9 @@ export function UserDetailPage() {
       requireMfa !== savedProfile.requireMfa
     ))
   )
-  const hasChanges = profileChanged || companiesChanged || inviteChanged || (isOwner && rolesChanged)
+  const hasChanges = profileChanged || companiesChanged || inviteChanged || (canAssignRoles && rolesChanged)
   const changesSummary = [
-    isOwner && rolesChanged ? t('users.editRoleChanges', { added: addedRoles, removed: removedRoles }) : '',
+    canAssignRoles && rolesChanged ? t('users.editRoleChanges', { added: addedRoles, removed: removedRoles }) : '',
     companiesChanged ? t('users.editCompanyChanges', { added: addedCompanies, removed: removedCompanies }) : '',
     inviteChanged ? t('users.editInviteChanged') : '',
     profileChanged ? t('users.editProfileChanged') : '',
@@ -110,7 +113,7 @@ export function UserDetailPage() {
     setSavedRoleIds([])
     setRolesError(null)
 
-    if (!isOwner || !accessToken?.startsWith('backend_') || !userId) {
+    if (!canAssignRoles || !accessToken?.startsWith('backend_') || !userId) {
       setIsRolesLoading(false)
       return () => controller.abort()
     }
@@ -139,15 +142,13 @@ export function UserDetailPage() {
 
     }
 
-
-
     void loadRoles()
 
     return () => controller.abort()
-  }, [isOwner, accessToken, userId])
+  }, [canAssignRoles, accessToken, userId])
 
   function toggleUserRole(roleId: string) {
-    if (!isOwner || !isEditing || isRolesLoading || isSaving || rolesError) return
+    if (!canAssignRoles || !isEditing || isRolesLoading || isSaving || rolesError) return
     setSelectedRoleIds(current =>
       current.includes(roleId)
         ? current.filter(id => id !== roleId)
@@ -255,7 +256,7 @@ export function UserDetailPage() {
       !hasChanges ||
       isSaving ||
       saveInFlight.current ||
-      (isOwner && (isRolesLoading || !!rolesError))
+      (canAssignRoles && (isRolesLoading || !!rolesError))
     ) return
 
     saveInFlight.current = true
@@ -265,10 +266,12 @@ export function UserDetailPage() {
     try {
       const updated = await updateUser(user.id, {
         version: user.version,
-        ...(isOwner && rolesChanged
+        ...(canAssignRoles && rolesChanged
           ? { roleIds: [...selectedRoleIds] }
           : {}),
-        email: email.trim(), fullName: fullName.trim(), displayName: fullName.trim(), phone: phone.trim(),
+        ...(canEditProfile ? {
+          email: email.trim(), fullName: fullName.trim(), displayName: fullName.trim(), phone: phone.trim(),
+        } : {}),
         ...(canManage ? { requireMfa, canInvite } : {}),
         ...(canManage ? {
           departmentId, positionId,
@@ -299,13 +302,13 @@ export function UserDetailPage() {
     </div> : !user ? <Button variant="secondary" onClick={() => navigate('/system/core/employees')}>{t('users.backToUsers')}</Button> :
       <form className="identity-invite identity-invite--page" onSubmit={event => void handleSaveProfile(event)}>
         <div className="identity-invite-content">
-          <fieldset className="identity-invite-sections" disabled={!isEditing || !canEdit || isSaving}>
+          <fieldset className="identity-invite-sections" disabled={!isEditing || !canEditProfile || isSaving}>
             <section className="identity-panel">
               <h3>{t('users.basicInformation')}</h3>
               <div className="identity-invite-fields">
                 <FormField label={t('users.workEmail')} htmlFor="profile-email"><TextField id="profile-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} /></FormField>
                 <FormField label={t('users.fieldFullName')} htmlFor="profile-name"><TextField id="profile-name" required value={fullName} onChange={event => setFullName(event.target.value)} /></FormField>
-                <FormField label={t('users.optionalPhone')} htmlFor="profile-phone"><TextField id="profile-phone" type="tel" value={phone && !canEdit ? '••••••••' : phone} onChange={event => setPhone(event.target.value)} /></FormField>
+                <FormField label={t('users.optionalPhone')} htmlFor="profile-phone"><TextField id="profile-phone" type="tel" value={phone && !canEditProfile ? '••••••••' : phone} onChange={event => setPhone(event.target.value)} /></FormField>
                 <FormField label={<>{t('users.optionalDepartment')}{departmentInactive ? <span className="identity-profile-inactive">{t('users.statusInactive')}</span> : null}</>} htmlFor="profile-department" hint={memberships.some(item => item.organizationId === departmentId && item.organizationDeleted) ? t('users.removedDepartment') : undefined}><SidebarSelect id="profile-department" title={department?.name} hideLabel label={t('users.department')} value={departmentId} disabled={!canManage} options={[{ value: '', label: t('users.selectDepartment') }, ...(options?.departments.map(item => ({ value: item.id, label: item.name })) ?? [])]} onChange={id => { setDepartmentId(id); const positions = options?.departments.find(item => item.id === id)?.positions ?? []; setPositionId(positions.length === 1 ? positions[0]!.id : '') }} /></FormField>
                 <FormField label={<>{t('users.optionalPosition')}{positionInactive ? <span className="identity-profile-inactive">{t('users.statusInactive')}</span> : null}</>} htmlFor="profile-position" hint={memberships.some(item => item.positionId === positionId && item.positionDeleted) ? t('users.removedPosition') : undefined}><SidebarSelect id="profile-position" title={department?.positions.find(item => item.id === positionId)?.name} hideLabel label={t('users.colPosition')} value={positionId} disabled={!canManage || !department} options={[{ value: '', label: t('users.selectPosition') }, ...(department?.positions.map(item => ({ value: item.id, label: item.name })) ?? [])]} onChange={setPositionId} /></FormField>
               </div>
@@ -325,7 +328,7 @@ export function UserDetailPage() {
               {canManage ? <label className="identity-invite-switch"><input type="checkbox" role="switch" checked={canInvite} onChange={event => setCanInvite(event.target.checked)} />{t('users.canInvite')}</label> : null}
             </section>
           </fieldset>
-            {isOwner && accessToken?.startsWith('backend_') ? (
+            {canAssignRoles && accessToken?.startsWith('backend_') ? (
               <section className="identity-panel user-access-roles" aria-busy={isRolesLoading}>
                 <h3>{t('users.rolesTitle')}</h3>
                 <p className="identity-directory-muted user-access-roles__description">{t(isEditing ? 'users.editRoleSelectionHint' : 'users.viewRoleSelectionHint')}</p>
@@ -357,7 +360,7 @@ export function UserDetailPage() {
           <div className="user-edit-footer__actions">
           {isEditing && canEdit ? <>
             <Button variant="secondary" disabled={isSaving} onClick={() => navigate('/system/core/employees')}>{t('users.cancel')}</Button>
-            <Button type="submit" aria-busy={isSaving} disabled={isSaving || !hasChanges || (isOwner && (isRolesLoading || !!rolesError))}>
+            <Button type="submit" aria-busy={isSaving} disabled={isSaving || !hasChanges || (canAssignRoles && (isRolesLoading || !!rolesError))}>
               {isSaving && <span className="user-edit-footer__spinner" aria-hidden="true" />}
               {t(isSaving ? 'users.saving' : 'users.saveChanges')}
             </Button>

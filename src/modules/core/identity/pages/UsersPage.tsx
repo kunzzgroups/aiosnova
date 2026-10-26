@@ -23,6 +23,7 @@ import {
 } from '@/components/icons/Icons'
 import { ApiError } from '@/services/httpClient'
 import { useAuthStore } from '@/stores/authStore'
+import { hasPermission } from '@/modules/core/auth/utils/permissions'
 import { useCompanyStore } from '@/stores/companyStore'
 import type { CompanyListItem } from '@/modules/core/identity/services/identityService'
 import type { IdentityUser,UserStatus,InvitationOptions,InvitationAssignment,InvitationPayload } from '@/modules/core/identity/types/identity'
@@ -117,6 +118,7 @@ export function UsersPage() {
   const mfaRequiredByPolicy=assignments.some(a => inviteOptions?.companies.find(c => c.id===a.companyId)?.requireMfa)
   const isOwner=Boolean(sessionUser?.isOwner)||users.some(u => u.id===sessionUser?.id&&u.isOwner)
   const canManageUsers=isOwner||Boolean(sessionUser?.canManageUsers)||users.some(u => u.id===sessionUser?.id&&u.canManageUsers)
+  const canAssignRoles=hasPermission(sessionUser,'roles.assign')
   // Replace the owner fallback with the Permissions-module capability when available.
   const canManageUserStatus = isOwner
   const [query,setQuery]=useState('')
@@ -546,7 +548,7 @@ export function UsersPage() {
                   const assigned=memberships.filter(m => m.userId===user.id&&(!isOwner||m.status!=='ended'))
                   const companyNames=companyNamesFor(user.id)
                   const positionNames=[...new Set(assigned.filter(m=>m.companyId===activeCompanyId).map(m => m.positionDeleted ? t('users.removedPositionName',{name:m.positionName||''}) : m.positionName||inviteOptions?.companies.find(c => c.id===m.companyId)?.departments.find(d => d.id===m.organizationId)?.positions.find(p => p.id===m.positionId)?.name).filter(Boolean))]
-                  const canEdit=user.status==='draft' ? isOwner : canManageUsers||sessionUser?.id===user.id
+                  const canEdit=user.status==='draft' ? isOwner : canManageUsers||canAssignRoles||sessionUser?.id===user.id
                   return (
                   <tr key={user.id}>
                     <td>

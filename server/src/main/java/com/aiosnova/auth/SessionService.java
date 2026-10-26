@@ -12,6 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import java.util.List;
+
+import com.aiosnova.access.PermissionService;
 
 @Service
 public class SessionService {
@@ -19,12 +22,14 @@ public class SessionService {
     private final AuthSecretService secrets;
     private final String merchantId;
     private final SecureRandom random = new SecureRandom();
+    private final PermissionService permissions;
 
     public SessionService(AuthRepository repository, AuthSecretService secrets,
-                          @Value("${app.local-merchant-id}") String merchantId) {
+                          @Value("${app.local-merchant-id}") String merchantId, PermissionService permissions) {
         this.repository = repository;
         this.secrets = secrets;
         this.merchantId = merchantId;
+        this.permissions = permissions;
     }
 
     @Transactional
@@ -83,7 +88,7 @@ public class SessionService {
         AuthRepository.User user = repository.userById(actor.id());
         return new Login(token, new PublicUser(user.id(), user.email(), user.fullName(),
                 repository.hasMfa(user.id()), user.fullName() != null && !user.fullName().isBlank(),
-                actor.owner(), actor.manageUsers()));
+                actor.owner(), actor.manageUsers(), permissions.effectivePermissionCodes(actor)));
     }
 
     private String token(String prefix) {
@@ -99,6 +104,6 @@ public class SessionService {
 
     public record Actor(String id, String merchantId, String status, boolean owner, boolean manageUsers, boolean canInvite) { }
     public record PublicUser(String id, String email, String name, boolean mfaEnabled,
-                             boolean profileComplete, boolean isOwner, boolean canManageUsers) { }
+                             boolean profileComplete, boolean isOwner, boolean canManageUsers, List<String> permissions) { }
     public record Login(String accessToken, PublicUser user) { }
 }
