@@ -11,7 +11,7 @@ class DirectoryControllerTest {
     private final SessionService.Actor actor = new SessionService.Actor("user", "merchant", "active", false, false, false);
 
     @Test void unauthenticatedReadStopsBeforeDirectoryAccess() {
-        var sessions = new SessionService(null, null, "merchant") {
+        var sessions = new SessionService(null, null, "merchant", null) {
             @Override public Actor authenticate(HttpServletRequest request) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
             }
@@ -40,10 +40,10 @@ class DirectoryControllerTest {
                 return List.of();
             }
         };
-        var sessions = new SessionService(null, null, "merchant") {
+        var sessions = new SessionService(null, null, "merchant", null) {
             @Override public Actor authenticate(HttpServletRequest request) { return actor; }
         };
-        var controller = new DirectoryController(sessions, new DirectoryService(repository, null, null));
+        var controller = new DirectoryController(sessions, new DirectoryService(repository, null, null, null));
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(ResponseStatusException.class,
                 () -> controller.read("foreign-company", null, null)).getStatusCode());
         assertEquals(HttpStatus.FORBIDDEN, assertThrows(ResponseStatusException.class,

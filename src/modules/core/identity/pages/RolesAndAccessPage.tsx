@@ -10,6 +10,7 @@ import { IconAlertTriangle, IconChevronDown, IconCircleCheck, IconPencil, IconPl
 import { useCompanyStore } from '@/stores/companyStore'
 import { useAuthStore } from '@/stores/authStore'
 import { notifySuccess, notifyError } from '@/stores/toastStore'
+import { hasPermission } from '@/modules/core/auth/utils/permissions'
 
 import { apiRequest, ApiError } from '@/services/httpClient'
 import { accessPermissionGroups, accessPermissionRisks, type AccessRole } from '../mock/rolesAndAccess'
@@ -48,6 +49,13 @@ type PermissionResponse = {
 const permissionCodeByOption: Record<string, string> = {
   viewOrganization: 'organization.read',
   manageOrganization: 'organization.manage',
+  viewRoles: 'roles.read',
+  createRoles: 'roles.create',
+  renameRoles: 'roles.rename',
+  changeRolePermissions: 'roles.permissions.update',
+  changeRoleStatus: 'roles.status.update',
+  assignRoles: 'roles.assign',
+  deleteRoles: 'roles.delete',
 }
 
 const permissionOptionByCode = Object.fromEntries(
@@ -150,6 +158,13 @@ function PermissionChoices({ permissions, onChange, idPrefix, disabled = false, 
 
 function RolesAndAccessEditor() {
   const { t } = useTranslation()
+  const user = useAuthStore(state => state.user)
+  const canReadRoles = hasPermission(user, 'roles.read')
+  const canCreateRoles = hasPermission(user, 'roles.create')
+  const canRenameRoles = hasPermission(user, 'roles.rename')
+  const canUpdateRolePermissions = hasPermission(user, 'roles.permissions.update')
+  const canUpdateRoleStatus = hasPermission(user, 'roles.status.update')
+  const canDeleteRoles = hasPermission(user, 'roles.delete')
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isRenaming, setIsRenaming] = useState(false)
@@ -157,6 +172,7 @@ function RolesAndAccessEditor() {
   const [permissionCatalog, setPermissionCatalog] =
     useState<PermissionResponse[]>([])
   const [isSavingPermissions, setIsSavingPermissions] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const ids = useId()
   const [roles, setRoles] = useState<AccessRole[]>([])
   const [drafts, setDrafts] = useState<Record<string, string[]>>({})
@@ -186,6 +202,15 @@ function RolesAndAccessEditor() {
   }, [hasDrafts, editorOpen])
 
   useEffect(() => {
+    if (!canReadRoles) {
+      setRoles([])
+      setDrafts({})
+      setPermissionCatalog([])
+      setSelectedId('')
+      setEditor(null)
+      setIsLoading(false)
+      return
+    }
     const controller = new AbortController()
 
     async function loadRoles() {
@@ -234,16 +259,16 @@ function RolesAndAccessEditor() {
     void loadRoles()
 
     return () => controller.abort()
-  }, [t])
+  }, [t, canReadRoles])
 
 
   function update(next: string[]) {
-  if (!selected?.enabled || isSavingPermissions) return
-  setDrafts(current => ({ ...current, [selectedId]: next }))
-}
+    if (!canUpdateRolePermissions || !selected?.enabled || isSavingPermissions) return
+    setDrafts(current => ({ ...current, [selectedId]: next }))
+  }
 
   async function toggleRole(id: string) {
-    if (isUpdatingStatus) return
+    if (!canUpdateRoleStatus || isUpdatingStatus) return
 
     const role = roles.find(item => item.id === id)
     if (!role) return
@@ -277,7 +302,7 @@ function RolesAndAccessEditor() {
   }
 
   async function saveInlineName() {
-    if (inlineName === null || !selected || isRenaming) return
+    if (!canRenameRoles || inlineName === null || !selected || isRenaming) return
     const name = inlineName.trim()
     if (name === selected.name) return
     if (!name) { setInlineError(t('access.nameRequired')); return }
@@ -309,7 +334,7 @@ function RolesAndAccessEditor() {
   }
 
   async function savePermissions() {
-    if (!selected?.enabled || !changes || isSavingPermissions) return
+    if (!canUpdateRolePermissions || !selected?.enabled || !changes || isSavingPermissions) return
     const permissionIds: string[] = []
 
     for (const option of permissions) {
@@ -340,8 +365,42 @@ function RolesAndAccessEditor() {
 
   }
 
+  async function handleDeleteRole() {
+    if (!canDeleteRoles || !deleteRole || isDeleting || deleteRole.enabled || deleteRole.peopleCount > 0) return
+    const roleId = deleteRole.id
+    setIsDeleting(true)
+
+    try {
+      await apiRequest<void>(
+        `/api/identity/roles/${encodeURIComponent(roleId)}`,
+        { method: 'DELETE', auth: true }
+      )
+
+      const remaining = roles.filter(role => role.id !== roleId)
+      setRoles(current => current.filter(role => role.id !== roleId))
+      setDrafts(current => {
+        const next = { ...current }
+        delete next[roleId]
+        return next
+      })
+      setSelectedId(current =>
+        current === roleId ? remaining[0]?.id ?? '' : current
+      )
+      setDeleteId(null)
+      notifySuccess(t('access.roleDeleted'))
+    } catch (error) {
+      notifyError(t(
+        error instanceof ApiError && error.status === 409
+          ? 'access.deleteConflict'
+          : 'access.deleteFailed'
+      ))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   function openEditor() {
-    if (isLoading || isSaving) return
+    if (!canCreateRoles || isLoading || isSaving) return
     setNameError('')
     if (!editor) setEditor({ name: '', enabled: true, permissions: [] })
     setSelectedId('__new__')
@@ -349,7 +408,7 @@ function RolesAndAccessEditor() {
 
 
   async function saveRole() {
-    if (!editor || isSaving) return
+    if (!canCreateRoles || !editor || isSaving) return
     const name = editor.name.trim()
     if (!name) { setNameError(t('access.nameRequired')); return }
     if (roles.some(role => role.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { setNameError(t('access.nameDuplicate')); return }
@@ -400,12 +459,15 @@ function RolesAndAccessEditor() {
       setIsSaving(false)
     }
   }
+  if (!canReadRoles) {
+    return <p role="status">{t('access.readForbidden')}</p>
+  }
 
   return <section className="roles-access" aria-label={t('access.title')}>
     <div className="roles-access__content">
       <div className="roles-access__workspace">
         <aside className="roles-access__sidebar" aria-label={t('access.roles')}>
-          <div className="roles-access__list-heading"><span>{t('access.roles')}</span><span>{roles.length}</span></div><div className="roles-access__add-wrap"><Button variant="ghost" className="roles-access__add-role" aria-pressed={selectedId === '__new__'} onClick={openEditor} disabled={isLoading || isSaving}><span className="roles-access__add-label"><span className="roles-access__add-title"><IconPlus />{t('access.addRole')}</span></span><span className="roles-access__add-description">{t('access.createNewRole')}</span></Button></div>
+          <div className="roles-access__list-heading"><span>{t('access.roles')}</span><span>{roles.length}</span></div><div className="roles-access__add-wrap"><Button variant="ghost" className="roles-access__add-role" aria-pressed={selectedId === '__new__'} onClick={openEditor} disabled={!canCreateRoles || isLoading || isSaving}><span className="roles-access__add-label"><span className="roles-access__add-title"><IconPlus />{t('access.addRole')}</span></span><span className="roles-access__add-description">{t('access.createNewRole')}</span></Button></div>
           <div className="roles-access__role-list" tabIndex={0} role="region" aria-label={t('access.roles')}>
             {roles.map(role => <button type="button" className="roles-access__role" key={role.id} aria-pressed={selectedId === role.id} onClick={() => setSelectedId(role.id)}>
               <strong>{role.name}</strong><span>{t('access.roleMeta', { count: drafts[role.id].length })} · {t(role.enabled ? 'access.enabled' : 'access.disabled')}{differs(drafts[role.id], role.permissions) ? ` · ${t('access.unsaved')}` : ''}</span>
@@ -448,7 +510,7 @@ function RolesAndAccessEditor() {
                       type="submit"
                       variant="secondary"
                       label={t('access.rename')}
-                      disabled={isRenaming || inlineName.trim() === selected.name}
+                      disabled={!canRenameRoles || isRenaming || inlineName.trim() === selected.name}
                     >
                       <IconCircleCheck />
                     </IconButton>
@@ -465,42 +527,56 @@ function RolesAndAccessEditor() {
                     >
                       <IconX />
                     </IconButton>
-                  </form> : <><h2>{selected.name}</h2><IconButton label={t('access.editRole', { name: selected.name })} variant="ghost" onClick={() => { setInlineName(selected.name); setInlineError('') }}><IconPencil /></IconButton></>}
+                  </form> : <><h2>{selected.name}</h2><IconButton label={t('access.editRole', { name: selected.name })} variant="ghost" onClick={() => { setInlineName(selected.name); setInlineError('') }} disabled={!canRenameRoles}><IconPencil /></IconButton></>}
                   {inlineError && <p id={`${ids}-inline-error`} role="alert">{inlineError}</p>}
                 </div>
                 <div className="roles-access__role-actions">
-                  <IconButton variant="ghost" className="roles-access__delete" aria-disabled={selected.enabled || selected.peopleCount > 0} label={selected.enabled ? t('access.disableBeforeDelete') : selected.peopleCount > 0 ? t('access.deleteAssigned', { count: selected.peopleCount, name: selected.name }) : t('access.deleteRole', { name: selected.name })} onClick={() => { if (!selected.enabled && selected.peopleCount === 0) setDeleteId(selected.id) }}><IconTrash /></IconButton>
+                      <IconButton variant="ghost" className="roles-access__delete" aria-disabled={!canDeleteRoles || isDeleting || selected.enabled || selected.peopleCount > 0} label={selected.enabled ? t('access.disableBeforeDelete') : selected.peopleCount > 0 ? t('access.deleteAssigned', { count: selected.peopleCount, name: selected.name }) : t('access.deleteRole', { name: selected.name })} onClick={() => {
+                        if (canDeleteRoles && !isDeleting && !selected.enabled && selected.peopleCount === 0) {
+                          setDeleteId(selected.id)
+                        }
+                      }} disabled={!canDeleteRoles || isDeleting}><IconTrash /></IconButton>
                   <label className="identity-invite-switch">
                     <input
                       type="checkbox"
                       role="switch"
                       checked={selected.enabled}
-                      disabled={isUpdatingStatus}
+                      disabled={!canUpdateRoleStatus || isUpdatingStatus}
                       aria-label={t('access.statusForRole', { name: selected.name })}
                       onChange={() => void toggleRole(selected.id)}
                     />
                     {t(selected.enabled ? 'access.enabled' : 'access.disabled')}
-                  </label>                </div>
+                  </label>
+                </div>
               </div>
               <div className="roles-access__search-row"><div className="roles-access__access-search"><IconSearch aria-hidden="true" /><TextField type="search" aria-label={t('access.searchPermissionCategories')} placeholder={t('access.searchPermissionCategories')} value={accessSearch} onChange={event => setAccessSearch(event.target.value)} /></div><span className="roles-access__selected-total" role="status">{t('access.granted', { count: permissions.length, total: totalPermissions })}</span></div>
             </header>
-            <PermissionChoices permissions={permissions} onChange={update} idPrefix={`${ids}-selection`} query={accessSearch} disabled={!selected.enabled || isSavingPermissions} />
+            <PermissionChoices permissions={permissions} onChange={update} idPrefix={`${ids}-selection`} query={accessSearch} disabled={!canUpdateRolePermissions || !selected.enabled || isSavingPermissions} />
             <footer className="roles-access__footer">
               <div className="roles-access__feedback" role="status">{changes ? <>{t('access.changes', { count: changes })}<small>{t('access.changeDetails', { added, removed })}</small></> : t('access.noChanges')}</div>
-              <div className="roles-access__actions"><Button variant="ghost" disabled={!selected.enabled || !changes || isSavingPermissions} onClick={() => update([...selected.permissions])}>{t('access.discard')}</Button><Button disabled={!selected.enabled || !changes || isSavingPermissions} onClick={savePermissions}>{t('access.save')}{changes ? ` · ${changes}` : ''}</Button></div>
+              <div className="roles-access__actions"><Button variant="ghost" disabled={!canUpdateRolePermissions || !selected.enabled || !changes || isSavingPermissions} onClick={() => update([...selected.permissions])}>{t('access.discard')}</Button><Button disabled={!canUpdateRolePermissions || !selected.enabled || !changes || isSavingPermissions} onClick={savePermissions}>{t('access.save')}{changes ? ` · ${changes}` : ''}</Button></div>
             </footer>
           </> : <p className="roles-access__empty">{t('access.noRoles')}</p>}
         </div>
       </div>
     </div>
-    <ConfirmDialog open={!!deleteRole} variant="deletion" title={t('access.deleteTitle')} description={deleteRole?.peopleCount ? t('access.deleteAssigned', { count: deleteRole.peopleCount, name: deleteRole.name }) : t('access.deleteConfirm', { name: deleteRole?.name })} confirmLabel={t('access.delete')} confirmDisabled={!!deleteRole?.enabled || !!deleteRole?.peopleCount} onCancel={() => setDeleteId(null)} onConfirm={() => {
-      if (!deleteRole || deleteRole.enabled || deleteRole.peopleCount) return
-      const remaining = roles.filter(role => role.id !== deleteRole.id)
-      setRoles(remaining)
-      setDrafts(current => { const next = { ...current }; delete next[deleteRole.id]; return next })
-      if (selectedId === deleteRole.id) setSelectedId(remaining[0]?.id ?? '')
-      setDeleteId(null)
-      notifySuccess(t('access.roleDeleted'))
-    }} />
+    <ConfirmDialog
+      open={!!deleteRole}
+      variant="deletion"
+      title={t('access.deleteTitle')}
+      description={deleteRole?.peopleCount
+        ? t('access.deleteAssigned', {
+          count: deleteRole.peopleCount,
+          name: deleteRole.name,
+        })
+        : t('access.deleteConfirm', { name: deleteRole?.name })}
+      confirmLabel={t('access.delete')}
+      busy={isDeleting}
+      confirmDisabled={!canDeleteRoles || !!deleteRole?.enabled || !!deleteRole?.peopleCount}
+      onCancel={() => {
+        if (!isDeleting) setDeleteId(null)
+      }}
+      onConfirm={handleDeleteRole}
+    />
   </section>
 }

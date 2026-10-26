@@ -3,6 +3,7 @@ package com.aiosnova.access;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -96,6 +97,13 @@ public class RoleController {
         HttpServletRequest request
     ){
         return service.userRoleIds(sessions.authenticate(request), id);
+    }
+
+    @DeleteMapping ("/roles/{id}")
+    public ResponseEntity<Void> deleteRole(@PathVariable ("id") String id, HttpServletRequest request){
+        service.deleteRole(sessions.authenticate(request), id);
+
+        return  ResponseEntity.noContent().build();
     }
 
     public record UpdateUserRoles(@NotNull List<@NotBlank String> roleIds) {

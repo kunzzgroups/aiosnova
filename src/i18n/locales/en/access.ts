@@ -79,4 +79,8 @@ export const access = {
   'access.renameFailed': 'Unable to rename role. Please try again.',
   'access.statusFailed': 'Unable to update role status. Please try again.',
   'access.permissionsSaveFailed': 'Unable to save permissions. Please reload and try again.',
+  'access.deleteFailed': 'Unable to delete the role. Please try again.',
+  'access.deleteConflict': 'This role can no longer be deleted. Reload to check its status and assignments.',
+  'access.readForbidden': 'You do not have permission to view roles.',
+
 }
