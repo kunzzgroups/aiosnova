@@ -71,7 +71,7 @@ class DeployedTestLoginServiceTest {
 
     private static class FakeSessions extends SessionService {
         int issued;
-        FakeSessions() { super(null, null, "merchant"); }
+        FakeSessions() { super(null, null, "merchant", null); }
         @Override public ResponseEntity<Login> issue(String user, HttpServletRequest request) {
             issued++;
             return ResponseEntity.ok().build();

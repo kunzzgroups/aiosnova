@@ -2,7 +2,6 @@ package com.aiosnova.access;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,10 +21,12 @@ import java.util.UUID;
 public class RoleService {
     private final RoleRepository repository;
     private final AuthRepository auth;
+    private final PermissionService permissions;
 
-    public RoleService(RoleRepository repository, AuthRepository auth) {
+    public RoleService(RoleRepository repository, AuthRepository auth, PermissionService permissions) {
         this.repository = repository;
         this.auth = auth;
+        this.permissions = permissions;
     }
 
     @Transactional
@@ -34,7 +35,7 @@ public class RoleService {
             String name,
             String status,
             List<String> permissionIds) {
-        if (!actor.owner()) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.create")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
@@ -72,6 +73,15 @@ public class RoleService {
             }
         }
 
+        if(!actor.owner()){
+            for (String permissionId : normalizedPermissionIds){
+                String code = repository.permissionCode(permissionId);
+                if(!permissions.hasPermission(actor, code)){
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                }
+            }
+        }
+        
         if (repository.roleNameExists(actor.merchantId(), normalizedName)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Role name already exists.");
         }
@@ -90,7 +100,7 @@ public class RoleService {
     }
 
     public List<RoleListItem> listRoles(SessionService.Actor actor) {
-        if (!actor.owner()) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.read")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         List<RoleListItem> items = new ArrayList<>();
@@ -111,7 +121,7 @@ public class RoleService {
 
     @Transactional
     public void renameRole(SessionService.Actor actor, String roleId, String name) {
-        if (!actor.owner()) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.rename")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
@@ -142,14 +152,28 @@ public class RoleService {
             String roleId,
             String status) {
 
-        if (!actor.owner()) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.status.update")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-
         if (!"enabled".equals(status) && !"disabled".equals(status)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Status must be enabled or disabled");
+        }
+
+        RoleRepository.RoleSummary role = repository.lockRole(actor.merchantId(), roleId);
+
+        if (role == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found");
+        }
+
+        List<String> rolePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
+        if (!actor.owner()) {
+            for (String code : rolePermissions) {
+                if (!permissions.hasPermission(actor, code)) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                }
+            }
         }
 
         int updated = repository.updateRoleStatus(
@@ -166,7 +190,7 @@ public class RoleService {
     }
 
     public List<RoleRepository.PermissionItem> listPermissions(SessionService.Actor actor) {
-        if (!actor.owner()) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.read")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         return repository.listPermissions();
@@ -178,7 +202,7 @@ public class RoleService {
             SessionService.Actor actor,
             String roleId,
             List<String> permissionIds) {
-        if (!actor.owner()) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.permissions.update")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
@@ -214,7 +238,21 @@ public class RoleService {
             }
         }
         List<String> beforePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
+        if(!actor.owner()){
+            for(String code : beforePermissions){
+                if(!permissions.hasPermission(actor, code)){
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                }
+            }
+            for (String permissionId : permissionIds){
+                String code = repository.permissionCode(permissionId);
+                if(!permissions.hasPermission(actor, code)){
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                }
+            }
+        }
         repository.deleteRolePermissions(actor.merchantId(), roleId);
+       
         for (String permissionId : permissionIds) {
             repository.insertRolePermission(
                     UUID.randomUUID().toString(),
@@ -251,7 +289,7 @@ public class RoleService {
         if (actor == null || !"active".equals(actor.status())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
-        if (!actor.owner()) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.assign")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         if (roleIds == null) {
@@ -284,6 +322,26 @@ public class RoleService {
             }
         }
         List<String> beforeRoleIds = repository.userRoleIds(actor.merchantId(), userId);
+        if(!actor.owner()){
+            for(String roleId : beforeRoleIds){
+                List<String> rolePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
+
+                for(String code : rolePermissions){
+                    if(!permissions.hasPermission(actor, code)){
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                    }
+                }
+            }
+            for (String roleId : roleIds){
+                List<String> rolePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
+
+                for(String code : rolePermissions){
+                    if(!permissions.hasPermission(actor, code)){
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                    }
+                }
+            }
+        }
         repository.deleteUserRoles(actor.merchantId(), userId);
         
         for(String roleId : roleIds){
@@ -303,7 +361,7 @@ public class RoleService {
     }
 
     public List<String> userRoleIds(SessionService.Actor actor, String userId){
-        if (!actor.owner()){
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.assign")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         AuthRepository.DirectoryUser target = auth.directoryUser(actor.merchantId(), userId);
@@ -313,6 +371,43 @@ public class RoleService {
         }
         return repository.userRoleIds(actor.merchantId(), userId);
     }
+
+    @Transactional
+    public void deleteRole(SessionService.Actor actor, String roleId){
+        if(!actor.owner() && !permissions.hasPermission(actor, "roles.delete")){
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        var role = repository.lockRole(actor.merchantId(), roleId);
+
+        if(role == null){
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        if(!"disabled".equals(role.status())){
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
+        }
+
+        if (role.peopleCount()>0){
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
+        }
+        List<String> beforePermissions= repository.rolePermissionCodes(actor.merchantId(), roleId);
+        if(!actor.owner()){
+            for(String code : beforePermissions){
+                if(!permissions.hasPermission(actor, code)){
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+                }
+            }
+        }
+        repository.deleteRole(actor.merchantId(), roleId);
+        Map<String, Object> changes = AuditChanges.between(Map.of("name", role.name(), "status", role.status(), "permissions", beforePermissions), Map.of());
+
+        if (!changes.isEmpty()){
+            auth.audit(actor.merchantId(), actor.id(), "identity.role.deleted", "role", roleId, changes);
+        }
+    }
+
+
 
     public record RoleListItem(String id, String name, String status, LocalDateTime createdAt, long peopleCount,
             List<String> permissions) {

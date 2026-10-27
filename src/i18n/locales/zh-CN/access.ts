@@ -78,4 +78,7 @@ export const access = {
   'access.renameFailed': '无法修改角色名称，请重试。',
   'access.statusFailed': '无法更新角色状态，请重试。',
   'access.permissionsSaveFailed': '无法保存权限，请重新加载后重试。',
+  'access.deleteFailed': '无法删除角色，请重试。',
+  'access.deleteConflict': '此角色当前无法删除，请重新加载以检查状态和人员分配。',
+  'access.readForbidden': '你没有查看角色的权限。',
 }

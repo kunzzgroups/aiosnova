@@ -34,6 +34,17 @@ public class RoleRepository {
         return count != null && count > 0;
     }
 
+    public String permissionCode(String permissionId){
+        List<String> rows = jdbc.query("""
+                SELECT code
+                FROM permissions
+                WHERE id = ?
+            
+            """, (rs,rowNum)-> rs.getString("code"), permissionId);
+
+        return rows.isEmpty() ? null : rows.getFirst();
+    }
+
     public boolean roleNameExists(String merchantId, String name) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM roles WHERE merchant_id = ? AND name = ? ",
                 Integer.class, merchantId, name);
@@ -75,7 +86,7 @@ public class RoleRepository {
         return jdbc.query("""
                     SELECT id, code, permission_name
                     FROM permissions
-                    WHERE code IN ('organization.read', 'organization.manage')
+                    WHERE code IN ('organization.read', 'organization.manage', 'roles.read', 'roles.create', 'roles.rename', 'roles.permissions.update', 'roles.status.update', 'roles.assign', 'roles.delete')
                     ORDER BY code
                 """, (rs, rowNum) -> new PermissionItem(rs.getString("id"), rs.getString("code"),
                 rs.getString("permission_name")));
@@ -171,19 +182,47 @@ public class RoleRepository {
                         SELECT EXISTS (
                             SELECT 1 FROM user_roles ur
                                 JOIN roles r
-                                ON r.id = ur.role_id AND r.merchant_id = ur.merchant_id
-                                JOIN role_permissions rp ON rp.role_id = r.id
-                                JOIN permissions p on p.id = rp.permission_id
+                                    ON r.id = ur.role_id 
+                                    AND r.merchant_id = ur.merchant_id
+                                JOIN role_permissions rp 
+                                    ON rp.role_id = r.id
+                                JOIN permissions p 
+                                    on p.id = rp.permission_id
                                 WHERE ur.merchant_id = ?
-                                AND ur.user_id = ?
-                                AND r.status = 'enabled'
-                                AND p.code = ?
+                                    AND ur.user_id = ?
+                                    AND r.status = 'enabled'
+                                    AND p.code = ?
                                 )
                         """,
                         Boolean.class,
                         merchantId,
                         userId,
                         permissionCode));
+    }
+
+    public List<String> effectivePermissionCodes(String merchantId, String userId){
+        return jdbc.query("""
+            SELECT DISTINCT p.code
+            FROM user_roles ur
+                JOIN roles r 
+                    ON r.id = ur.role_id
+                    AND r.merchant_id = ur.merchant_id
+                JOIN role_permissions rp
+                    ON rp.role_id = r.id
+                JOIN permissions p
+                    ON p.id = rp.permission_id
+                WHERE ur.merchant_id = ?
+                    AND ur.user_id = ?
+                    AND r.status = 'enabled'
+                ORDER BY p.code
+            """, (rs, rowNum) -> rs.getString("code"), merchantId, userId);
+    }
+
+    public int deleteRole(String merchantId, String roleId){
+        return jdbc.update("""
+            DELETE FROM roles
+            WHERE merchant_id = ? AND id = ?
+            """,merchantId, roleId);
     }
 
     public record PermissionItem(String id, String code, String permissionName) {
