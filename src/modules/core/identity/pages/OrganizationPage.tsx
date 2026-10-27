@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { TablePanel } from '@/components/ui/TablePanel'
@@ -127,8 +127,8 @@ export function OrganizationPage() {
     return () => { dialog?.close(); previous?.focus() }
   },[isEditorOpen])
 
-  useEffect(() => {
-    setShellHeader(company ? { titleKey:'org.organization.title',titleAside:<span className="organization-company-badge"><IconBuilding aria-hidden="true" /><span>{company.label}</span></span> } : null)
+  useLayoutEffect(() => {
+    setShellHeader({ titleKey:'org.organization.title',titleAside:company ? <span className="organization-company-badge"><IconBuilding aria-hidden="true" /><span>{company.label}</span></span> : undefined })
     return () => setShellHeader(null)
   },[company?.label,setShellHeader])
 
