@@ -2,38 +2,39 @@ package com.aiosnova_standalone;
 
 import java.util.Map;
 
-import com.aiosnova.ai.AiConnectionController;
-import com.aiosnova.ai.AiConnectionService;
+import com.aiosnova.ai.provider.AiConnectionController;
+import com.aiosnova.ai.provider.AiConnectionService;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import com.aiosnova.ai.AiModelController;
-import com.aiosnova.ai.OpenRouterModelService;
-import com.aiosnova.ai.AiProviderRepository;
-import com.aiosnova.ai.AiProviderController;
-import com.aiosnova.ai.AiApiKeyCrypto;
-import com.aiosnova.ai.AiProviderService;
-import com.aiosnova.ai.AiProviderVerificationService;
-import com.aiosnova.ai.AiChatService;
-import com.aiosnova.ai.AiChatController;
-import com.aiosnova.ai.AiChatMessageValidator;
-import com.aiosnova.ai.AiModelRepository;
-import com.aiosnova.ai.AiModelConfigController;
-import com.aiosnova.ai.AiModelSyncService;
-import com.aiosnova.ai.AiModelStateService;
-import com.aiosnova.ai.AiModelPreferencesService;
-import com.aiosnova.ai.AiModelPreferencesController;
-import com.aiosnova.ai.AiAgentRepository;
-import com.aiosnova.ai.AiMigrationToolsConfiguration;
-import com.aiosnova.ai.AiAgentWriteService;
-import com.aiosnova.ai.AiKnowledgeAccess;
-import com.aiosnova.ai.AiKnowledgeRepository;
-import com.aiosnova.ai.AiKnowledgeService;
-import com.aiosnova.ai.AiKnowledgeController;
-import com.aiosnova.ai.AiAgentService;
-import com.aiosnova.ai.AiAgentController;
+import com.aiosnova.ai.model.AiModelController;
+import com.aiosnova.ai.model.OpenRouterModelService;
+import com.aiosnova.ai.provider.AiProviderRepository;
+import com.aiosnova.ai.provider.AiProviderController;
+import com.aiosnova.ai.provider.AiApiKeyCrypto;
+import com.aiosnova.ai.provider.AiProviderService;
+import com.aiosnova.ai.provider.AiProviderVerificationService;
+import com.aiosnova.ai.chat.AiChatService;
+import com.aiosnova.ai.chat.AiChatController;
+import com.aiosnova.ai.chat.AiChatMessageValidator;
+import com.aiosnova.ai.model.AiModelRepository;
+import com.aiosnova.ai.model.AiModelConfigController;
+import com.aiosnova.ai.model.AiModelSyncService;
+import com.aiosnova.ai.model.AiModelStateService;
+import com.aiosnova.ai.model.AiModelPreferencesService;
+import com.aiosnova.ai.model.AiModelPreferencesController;
+import com.aiosnova.ai.agent.AiAgentRepository;
+import com.aiosnova.ai.migration.AiMigrationToolsConfiguration;
+import com.aiosnova.ai.agent.AiAgentWriteService;
+import com.aiosnova.ai.knowledge.AiKnowledgeAccess;
+import com.aiosnova.ai.knowledge.AiKnowledgeRepository;
+import com.aiosnova.ai.knowledge.AiKnowledgeService;
+import com.aiosnova.ai.knowledge.AiKnowledgeController;
+import com.aiosnova.ai.agent.AiAgentService;
+import com.aiosnova.ai.agent.AiAgentController;
+import com.aiosnova.ai.tool.AiToolManagementConfiguration;
 
 @Configuration
 @EnableAutoConfiguration
@@ -65,6 +66,7 @@ import com.aiosnova.ai.AiAgentController;
     AiKnowledgeController.class,
     AiAgentService.class,
     AiAgentController.class,
+    AiToolManagementConfiguration.class,
 })
 public class AiStandaloneApplication {
 

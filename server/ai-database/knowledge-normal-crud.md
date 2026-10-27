@@ -40,8 +40,8 @@ From `server`, using the already generated test classpath:
 
 ```powershell
 .\mvnw.cmd -q -DskipTests test-compile
-java '@target/ai-check-classpath.args' com.aiosnova.ai.AiKnowledgePersistenceCheck
-java '@target/ai-check-classpath.args' com.aiosnova.ai.AiAgentPersistenceCheck
+java '@target/ai-check-classpath.args' com.aiosnova.ai.knowledge.AiKnowledgePersistenceCheck
+java '@target/ai-check-classpath.args' com.aiosnova.ai.agent.AiAgentPersistenceCheck
 ```
 
 The frontend checks simulate HTTP. The Java check uses the real Service/Spring transaction proxy with simulated SQL storage, including late Promote/Adopt failure rollback. These checks do not establish that a live MySQL schema or running process has been updated. Execute the local schema step and browser checks above for that verification. No Mock import is needed.

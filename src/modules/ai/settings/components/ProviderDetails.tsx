@@ -52,7 +52,7 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
       <section className="ai-provider-overview" aria-label={`${provider.name} overview`}>
         <header className="ai-provider-details-header identity-table__actions">
           <span className={`ai-settings-provider-mark ai-settings-provider-mark--${provider.slug}`} aria-hidden="true">{provider.name.slice(0, 2).toUpperCase()}</span>
-          <strong>{provider.name}</strong>
+          <strong title={provider.name}>{provider.name}</strong>
           <span className={`console-status console-status--${provider.status}`}>{connectionStatusLabel(provider.status)}</span>
           <div className="ai-provider-details-actions identity-inline-actions identity-directory-actions">
             {!provider.enabled && provider.status === 'disabled' ? (
@@ -69,15 +69,31 @@ export function ProviderDetails({ provider, companyId, busy, onEdit, onToggle, o
             <dt>Base URL</dt><dd>{provider.baseUrl}</dd>
             <dt>Status</dt><dd><button type="button" className={`console-status console-status--${provider.status} console-status--clickable`} disabled={busy} onClick={onToggle}>{connectionStatusLabel(provider.status)}</button></dd>
           </dl>
-          <div className="ai-provider-connection-actions ai-provider-connection-check">
-            <div className="ai-provider-connection-summary"><span aria-hidden="true"><IconClock/></span><div><strong>{provider.lastConnectionTest?.message ?? 'Not verified'}</strong><small>{provider.lastConnectionTest ? `${provider.lastConnectionTest.modelId} · ${new Date(provider.lastConnectionTest.checkedAt).toLocaleString()}` : 'Enter a test model ID. Leave API Key blank to test the saved database key.'}</small><small>The verification result is saved for this configuration and test model. Provider enablement is controlled separately.</small></div></div>
-            <Button variant="secondary" disabled={busy || !provider.enabled} onClick={onEdit}>Test Connection</Button>
+          <div className={`ai-provider-connection-check${provider.lastConnectionTest ? provider.lastConnectionTest.ok ? ' is-success' : ' is-error' : ''}`}>
+            <div className="ai-provider-connection-actions">
+              <div className="ai-provider-connection-summary">
+                <span aria-hidden="true"><IconClock/></span>
+                <div>
+                  <strong>{provider.lastConnectionTest ? provider.lastConnectionTest.ok ? 'Verified' : 'Verification failed' : 'Not verified'}</strong>
+                  <small title={provider.lastConnectionTest ? new Date(provider.lastConnectionTest.checkedAt).toLocaleString('en-GB') : undefined}>
+                    {provider.lastConnectionTest ? new Date(provider.lastConnectionTest.checkedAt).toLocaleString('en-GB') : 'Run a connection test.'}
+                  </small>
+                </div>
+              </div>
+              <Button variant="secondary" disabled={busy || !provider.enabled} onClick={onEdit}>Test Connection</Button>
+            </div>
+            {provider.lastConnectionTest && !provider.lastConnectionTest.ok ? <p className="ai-provider-connection-error" role="status">{provider.lastConnectionTest.message}</p> : null}
+            <details className="ai-provider-verification-details" key={provider.id}>
+              <summary>Verification details</summary>
+              {provider.lastConnectionTest ? <p><span>Test model</span><strong>{provider.lastConnectionTest.modelId}</strong></p> : <p>Enter a test model ID. Leave API Key blank to test the saved database key.</p>}
+              <p>The result is saved for this configuration and test model. Provider enablement is controlled separately.</p>
+            </details>
           </div>
         </div>
       </section>
       <section className="ai-provider-models" aria-label={`${provider.name} models`}>
         <header className="ai-provider-models-header">
-          <div><h2>Model catalog</h2><small>{loading ? 'Loading catalog…' : `${models.length} models configured for this Provider`}</small></div>
+          <h2>Model catalog</h2>
           <div className="ai-provider-catalog-actions">
             {provider.baseUrl.trim() === 'https://openrouter.ai/api/v1' ? <Button variant="secondary" disabled={busy || syncing} onClick={onSync}><IconRefresh className={syncing ? 'ai-catalog-spinning' : undefined} />{syncing ? 'Syncing models…' : 'Sync catalog'}</Button> : null}
             <Button variant="secondary" disabled={busy} onClick={onManageModels}>Manage Models</Button>

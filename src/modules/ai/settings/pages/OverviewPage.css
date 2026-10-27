@@ -21,7 +21,7 @@
 .ai-settings-overview .ai-settings-provider-entry {margin-right:auto;color:var(--color-text-muted)}
 .ai-settings-overview .ai-settings-capability-entry {margin-left:auto}
 .ai-settings-overview .ai-settings-overview-body {flex:1 1 0;min-height:0;grid-template-columns:minmax(0,2fr) minmax(20rem,1fr);grid-template-rows:minmax(0,1fr);gap:1rem;align-items:stretch}
-.ai-settings-overview .ai-settings-status-rail {display:grid;grid-template-rows:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr);gap:1rem;min-width:0;min-height:0}
+.ai-settings-overview .ai-settings-status-rail {display:grid;grid-template-rows:minmax(0,1.1fr) max-content minmax(0,1fr);gap:1rem;min-width:0;min-height:0}
 .ai-settings-overview .ai-settings-rail-panel {display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:.85rem}
 .ai-settings-overview .ai-settings-section-header {flex:0 0 auto}
 .ai-settings-overview .ai-settings-usage-panel {min-height:0;overflow:hidden;align-self:stretch}
@@ -29,12 +29,18 @@
 .ai-settings-overview .ai-settings-usage-preview {flex:1 1 0;min-height:0}
 .ai-settings-overview .ai-settings-usage-chart-area {flex:1 1 0;min-height:0;grid-template-rows:auto minmax(0,1fr) auto}
 .ai-settings-overview .ai-settings-usage-chart {height:100%;min-height:0}
-.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem 1rem;align-content:start;flex:1 1 0;min-height:0;max-height:none;overflow:auto;padding:.25rem .25rem 0 0;scrollbar-gutter:auto;overscroll-behavior:contain}
-.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list > div {display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:.25rem;min-width:0;min-height:0;padding:0;border:0;box-sizing:border-box}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list {display:grid;grid-template-columns:minmax(0,1fr);gap:.35rem;align-content:start;flex:0 0 auto;min-height:0;max-height:none;overflow:visible;padding:0;scrollbar-gutter:auto}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list > div {display:grid;grid-template-columns:auto minmax(0,1fr);align-items:baseline;gap:.75rem;min-width:0;min-height:0;padding:0;border:0;box-sizing:border-box}
 .ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list dt {font-size:var(--text-xs);line-height:1.4;color:var(--color-text-muted)}
-.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list dd {width:100%;min-width:0;text-align:left;font-size:var(--text-sm);line-height:1.4;font-weight:400;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list dd {margin:0;min-width:0;text-align:right;font-size:var(--text-sm);line-height:1.4;font-weight:400;color:var(--color-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list > .ai-settings-runtime-model {grid-template-columns:minmax(0,1fr);gap:.15rem}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-runtime-model dd {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;text-align:left;overflow-wrap:anywhere;font-weight:550}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-default-list .ai-settings-runtime-secondary {color:var(--color-text-muted)}
 .ai-settings-overview .ai-settings-runtime-panel {overflow:hidden}
-.ai-settings-overview .ai-settings-runtime-panel .ai-settings-section-header {flex:0 0 auto}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-section-header {flex:0 0 auto;flex-wrap:nowrap;min-height:1.75rem;margin-bottom:.4rem}
+.ai-settings-overview .ai-settings-runtime-panel .ai-settings-section-header h2 {white-space:nowrap;min-width:0}
+.ai-settings-overview .ai-settings-runtime-panel .ui-icon-button-wrap {flex:0 0 auto}
+.ai-settings-overview .ai-settings-runtime-panel .ui-icon-button {width:1.75rem;min-width:1.75rem;height:1.75rem;min-height:1.75rem}
 .ai-settings-overview .ai-settings-health-list,.ai-settings-overview .ai-settings-activity-list {flex:1 1 0;min-height:0;max-height:none;overflow:auto;scrollbar-gutter:stable}
 .ai-settings-overview .ai-settings-activity-copy {min-width:0;overflow-wrap:anywhere}
 .ai-settings-overview .ai-settings-activity-list {display:block}

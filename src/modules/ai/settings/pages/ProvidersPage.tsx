@@ -853,19 +853,6 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                             />
                         </FormField>
 
-                        <FormField label="Test Model ID" htmlFor="provider-test-model-id">
-                            <TextField
-                                id="provider-test-model-id"
-                                value={modelId}
-                                onChange={(event) => {
-                                    setModelId(event.target.value)
-                                    setTestResult(null)
-                                }}
-                                placeholder="deepseek/deepseek-v4.1-flash-1017"
-                                disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
-                            />
-                        </FormField>
-
                     </SettingsEditorSection>
                     <SettingsEditorSection title="Availability" icon={<IconShieldCheck />}>
                         <FormField label="Status" htmlFor="provider-status">
@@ -887,8 +874,20 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                         </FormField>
                     </SettingsEditorSection>
 
-                    <SettingsEditorSection title="Model Connection Test" icon={<IconSettings />}>
-                        <p>Sends a real model request and may incur API charges. Leave the key blank to test the saved configuration, or enter a key to test unsaved input.</p>
+                    <SettingsEditorSection title="Verify connection" icon={<IconSettings />}>
+                        <FormField label="Test Model ID" htmlFor="provider-test-model-id">
+                            <TextField
+                                id="provider-test-model-id"
+                                value={modelId}
+                                onChange={(event) => {
+                                    setModelId(event.target.value)
+                                    setTestResult(null)
+                                }}
+                                placeholder="deepseek/deepseek-v4.1-flash-1017"
+                                disabled={isSaving || isTesting || isLoadingCapabilities || isUpdating}
+                            />
+                        </FormField>
+                        <p className="ai-provider-editor-note">Uses the saved key unless a new key is entered.</p>
 
                         <Button
                             type="button"
@@ -898,23 +897,23 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                         >
                             {isTesting ? 'Testing…' : 'Test Connection'}
                         </Button>
+                        <p className="ai-provider-editor-note">May incur API charges.</p>
 
                         {testResult ? (
                             <div
-                                className={`ai-settings-connection-result${testResult.ok ? '' : ' is-error'
+                                className={`ai-settings-connection-result${testResult.ok ? ' is-success' : ' is-error'
                                     }`}
                                 role="status"
                             >
-                                <strong>{testResult.message}</strong>
-                                {testResult.reply ? (
-                                    <p>Model reply: {testResult.reply}</p>
-                                ) : null}
+                                <strong title={testResult.message}>{testResult.ok ? 'Connection successful.' : testResult.message}</strong>
                             </div>
                         ) : null}
                         {syncingProviderId ? <p className="ai-provider-sync-status" role="status"><IconRefresh className="ai-catalog-spinning" aria-hidden="true" />Syncing models…</p> : null}
                     </SettingsEditorSection>
 
-                    <SettingsEditorSection
+                    <details className="ai-provider-editor-advanced" key={editingId ?? 'new-provider'}>
+                      <summary>Advanced details</summary>
+                      <SettingsEditorSection
                         title="Model Capabilities"
                         icon={<IconSettings />}
                     >
@@ -955,7 +954,8 @@ function ProvidersWorkspace({ companyId }: { companyId: string }) {
                                 </dl>
                             </div>
                         ) : null}
-                    </SettingsEditorSection>
+                      </SettingsEditorSection>
+                    </details>
 
                 </form>
             </SettingsEditor>

@@ -16,6 +16,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
 import { Button } from '@/components/ui/Button'
+import { IconButton } from '@/components/ui/IconButton'
+import { IconExternalLink } from '@/components/icons/Icons'
 import { FlashToasts } from '@/components/ui/FlashToasts'
 import { useCompanyStore } from '@/stores/companyStore'
 
@@ -814,21 +816,20 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
             {/* Runtime */}
             <article className="console-panel ai-settings-rail-panel ai-settings-runtime-panel">
               <div className="ai-settings-section-header">
-                <h2>
-                  <span title="Sample runtime defaults for this company. Runtime editing is not connected in this local demo.">Runtime Defaults · Sample</span>
-                </h2>
+                <h2>Runtime Defaults</h2>
 
-                <Button
+                <IconButton
                   type="button"
-                  variant="secondary"
+                  label="View Providers"
+                  variant="ghost"
                   onClick={() =>
                     void navigate(
                       '/ai/ai/ai-settings/models/providers',
                     )
                   }
                 >
-                  View Providers
-                </Button>
+                  <IconExternalLink aria-hidden="true" />
+                </IconButton>
               </div>
 
 
@@ -845,7 +846,7 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
                   </dd>
                 </div>
 
-                <div>
+                <div className="ai-settings-runtime-model">
                   <dt>
                     Model
                   </dt>
@@ -862,7 +863,7 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
                     Fallback
                   </dt>
 
-                  <dd title={RUNTIME_DEFAULTS.fallbackModel}>
+                  <dd className="ai-settings-runtime-secondary" title={RUNTIME_DEFAULTS.fallbackModel}>
                     {
                       RUNTIME_DEFAULTS.fallbackModel
                     }
@@ -874,7 +875,7 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
                     Routing
                   </dt>
 
-                  <dd title={RUNTIME_DEFAULTS.routing}>
+                  <dd className="ai-settings-runtime-secondary" title={RUNTIME_DEFAULTS.routing}>
                     {
                       RUNTIME_DEFAULTS.routing
                     }
@@ -917,9 +918,9 @@ function OverviewWorkspace({companyId}:{companyId:string}) {
                           }
                         </strong>
 
-                        <small title={activity.detail+' · '+new Date(activity.time).toLocaleString()}>
+                        <small title={activity.detail+' · '+new Date(activity.time).toLocaleString('en-GB')}>
                           {
-                            activity.detail+' · '+new Date(activity.time).toLocaleString()
+                            activity.detail+' · '+new Date(activity.time).toLocaleString('en-GB')
                           }
                         </small>
                       </div>
