@@ -13,17 +13,28 @@ export function OrganizationAccessProvider({ children }:{ children:ReactNode }) 
   const token=useAuthStore(state=>state.accessToken)
   const { pathname }=useLocation()
   const [access,setAccess]=useState<{ scope:string; canRead:boolean; canManage:boolean }|null>(null)
-  const scope=JSON.stringify([companyId,userId,token,pathname])
+  const [recheck,setRecheck]=useState(0)
+  useEffect(()=>{
+    const refresh=()=>{ if(document.visibilityState==='visible') setRecheck(value=>value+1) }
+    window.addEventListener('focus',refresh)
+    window.addEventListener('online',refresh)
+    document.addEventListener('visibilitychange',refresh)
+    return ()=>{
+      window.removeEventListener('focus',refresh)
+      window.removeEventListener('online',refresh)
+      document.removeEventListener('visibilitychange',refresh)
+    }
+  },[])
+  const scope=JSON.stringify([companyId,userId,token])
   const canCheckAccess=Boolean(companyId&&userId&&token?.startsWith('backend_'))
   useEffect(()=>{
     let current=true
     const controller=new AbortController()
-    setAccess(null)
     if (companyId&&userId&&token?.startsWith('backend_')) fetchOrganizationAccess(companyId,controller.signal).then(result=>{
       if(current) setAccess({ scope,canRead:result.canRead,canManage:result.canManage })
     }).catch(()=>{ if(current) setAccess({ scope,canRead:false,canManage:false }) })
     return ()=>{ current=false;controller.abort() }
-  },[companyId,userId,token,scope])
+  },[companyId,userId,token,scope,pathname,recheck])
   const value=access?.scope===scope
     ? { ...access,isLoading:false }
     : { canRead:false,canManage:false,isLoading:canCheckAccess }

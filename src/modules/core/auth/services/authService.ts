@@ -20,17 +20,17 @@ import type {
 import { isMfaRequired } from '@/modules/core/auth/types/auth'
 
 export async function fetchInvitation(token: string) {
-  return apiRequest<InvitationDetails>(`/api/mock/invitations/${encodeURIComponent(token)}`)
+  return apiRequest<InvitationDetails>(`/api/auth/invitations/${encodeURIComponent(token)}`)
 }
 
 export async function startInvitationMfa(token: string) {
-  return apiRequest<InvitationMfaSetup>(`/api/mock/invitations/${encodeURIComponent(token)}/mfa/start`, {
+  return apiRequest<InvitationMfaSetup>(`/api/auth/invitations/${encodeURIComponent(token)}/mfa/start`, {
     method: 'POST',
   })
 }
 
 export async function activateInvitation(token: string, code: string) {
-  return apiRequest<ActivatedAccount>(`/api/mock/invitations/${encodeURIComponent(token)}/activate`, {
+  return apiRequest<ActivatedAccount>(`/api/auth/invitations/${encodeURIComponent(token)}/activate`, {
     method: 'POST', body: { code },
   })
 }
