@@ -12,6 +12,7 @@ type TablePaginationProps = {
   currentPage: number
   pageCount: number
   pagesLabel: string
+  translationPrefix?: string
   onPageSizeChange: (size: number) => void
   onPageChange: (page: number) => void
 }
@@ -28,29 +29,30 @@ function paginationItems(current: number, total: number): (number | 'backward' |
   return items
 }
 
-export function TablePagination({ id, total, pageSize, autoPageSize, effectivePageSize, currentPage, pageCount, pagesLabel, onPageSizeChange, onPageChange }: TablePaginationProps) {
+export function TablePagination({ id, total, pageSize, autoPageSize, effectivePageSize, currentPage, pageCount, pagesLabel, translationPrefix = 'users', onPageSizeChange, onPageChange }: TablePaginationProps) {
   const { t } = useTranslation()
+  const translate = (key: string, values?: Record<string, number>) => t(`${translationPrefix}.${key}`, values)
   return (
         <footer className="identity-directory-footer">
           <div className="identity-directory-footer__listing">
-            <label htmlFor={id}>{t('users.rowsPerPage')}</label>
-            <SidebarSelect id={id} hideLabel className="identity-pagination-select" label={t('users.rowsPerPage')} title={pageSize===0? t('users.autoRowsHint', { count: autoPageSize }):undefined} value={String(pageSize)} options={[{ value: '0', label: '–' }, ...[10,25,50,100,200].map(n => ({ value: String(n), label: String(n) }))]} onChange={value => onPageSizeChange(Number(value))} />
-            <span>{t('users.listingRange', { start: total ? (currentPage-1)*effectivePageSize+1 : 0, end: Math.min(currentPage*effectivePageSize,total), total: total })}</span>
+            <label htmlFor={id}>{translate('rowsPerPage')}</label>
+            <SidebarSelect id={id} hideLabel className="identity-pagination-select" label={translate('rowsPerPage')} title={pageSize===0? translate('autoRowsHint', { count: autoPageSize }):undefined} value={String(pageSize)} options={[{ value: '0', label: '–' }, ...[10,25,50,100,200].map(n => ({ value: String(n), label: String(n) }))]} onChange={value => onPageSizeChange(Number(value))} />
+            <span>{translate('listingRange', { start: total ? (currentPage-1)*effectivePageSize+1 : 0, end: Math.min(currentPage*effectivePageSize,total), total: total })}</span>
           </div>
           <nav className="identity-pagination" aria-label={pagesLabel}>
-            <Button variant="secondary" disabled={currentPage===1} onClick={() => onPageChange(currentPage-1)} aria-label={t('users.previousPage')}>‹</Button>
+            <Button variant="secondary" disabled={currentPage===1} onClick={() => onPageChange(currentPage-1)} aria-label={translate('previousPage')}>‹</Button>
             {paginationItems(currentPage,pageCount).map(item => {
               if (typeof item === 'number') return (
-                <Button key={item} variant="secondary" aria-label={t('users.pageNumber', { page: item })} aria-current={item===currentPage? 'page':undefined} onClick={() => onPageChange(item)}>{item}</Button>
+                <Button key={item} variant="secondary" aria-label={translate('pageNumber', { page: item })} aria-current={item===currentPage? 'page':undefined} onClick={() => onPageChange(item)}>{item}</Button>
               )
               const backward = item === 'backward'
-              const label = t(backward ? 'users.jumpBackPages' : 'users.jumpForwardPages')
+              const label = translate(backward ? 'jumpBackPages' : 'jumpForwardPages')
               return <Button key={item} variant="ghost" className="identity-pagination__jump" aria-label={label} title={label} onClick={() => onPageChange(Math.max(1,Math.min(pageCount,currentPage + (backward ? -5 : 5))))}>
                 <span className="identity-pagination__ellipsis" aria-hidden>•••</span>
                 <span className="identity-pagination__jump-arrow" aria-hidden>{backward ? '«' : '»'}</span>
               </Button>
             })}
-            <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => onPageChange(currentPage+1)} aria-label={t('users.nextPage')}>›</Button>
+            <Button variant="secondary" disabled={currentPage===pageCount} onClick={() => onPageChange(currentPage+1)} aria-label={translate('nextPage')}>›</Button>
           </nav>
         </footer>
   )

@@ -1,0 +1,32 @@
+export type ActivityEvent = {
+  id: string
+  occurredAt: string
+  actor: string
+  email: string
+  initials: string
+  module: string
+  moduleKey: string
+  action: 'created' | 'updated' | 'deleted' | 'login'
+  actionKey: string
+  target: string
+  result: 'success' | 'failure'
+  company: string
+  resourceKey: string
+  changes: { field: string; labelKey: string; before: string; after: string }[]
+}
+
+// Static preview entries illustrate the page layout; they are not returned by an audit API.
+export const activityEvents: ActivityEvent[] = [
+  { id: 'evt-1287', occurredAt: '2026-10-17T14:28:12+08:00', actor: 'Alex Tan', email: 'alex@acmeretail.com', initials: 'AT', module: 'roles', moduleKey: 'activity.module.roles', action: 'updated', actionKey: 'activity.action.updateRole', target: 'Marketing Manager', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.role', changes: [{ field: 'roleName', labelKey: 'activity.field.roleName', before: 'Marketing Executive', after: 'Marketing Manager' }, { field: 'description', labelKey: 'activity.field.description', before: '', after: 'Manage marketing team and campaigns' }] },
+  { id: 'evt-1286', occurredAt: '2026-10-17T13:15:45+08:00', actor: 'Sarah Lim', email: 'sarah@acmeretail.com', initials: 'SL', module: 'employees', moduleKey: 'activity.module.employees', action: 'created', actionKey: 'activity.action.createEmployee', target: 'John Lee', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.employee', changes: [{ field: 'status', labelKey: 'activity.field.status', before: '', after: 'Invited' }] },
+  { id: 'evt-1285', occurredAt: '2026-10-17T12:46:03+08:00', actor: 'David Lee', email: 'david@acmeretail.com', initials: 'DL', module: 'organization', moduleKey: 'activity.module.organization', action: 'created', actionKey: 'activity.action.createDepartment', target: 'Marketing', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.department', changes: [{ field: 'departmentName', labelKey: 'activity.field.departmentName', before: '', after: 'Marketing' }] },
+  { id: 'evt-1284', occurredAt: '2026-10-17T11:32:20+08:00', actor: 'Alex Tan', email: 'alex@acmeretail.com', initials: 'AT', module: 'system', moduleKey: 'activity.module.system', action: 'login', actionKey: 'activity.action.login', target: '—', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.session', changes: [{ field: 'session', labelKey: 'activity.field.session', before: '', after: 'Signed in' }] },
+  { id: 'evt-1283', occurredAt: '2026-10-16T18:05:14+08:00', actor: 'Cheryl Yap', email: 'cheryl@acmeretail.com', initials: 'CY', module: 'roles', moduleKey: 'activity.module.roles', action: 'updated', actionKey: 'activity.action.updateRole', target: 'Finance Approver', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.role', changes: [{ field: 'permissions', labelKey: 'activity.field.permissions', before: 'View expenses', after: 'View and approve expenses' }] },
+  { id: 'evt-1282', occurredAt: '2026-10-16T16:42:37+08:00', actor: 'Sarah Lim', email: 'sarah@acmeretail.com', initials: 'SL', module: 'employees', moduleKey: 'activity.module.employees', action: 'updated', actionKey: 'activity.action.updateEmployee', target: 'Emily Wong', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.employee', changes: [{ field: 'position', labelKey: 'activity.field.position', before: 'Sales Associate', after: 'Store Supervisor' }] },
+  { id: 'evt-1281', occurredAt: '2026-10-16T15:10:21+08:00', actor: 'David Lee', email: 'david@acmeretail.com', initials: 'DL', module: 'organization', moduleKey: 'activity.module.organization', action: 'created', actionKey: 'activity.action.createPosition', target: 'Support Agent', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.position', changes: [{ field: 'positionName', labelKey: 'activity.field.positionName', before: '', after: 'Support Agent' }] },
+  { id: 'evt-1280', occurredAt: '2026-10-16T14:48:55+08:00', actor: 'Alex Tan', email: 'alex@acmeretail.com', initials: 'AT', module: 'roles', moduleKey: 'activity.module.roles', action: 'deleted', actionKey: 'activity.action.deleteRole', target: 'Old Campaign View', result: 'failure', company: 'Acme Retail', resourceKey: 'activity.resource.role', changes: [{ field: 'roleStatus', labelKey: 'activity.field.result', before: 'Active', after: 'Not changed' }] },
+  { id: 'evt-1279', occurredAt: '2026-10-16T10:15:03+08:00', actor: 'Cheryl Yap', email: 'cheryl@acmeretail.com', initials: 'CY', module: 'employees', moduleKey: 'activity.module.employees', action: 'updated', actionKey: 'activity.action.updateEmployee', target: 'Mia Tan', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.employee', changes: [{ field: 'department', labelKey: 'activity.field.department', before: 'Retail', after: 'Customer Care' }] },
+  { id: 'evt-1278', occurredAt: '2026-10-15T16:42:18+08:00', actor: 'Sarah Lim', email: 'sarah@acmeretail.com', initials: 'SL', module: 'roles', moduleKey: 'activity.module.roles', action: 'updated', actionKey: 'activity.action.updateRole', target: 'Store Supervisor', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.role', changes: [{ field: 'permissions', labelKey: 'activity.field.permissions', before: 'View employees', after: 'View and update employees' }] },
+  { id: 'evt-1277', occurredAt: '2026-10-15T11:28:40+08:00', actor: 'David Lee', email: 'david@acmeretail.com', initials: 'DL', module: 'organization', moduleKey: 'activity.module.organization', action: 'updated', actionKey: 'activity.action.updateDepartment', target: 'Customer Care', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.department', changes: [{ field: 'departmentName', labelKey: 'activity.field.departmentName', before: 'Customer Service', after: 'Customer Care' }] },
+  { id: 'evt-1276', occurredAt: '2026-10-14T09:04:11+08:00', actor: 'Alex Tan', email: 'alex@acmeretail.com', initials: 'AT', module: 'employees', moduleKey: 'activity.module.employees', action: 'created', actionKey: 'activity.action.createEmployee', target: 'Mia Tan', result: 'success', company: 'Acme Retail', resourceKey: 'activity.resource.employee', changes: [{ field: 'status', labelKey: 'activity.field.status', before: '', after: 'Invited' }] },
+]
