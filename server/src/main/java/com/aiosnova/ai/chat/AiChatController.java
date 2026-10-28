@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController
 @RequestMapping("/api/ai/chat")
@@ -33,12 +35,22 @@ public class AiChatController {
 
     private final AiToolAuthorizationService toolAuthorization;
 
+    public AiChatController(AiChatService service) {
+        this(service, null);
+    }
+
     /**
      * Normal application startup: tool endpoint remains disabled.
      */
     @Autowired
-    public AiChatController(AiChatService service) {
-        this(service, null);
+    public AiChatController(
+            AiChatService service,
+            ObjectProvider<AiToolAuthorizationService> authorization,
+            @Value("${ai.tools.chat.enabled:false}") boolean toolsEnabled) {
+
+        this(
+                service,
+                toolsEnabled ? authorization.getObject() : null);
     }
 
     /**

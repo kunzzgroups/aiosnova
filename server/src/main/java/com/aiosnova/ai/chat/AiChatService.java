@@ -5,6 +5,7 @@ import com.aiosnova.ai.provider.AiApiKeyCrypto;
 import com.aiosnova.ai.provider.AiProviderRepository;
 import com.aiosnova.ai.tool.AiToolRegistry;
 import com.aiosnova.ai.tool.AiToolAuthorizationService;
+import com.aiosnova.ai.model.OpenRouterModelService;
 
 import java.io.IOException;
 import java.net.URI;
@@ -26,6 +27,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 public class AiChatService {
@@ -37,20 +40,30 @@ public class AiChatService {
     private final AiChatMessageValidator messageValidator;
     private final AiModelStateService modelStateService;
     private final AiChatRequestBuilder requestBuilder = new AiChatRequestBuilder();
+    private final AiAgentModelBindingValidator agentModelBindingValidator;
+    private final AiAgentExecutionParameterValidator agentParameterValidator;
+    private final OpenRouterModelService toolModelMetadata;
 
     @Autowired
     public AiChatService(
             AiProviderRepository repository,
             AiApiKeyCrypto crypto,
             AiChatMessageValidator messageValidator,
-            AiModelStateService modelStateService) {
+            AiModelStateService modelStateService,
+            ObjectProvider<AiAgentModelBindingValidator> bindingValidators,
+            ObjectProvider<AiAgentExecutionParameterValidator> parameterValidators,
+            OpenRouterModelService toolModelMetadata,
+            @Value("${ai.tools.chat.enabled:false}") boolean toolsEnabled) {
 
         this(
                 repository,
                 crypto,
                 defaultTransport(),
                 messageValidator,
-                modelStateService);
+                modelStateService,
+                toolsEnabled ? bindingValidators.getObject() : null,
+                toolsEnabled ? parameterValidators.getObject() : null,
+                toolModelMetadata);
     }
 
     AiChatService(
@@ -60,11 +73,45 @@ public class AiChatService {
             AiChatMessageValidator messageValidator,
             AiModelStateService modelStateService) {
 
+        this(
+                repository,
+                crypto,
+                transport,
+                messageValidator,
+                modelStateService,
+                null);
+    }
+
+    AiChatService(
+            AiProviderRepository repository,
+            AiApiKeyCrypto crypto,
+            ChatTransport transport,
+            AiChatMessageValidator messageValidator,
+            AiModelStateService modelStateService,
+            AiAgentModelBindingValidator bindingValidator) {
+
+        this(repository, crypto, transport, messageValidator, modelStateService,
+                bindingValidator, null, null);
+    }
+
+    AiChatService(
+            AiProviderRepository repository,
+            AiApiKeyCrypto crypto,
+            ChatTransport transport,
+            AiChatMessageValidator messageValidator,
+            AiModelStateService modelStateService,
+            AiAgentModelBindingValidator bindingValidator,
+            AiAgentExecutionParameterValidator parameterValidator,
+            OpenRouterModelService modelMetadata) {
+
         this.repository = repository;
         this.crypto = crypto;
         this.transport = transport;
         this.messageValidator = messageValidator;
         this.modelStateService = modelStateService;
+        this.agentModelBindingValidator = bindingValidator;
+        this.agentParameterValidator = parameterValidator;
+        this.toolModelMetadata = modelMetadata;
     }
 
     record ChatHttpResult(int statusCode, String body) {
@@ -194,21 +241,43 @@ public class AiChatService {
         var authorized = authorization.authorize(
                 request.companyId(), agentId);
 
-        Runnable authorizationGuard = () -> authorization.requireStillAllowed(
-                request.companyId(),
+        var initialBinding = requireAgentToolModel(
+                request,
                 agentId,
-                authorized.functionNames());
+                agentModelBindingValidator);
+
+        var parameters = requireAgentParameters(request, agentId);
+
+        Runnable authorizationGuard = () -> {
+            authorization.requireStillAllowed(
+                    request.companyId(),
+                    agentId,
+                    authorized.functionNames());
+
+            var currentBinding = requireAgentToolModel(
+                    request,
+                    agentId,
+                    agentModelBindingValidator);
+
+            agentModelBindingValidator.requireUnchanged(
+                    initialBinding, currentBinding);
+        };
+
+        var agentRequest = new AiChatMessagesRequest(
+                request.companyId(), request.providerId(), request.modelId(),
+                null, request.messages());
 
         return chatMessagesWithTools(
-                request,
+                agentRequest,
                 authorized.registry(),
                 authorized.functionNames(),
-                authorizationGuard);
+                authorizationGuard,
+                parameters);
     }
 
     /**
      * Internal integration entry.
-     * No Controller or streaming endpoint calls this yet.
+     * Called after server-side tool and Agent model binding authorization.
      *
      * Registry and allowlist must come from trusted server-side code.
      */
@@ -217,6 +286,17 @@ public class AiChatService {
             AiToolRegistry registry,
             Set<String> allowedFunctionNames,
             Runnable toolAuthorizationGuard) {
+
+        return chatMessagesWithTools(request, registry, allowedFunctionNames,
+                toolAuthorizationGuard, null);
+    }
+
+    private ChatReply chatMessagesWithTools(
+            AiChatMessagesRequest request,
+            AiToolRegistry registry,
+            Set<String> allowedFunctionNames,
+            Runnable toolAuthorizationGuard,
+            AiToolRequestParameters agentParameters) {
 
         var validated = messageValidator.validate(request);
 
@@ -257,10 +337,12 @@ public class AiChatService {
                 guard);
 
         try {
-            String reply = conversation.chat(
+            var parameters = agentParameters != null ? agentParameters
+                    : new AiToolRequestParameters(validated.temperature(), null, 2048);
+            String reply = conversation.chatWithParameters(
                     modelId,
                     validated.messages(),
-                    validated.temperature(),
+                    parameters,
                     apiKey,
                     allowedFunctionNames);
 
@@ -275,6 +357,44 @@ public class AiChatService {
             throw new ResponseStatusException(
                     status,
                     error.getMessage());
+        }
+    }
+
+    private AiToolRequestParameters requireAgentParameters(
+            AiChatMessagesRequest request, String agentId) {
+        if (agentParameterValidator == null || toolModelMetadata == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Agent execution parameter validation is not configured.");
+        }
+
+        var model = modelStateService.requireEnabledModel(
+                request.companyId(), request.providerId(), request.modelId());
+        var stored = agentParameterValidator.requireParameters(
+                request.companyId(), agentId, model.contextWindow());
+
+        try {
+            var metadata = toolModelMetadata.loadMetadata(model.modelId());
+            if (metadata == null || metadata.capabilities() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Model parameter support is unavailable.");
+            }
+            return new AiToolRequestParameters(
+                    stored.temperatureFor(metadata.supportsTemperature()),
+                    stored.topPFor(metadata.supportsTopP()),
+                    stored.maxTokens());
+        } catch (IllegalArgumentException error) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Model parameter support is unavailable.");
+        } catch (HttpTimeoutException error) {
+            throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT,
+                    "Loading model parameter support timed out.");
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Loading model parameter support was interrupted.");
+        } catch (IOException error) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Unable to load model parameter support.");
         }
     }
 
@@ -548,5 +668,35 @@ public class AiChatService {
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "Unable to decrypt the Provider key. Check the AI storage key configuration.");
         }
+    }
+
+    com.aiosnova.ai.tool.AiToolRepository.AgentModelBinding requireAgentToolModel(
+            AiChatMessagesRequest request,
+            String agentId,
+            AiAgentModelBindingValidator bindingValidator) {
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Chat request is required.");
+        }
+
+        if (bindingValidator == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Agent model binding validation is not configured.");
+        }
+
+        // Resolve the configuration UUID from trusted server-side storage.
+        var model = modelStateService.requireEnabledModel(
+                request.companyId(),
+                request.providerId(),
+                request.modelId());
+
+        return bindingValidator.requireMatch(
+                request.companyId(),
+                agentId,
+                model.providerId(),
+                model.id());
     }
 }

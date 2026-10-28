@@ -23,7 +23,7 @@ function ToolEditor({ companyId, tool, onClose, onSaved }: Props) {
   const [toolType, setToolType] = useState(tool ? TOOL_TYPES.find(type => type.action === tool.action)?.action ?? 'custom' : '')
   const lastSuggestedName = useRef('')
   const [risk, setRisk] = useState<ToolRisk>(tool?.risk ?? 'low')
-  const [enabled, setEnabled] = useState(tool ? tool.status !== 'disabled' : false)
+  const [enabled, setEnabled] = useState(tool?.status === 'active')
   const [timeout, setTimeoutValue] = useState(String(tool?.timeoutSeconds ?? 30))
   const [confirmation, setConfirmation] = useState(tool?.requiresConfirmation ?? false)
   const [configuration, setConfiguration] = useState(JSON.stringify({...defaultToolConfiguration(tool?.action??''),...tool?.configuration}, null, 2))
@@ -85,7 +85,7 @@ function ToolEditor({ companyId, tool, onClose, onSaved }: Props) {
     if(Object.keys(validation).length){setError(Object.values(validation)[0]);return}
     setBusy(true)
     try {
-      const saved = await saveTool(companyId, { name, description, module, action, risk, enabled, timeoutSeconds: Number(timeout), requiresConfirmation: risk === 'high' || confirmation, configuration: parsed as Record<string, unknown> }, tool?.id)
+      const saved = await saveTool(companyId, { name, description, module, action, risk, enabled, timeoutSeconds: Number(timeout), requiresConfirmation: risk === 'high' || confirmation, configuration: parsed as Record<string, unknown> }, tool ?? undefined)
       onSaved(saved)
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to save tool.') }
     finally { setBusy(false) }
@@ -93,7 +93,7 @@ function ToolEditor({ companyId, tool, onClose, onSaved }: Props) {
   return <SettingsEditor open title={tool ? 'Edit Tool' : 'Add Tool'} description="Configure an action available to your agents." busy={busy} onClose={onClose} closeLabel="Close" footer={<><Button type="submit" form="ai-tool-form" disabled={busy}>{busy ? 'Saving…' : 'Save'}</Button><Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button></>}>
     <form id="ai-tool-form" className="ai-settings-form ai-settings-tool-form" onSubmit={event => void submit(event)} onKeyDownCapture={event => { if (event.key === 'Escape' && openSelect) { event.preventDefault(); event.stopPropagation(); setOpenSelect(null) } }}>
       <SettingsEditorSection title="Basic Information" icon={<IconSpark />}>
-        <FormField label="Tool type" htmlFor="tool-type" hint="The same type can be used for multiple tools. Give each tool a descriptive name and its own configuration."><SidebarSelect menuPortal id="tool-type" label="Tool type" value={toolType} options={[{value:'',label:'Select tool type'},...TOOL_TYPES.map(type=>({value:type.action,label:type.label})),{value:'custom',label:'Custom tool'}]} onChange={changeType} {...selectState('type')} /></FormField>
+        <FormField label="Tool type" htmlFor="tool-type" hint="The same type can be used for multiple tools. Give each tool a descriptive name and its own configuration."><SidebarSelect menuPortal id="tool-type" label="Tool type" value={toolType} options={[{value:'',label:'Select tool type'},...TOOL_TYPES.map(type=>({value:type.action,label:type.label})),{value:'custom',label:'Custom tool'}]} onChange={changeType} {...selectState('type')} disabled={busy || !!tool} /></FormField>
         <FormField label="Tool Name" htmlFor="tool-name"><TextField id="tool-name" value={name} onChange={event => setName(event.target.value)} disabled={busy} required /></FormField>
         <FormField label="Description" htmlFor="tool-description"><TextField id="tool-description" value={description} onChange={event => setDescription(event.target.value)} disabled={busy} /></FormField>
       </SettingsEditorSection>
@@ -102,9 +102,8 @@ function ToolEditor({ companyId, tool, onClose, onSaved }: Props) {
         <FormField label="Module" htmlFor="tool-module"><SidebarSelect menuPortal id="tool-module" label="Module" value={module} options={[...TOOL_MODULES]} onChange={value => setModule(value as ToolModule)} {...selectState('module')} /></FormField>
         <FormField label="Risk" htmlFor="tool-risk"><SidebarSelect menuPortal id="tool-risk" label="Risk" value={risk} options={[{value:'low',label:'Low'},{value:'medium',label:'Medium'},{value:'high',label:'High'}]} onChange={value => setRisk(value as ToolRisk)} {...selectState('risk')} /></FormField>
         </div>
-        <FormField label="Action" htmlFor="tool-action" hint={toolType==='custom'?'Enter the action supported by your custom integration, for example custom.run.':'Set by the selected tool type.'}><TextField id="tool-action" value={action} onChange={event => changeAction(event.target.value)} readOnly={toolType!=='custom'} disabled={busy} required placeholder={toolType==='custom'?'custom.run':''} /></FormField>
+        <FormField label="Action" htmlFor="tool-action" hint={toolType==='custom'?'Enter the action supported by your custom integration, for example custom.run.':'Set by the selected tool type.'}><TextField id="tool-action" value={action} onChange={event => changeAction(event.target.value)} readOnly={!!tool || toolType !== 'custom'} disabled={busy} required placeholder={toolType==='custom'?'custom.run':''} /></FormField>
         {toolType?<p className="console-table__muted">{toolType==='custom'?'Use the action identifier and JSON required by your custom integration.':toolTypeDescription(action)}</p>:null}
-        {tool && tool.action !== action.trim() ? <p role="status" className="console-table__muted">Changing Action archives the previous configuration and usage in Recent Activity. Usage starts fresh for this Action. Assigned agents stay assigned; review their access after saving.</p> : null}
         {fields.length?<div className="ai-tool-action-settings"><h4>Action settings</h4>
           {!parsedConfiguration?<p role="status" className="ai-settings-tool-error">Fix the JSON in Advanced to edit these fields.</p>:null}
           {fields.map(field=>{

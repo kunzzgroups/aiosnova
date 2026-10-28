@@ -4,6 +4,7 @@ import { authHandlers } from '@/mocks/handlers/authHandlers'
 import { identityHandlers } from '@/mocks/handlers/identityHandlers'
 import { agentHandlers } from '@/mocks/handlers/agentHandlers'
 import { knowledgeHandlers } from '@/mocks/handlers/knowledgeHandlers'
+import { toolChatPreviewHandlers, toolChatLocalSimulationHandlers } from '@/mocks/handlers/toolChatPreviewHandlers'
 
 const backendTacHandlers = [
   http.get('/api/identity/directory', () => passthrough()),
@@ -53,8 +54,16 @@ const backendTacHandlers = [
   http.put('/api/identity/roles/:id/permissions', () => passthrough()),
   http.get('/api/identity/users/:id/roles', () => passthrough()),
   http.put('/api/identity/users/:id/roles', () => passthrough()),
+  http.get('/api/ai/tools', () => passthrough()),
+  http.get('/api/ai/tools/:id', () => passthrough()),
+  http.post('/api/ai/tools', () => passthrough()),
+  http.put('/api/ai/tools/:id', () => passthrough()),
+  http.patch('/api/ai/tools/:id/enabled', () => passthrough()),
+  http.put('/api/ai/tools/:id/agents', () => passthrough()),
 ]
 export const worker = setupWorker(
+  ...toolChatLocalSimulationHandlers,
+  ...toolChatPreviewHandlers,
   ...backendTacHandlers,
   ...authHandlers,
   ...identityHandlers,

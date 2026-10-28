@@ -84,13 +84,30 @@ final class AiToolConversationService {
             String apiKey,
             Set<String> allowedFunctionNames) {
 
+        return chatWithParameters(
+                modelId,
+                messages,
+                new AiToolRequestParameters(temperature, null, 2048),
+                apiKey,
+                allowedFunctionNames);
+    }
+
+    String chatWithParameters(
+            String modelId,
+            List<Map<String, Object>> messages,
+            AiToolRequestParameters parameters,
+            String apiKey,
+            Set<String> allowedFunctionNames) {
+
         if (modelId == null || modelId.isBlank()
                 || apiKey == null || apiKey.isBlank()
                 || messages == null || messages.isEmpty()
                 || messages.stream().anyMatch(message -> message == null)
-                || allowedFunctionNames == null) {
+                || allowedFunctionNames == null
+                || parameters == null) {
+
             throw new IllegalArgumentException(
-                    "Model, messages, key and allowlist are required.");
+                    "Model, messages, key, parameters and allowlist are required.");
         }
 
         // For this isolated flow, the registry must contain exactly
@@ -114,8 +131,13 @@ final class AiToolConversationService {
                     new TypeReference<List<Map<String, Object>>>() {
                     });
 
-            String firstBody = send(builder.buildForToolSelection(
-                    modelId, original, temperature, apiKey, registry));
+            String firstBody = send(
+                    builder.buildForToolSelectionWithParameters(
+                            modelId,
+                            original,
+                            parameters,
+                            apiKey,
+                            registry));
 
             var calls = parser.parse(firstBody);
 
@@ -133,10 +155,10 @@ final class AiToolConversationService {
                         "Tool execution failed. Conversation stopped.");
             }
 
-            var secondRequest = builder.buildAfterToolExecution(
+            var secondRequest = builder.buildAfterToolExecutionWithParameters(
                     modelId,
                     original,
-                    temperature,
+                    parameters,
                     apiKey,
                     registry,
                     firstBody,

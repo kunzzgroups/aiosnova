@@ -11,5 +11,8 @@ export type AiTool = {
   agents: string[]; activity: ToolActivity[]; updatedAt: string
   usage?: { sample?: boolean; points: ToolUsagePoint[] }
   previousActions?: { action: string; name: string; changedAt: string; configuration: Record<string, unknown>; usage?: { sample?: boolean; points: ToolUsagePoint[] } }[]
+  agentIds?: string[]
+  version?: number
+  executorType?: string
 }
 export type SaveToolPayload = Pick<AiTool, 'name' | 'description' | 'module' | 'action' | 'risk' | 'timeoutSeconds' | 'requiresConfirmation' | 'configuration'> & { enabled: boolean }

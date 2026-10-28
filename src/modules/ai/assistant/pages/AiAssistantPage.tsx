@@ -59,7 +59,7 @@ import {
   resolveExecutableModel,
   type AssistantModelOption,
 } from '@/modules/ai/settings/services/settingsService'
-import { streamAssistantChat } from '../services/chatStreamService'
+import { requestAssistantReply, toolChatLocalSimulation } from '../services/chatReplyService'
 import { assistantModelMenuIds, availableDefaultModelId } from '../services/assistantModelMenu'
 import { fetchModelPreferences } from '@/modules/ai/settings/services/modelPreferencesService'
 import { getModelVendor, MODEL_VENDORS } from '@/modules/ai/settings/services/modelVendor'
@@ -980,7 +980,7 @@ export function AiAssistantPage() {
         throw new Error('Model configuration changed. Select the model again before sending.')
       }
 
-      const full = await streamAssistantChat(
+      const full = await requestAssistantReply(
         {
           companyId,
           providerId: selectedOption.providerId,
@@ -998,6 +998,7 @@ export function AiAssistantPage() {
             setStreamingText(text)
           },
         },
+        effectiveAgentId ?? undefined,
       )
 
       const turn: AssistantTurn = {
@@ -1008,7 +1009,7 @@ export function AiAssistantPage() {
           lead: full,
           facts: [],
           tail: '',
-          model: selectedModel,
+          model: toolChatLocalSimulation ? 'Simulation (test/model)' : selectedModel,
           cites: evidence.sources.map((_, i) => i + 1),
           trace: {
             scanned: evidence.scanned,

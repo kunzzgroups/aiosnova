@@ -9,6 +9,7 @@ import com.aiosnova.ai.provider.AiProviderRepository;
 import com.aiosnova.ai.tool.AiToolDefinition;
 import com.aiosnova.ai.tool.AiToolHandler;
 import com.aiosnova.ai.tool.AiToolRegistry;
+import com.aiosnova.ai.tool.AiToolRepository;
 import com.aiosnova.ai.tool.builtin.CalculatorTool;
 
 import java.net.http.HttpRequest;
@@ -20,6 +21,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.HashSet;
+import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,39 +44,51 @@ class AiChatToolIntegrationTest {
     private static final String MODEL = "test/model";
     private static final String FAKE_KEY = "fake-integration-key";
 
-    private static final JsonMapper JSON =
-            JsonMapper.builder().build();
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     static final class FakeProviders
             extends AiProviderRepository {
 
+        final Set<String> additionalProviderIds = new HashSet<>();
+
         boolean enabled = true;
         final AiApiKeyCrypto crypto;
         final byte[] ciphertext;
+        final String company;
 
         FakeProviders(AiApiKeyCrypto crypto) {
-            // No DataSource: accidental SQL calls cannot reach a database.
+            this(crypto, COMPANY);
+        }
+
+        FakeProviders(AiApiKeyCrypto crypto, String company) {
             super(new JdbcTemplate());
+
+            this.company = company;
             this.crypto = crypto;
             this.ciphertext = crypto.encrypt(
-                    COMPANY, PROVIDER, FAKE_KEY);
+                    company, PROVIDER, FAKE_KEY);
         }
 
         @Override
         public List<ProviderSummary> findByCompany(String companyId) {
-            if (!COMPANY.equals(companyId)) {
+            if (!company.equals(companyId)) {
                 return List.of();
             }
 
-            return List.of(new ProviderSummary(
-                    PROVIDER,
-                    COMPANY,
-                    "Test Provider",
-                    "openrouter",
-                    "https://openrouter.ai/api/v1",
-                    enabled,
-                    true,
-                    0L));
+            var ids = new ArrayList<String>();
+            ids.add(PROVIDER);
+            ids.addAll(additionalProviderIds);
+            return ids.stream()
+                    .map(id -> new ProviderSummary(
+                            id,
+                            company,
+                            "Test Provider",
+                            "openrouter",
+                            "https://openrouter.ai/api/v1",
+                            enabled,
+                            true,
+                            0L))
+                    .toList();
         }
 
         @Override
@@ -76,18 +96,21 @@ class AiChatToolIntegrationTest {
                 String companyId,
                 String providerId) {
 
-            if (!COMPANY.equals(companyId)
-                    || !PROVIDER.equals(providerId)) {
+            if (!company.equals(companyId)
+                    || (!PROVIDER.equals(providerId)
+                            && !additionalProviderIds.contains(providerId))) {
                 return Optional.empty();
             }
 
             return Optional.of(new ProviderExecutionConfig(
-                    PROVIDER,
-                    COMPANY,
+                    providerId,
+                    company,
                     "openrouter",
                     "https://openrouter.ai/api/v1",
                     enabled,
-                    ciphertext.clone(),
+                    PROVIDER.equals(providerId)
+                            ? ciphertext.clone()
+                            : crypto.encrypt(company, providerId, FAKE_KEY),
                     crypto.keyId()));
         }
     }
@@ -95,11 +118,19 @@ class AiChatToolIntegrationTest {
     static final class FakeModels
             extends AiModelRepository {
 
+        final Map<String, ModelSummary> additionalModels = new HashMap<>();
+
         boolean enabled = true;
         boolean supportsTools = true;
+        final String company;
 
         FakeModels() {
+            this(COMPANY);
+        }
+
+        FakeModels(String company) {
             super(new JdbcTemplate());
+            this.company = company;
         }
 
         @Override
@@ -108,15 +139,22 @@ class AiChatToolIntegrationTest {
                 String providerId,
                 String modelId) {
 
-            if (!COMPANY.equals(companyId)
-                    || !PROVIDER.equals(providerId)
-                    || !MODEL.equals(modelId)) {
+            if (!company.equals(companyId)) {
+                return Optional.empty();
+            }
+
+            var additional = additionalModels.get(providerId + "\n" + modelId);
+            if (additional != null) {
+                return Optional.of(additional);
+            }
+
+            if (!PROVIDER.equals(providerId) || !MODEL.equals(modelId)) {
                 return Optional.empty();
             }
 
             return Optional.of(new ModelSummary(
                     "model-config-test",
-                    COMPANY,
+                    company,
                     PROVIDER,
                     MODEL,
                     "Test Model",
@@ -138,7 +176,8 @@ class AiChatToolIntegrationTest {
             implements AiChatService.ChatTransport {
 
         final List<HttpRequest> requests = new ArrayList<>();
-        Runnable afterFirstResponse = () -> {};
+        Runnable afterFirstResponse = () -> {
+        };
         String firstResponseOverride;
 
         @Override
@@ -160,16 +199,16 @@ class AiChatToolIntegrationTest {
                 return new AiChatService.ChatHttpResult(
                         200,
                         """
-                        {
-                          "choices": [{
-                            "finish_reason": "stop",
-                            "message": {
-                              "role": "assistant",
-                              "content": "The answer is 5."
-                            }
-                          }]
-                        }
-                        """);
+                                {
+                                  "choices": [{
+                                    "finish_reason": "stop",
+                                    "message": {
+                                      "role": "assistant",
+                                      "content": "The answer is 5."
+                                    }
+                                  }]
+                                }
+                                """);
             }
 
             throw new AssertionError(
@@ -180,12 +219,12 @@ class AiChatToolIntegrationTest {
     static final class CountingCalculator
             implements AiToolHandler {
 
-        private final CalculatorTool calculator =
-                new CalculatorTool();
+        private final CalculatorTool calculator = new CalculatorTool();
 
         int executions;
         boolean fail;
-        Runnable afterExecution = () -> {};
+        Runnable afterExecution = () -> {
+        };
 
         @Override
         public AiToolDefinition definition() {
@@ -218,40 +257,117 @@ class AiChatToolIntegrationTest {
     static final class Fixture {
 
         final AiApiKeyCrypto crypto = newCrypto();
-        final FakeProviders providers = new FakeProviders(crypto);
-        final FakeModels models = new FakeModels();
+        final String company;
+        final FakeProviders providers;
+        final FakeModels models;
         final FakeTransport transport = new FakeTransport();
-        final CountingCalculator calculator =
-                new CountingCalculator();
+        final CountingCalculator calculator = new CountingCalculator();
+        boolean supportsTopP = false;
+        java.io.IOException metadataFailure;
+        int metadataRequests;
 
-        final AiToolRegistry registry =
-                new AiToolRegistry(List.of(
-                        new AiToolRegistry.Registration(
-                                "calculator", calculator)));
+        final AiToolRegistry registry = new AiToolRegistry(List.of(
+                new AiToolRegistry.Registration(
+                        "calculator", calculator)));
 
         final AiChatService service;
+        double agentTemperature = 0.7;
+        double agentTopP = 1.0;
+        int agentMaxTokens = 1024;
+        boolean supportsTemperature = true;
+        String boundProvider = PROVIDER;
+        String boundModelConfig = "model-config-test";
 
         Fixture() {
+            this(COMPANY);
+        }
+
+        Fixture(String company) {
+            if (company == null
+                    || !company.matches("[A-Za-z0-9_-]{1,64}")) {
+                throw new IllegalArgumentException("Invalid test company.");
+            }
+
+            this.company = company;
+            this.providers = new FakeProviders(crypto, company);
+            this.models = new FakeModels(company);
+
             // Override catalog lookup: never request real model metadata.
             var catalog = new OpenRouterModelService() {
                 @Override
-                public ModelCapabilities loadCapabilities(
-                        String modelId) {
-                    return new ModelCapabilities(
-                            true, false, true, 32000);
+                public ModelMetadata loadMetadata(String modelId)
+                        throws java.io.IOException {
+
+                    metadataRequests++;
+
+                    if (metadataFailure != null) {
+                        throw metadataFailure;
+                    }
+
+                    return new ModelMetadata(
+                            new ModelCapabilities(true, false, true, 32000),
+                            Fixture.this.supportsTemperature,
+                            Fixture.this.supportsTopP);
+                }
+
+                @Override
+                public ModelCapabilities loadCapabilities(String modelId) {
+                    return new ModelCapabilities(true, false, true, 32000);
                 }
             };
+
+            var bindingRepository = new AiToolRepository(new JdbcTemplate()) {
+                @Override
+                public Optional<AgentExecutionParameters> findAgentExecutionParameters(
+                        String requestedCompany, String requestedMerchant, String requestedAgent) {
+                    if (!company.equals(requestedCompany)
+                            || !"merchant-test".equals(requestedMerchant)) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(new AgentExecutionParameters(
+                            company, requestedMerchant, requestedAgent, "active",
+                            agentTemperature, agentTopP, agentMaxTokens, 0L));
+                }
+
+                @Override
+                public Optional<AgentModelBinding> findAgentModelBinding(
+                        String requestedCompany,
+                        String requestedMerchant,
+                        String requestedAgent) {
+
+                    if (!company.equals(requestedCompany)
+                            || !"merchant-test".equals(requestedMerchant)) {
+                        return Optional.empty();
+                    }
+
+                    // Synthetic model binding only. Tool authorization separately
+                    // checks Agent access; no actual Agent model rows are read here.
+                    return Optional.of(new AgentModelBinding(
+                            company,
+                            requestedMerchant,
+                            requestedAgent,
+                            "active",
+                            boundProvider,
+                            boundModelConfig,
+                            0L));
+                }
+            };
+            var bindingValidator = new AiAgentModelBindingValidator(
+                    bindingRepository, "merchant-test");
 
             service = new AiChatService(
                     providers,
                     crypto,
                     transport,
                     new AiChatMessageValidator(catalog),
-                    new AiModelStateService(models, providers));
+                    new AiModelStateService(models, providers),
+                    bindingValidator,
+                    new AiAgentExecutionParameterValidator(bindingRepository, "merchant-test"),
+                    catalog);
         }
 
         AiChatService.ChatReply run() {
-            return run(COMPANY, PROVIDER);
+            return run(company, PROVIDER);
         }
 
         AiChatService.ChatReply run(
@@ -312,6 +428,110 @@ class AiChatToolIntegrationTest {
 
         assertEquals(expected, error.getStatusCode().value());
         return error;
+    }
+
+    static String readRequestBody(HttpRequest request)
+            throws Exception {
+
+        var subscriber = HttpResponse.BodySubscribers.ofString(
+                StandardCharsets.UTF_8);
+
+        request.bodyPublisher().orElseThrow().subscribe(
+                new Flow.Subscriber<ByteBuffer>() {
+                    @Override
+                    public void onSubscribe(Flow.Subscription subscription) {
+                        subscriber.onSubscribe(subscription);
+                    }
+
+                    @Override
+                    public void onNext(ByteBuffer item) {
+                        subscriber.onNext(List.of(item));
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        subscriber.onError(error);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        subscriber.onComplete();
+                    }
+                });
+
+        return subscriber.getBody().toCompletableFuture()
+                .get(2, TimeUnit.SECONDS);
+    }
+
+    @Test
+    void secondRequestContainsCalculatorResultAndOriginalToolCall()
+            throws Exception {
+
+        var fixture = new Fixture();
+
+        fixture.run();
+
+        assertEquals(2, fixture.transport.requests.size());
+        assertEquals(1, fixture.calculator.executions);
+
+        var first = JSON.readTree(
+                readRequestBody(fixture.transport.requests.get(0)));
+
+        var second = JSON.readTree(
+                readRequestBody(fixture.transport.requests.get(1)));
+
+        assertEquals("auto", first.path("tool_choice").asString());
+        assertEquals("none", second.path("tool_choice").asString());
+
+        var originalMessages = first.path("messages");
+        var messages = second.path("messages");
+
+        // Second request preserves the original conversation,
+        // then appends assistant tool_calls and the tool result.
+        assertEquals(originalMessages.size() + 2, messages.size());
+
+        for (int i = 0; i < originalMessages.size(); i++) {
+            assertEquals(originalMessages.get(i), messages.get(i));
+        }
+
+        var assistant = messages.get(originalMessages.size());
+        var toolMessage = messages.get(originalMessages.size() + 1);
+
+        assertEquals("assistant", assistant.path("role").asString());
+
+        var calls = assistant.path("tool_calls");
+        assertEquals(1, calls.size());
+
+        var call = calls.get(0);
+
+        assertEquals("call_add", call.path("id").asString());
+        assertEquals("function", call.path("type").asString());
+        assertEquals(
+                "calc_run",
+                call.path("function").path("name").asString());
+
+        var arguments = JSON.readTree(
+                call.path("function").path("arguments").asString());
+
+        assertEquals("add", arguments.path("operation").asString());
+        assertEquals(2, arguments.path("a").asInt());
+        assertEquals(3, arguments.path("b").asInt());
+
+        assertEquals("tool", toolMessage.path("role").asString());
+        assertEquals(
+                call.path("id").asString(),
+                toolMessage.path("tool_call_id").asString());
+
+        // Tool content must be a JSON string containing the actual result.
+        assertTrue(toolMessage.path("content").isString());
+
+        var output = JSON.readTree(
+                toolMessage.path("content").asString());
+
+        assertTrue(output.path("ok").asBoolean());
+        assertEquals(
+                5,
+                output.path("output").path("result").asInt());
     }
 
     @Test
@@ -395,8 +615,7 @@ class AiChatToolIntegrationTest {
     void disablingAfterFirstResponsePreventsToolExecution() {
         var f = new Fixture();
 
-        f.transport.afterFirstResponse =
-                () -> f.models.enabled = false;
+        f.transport.afterFirstResponse = () -> f.models.enabled = false;
 
         expectStatus(409, () -> f.run());
 
@@ -408,8 +627,7 @@ class AiChatToolIntegrationTest {
     void disablingAfterToolExecutionPreventsSecondRequest() {
         var f = new Fixture();
 
-        f.calculator.afterExecution =
-                () -> f.models.enabled = false;
+        f.calculator.afterExecution = () -> f.models.enabled = false;
 
         expectStatus(409, () -> f.run());
 
@@ -442,5 +660,24 @@ class AiChatToolIntegrationTest {
         assertEquals("The answer is 5.", f.run().reply());
         assertEquals(2, f.transport.requests.size());
         assertEquals(1, f.calculator.executions);
+    }
+
+    @Test
+    void fixtureSupportsLocalCompanyWithoutRealModel() {
+        var fixture = new Fixture("company-j1");
+
+        var reply = fixture.run();
+
+        assertEquals("The answer is 5.", reply.reply());
+        assertEquals(2, fixture.transport.requests.size());
+        assertEquals(1, fixture.calculator.executions);
+
+        assertTrue(fixture.providers
+                .findByCompany("company-test").isEmpty());
+
+        assertTrue(fixture.models.findByExternalId(
+                "company-test",
+                PROVIDER,
+                MODEL).isEmpty());
     }
 }

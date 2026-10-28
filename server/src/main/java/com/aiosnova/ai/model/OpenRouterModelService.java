@@ -21,32 +21,29 @@ import java.util.Set;
 public class OpenRouterModelService {
 
     private final HttpClient httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(10))
-        .build();
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
     public JsonNode fetchModels()
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
 
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(
-                "https://openrouter.ai/api/v1/models?output_modalities=all"
-            ))
-            .timeout(Duration.ofSeconds(30))
-            .header("Accept", "application/json")
-            .GET()
-            .build();
+                .uri(URI.create(
+                        "https://openrouter.ai/api/v1/models?output_modalities=all"))
+                .timeout(Duration.ofSeconds(30))
+                .header("Accept", "application/json")
+                .GET()
+                .build();
 
         HttpResponse<String> response = httpClient.send(
-            request,
-            HttpResponse.BodyHandlers.ofString()
-        );
+                request,
+                HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
             throw new IOException(
-                "Unable to load the model catalog. HTTP status: " + response.statusCode()
-            );
+                    "Unable to load the model catalog. HTTP status: " + response.statusCode());
         }
 
         JsonNode root = jsonMapper.readTree(response.body());
@@ -60,14 +57,25 @@ public class OpenRouterModelService {
     }
 
     public ModelCapabilities loadCapabilities(String modelId)
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
         return loadMetadata(modelId).capabilities();
     }
 
-    public record ModelMetadata(ModelCapabilities capabilities, boolean supportsTemperature) {}
+    public record ModelMetadata(
+            ModelCapabilities capabilities,
+            boolean supportsTemperature,
+            boolean supportsTopP) {
+
+        public ModelMetadata(
+                ModelCapabilities capabilities,
+                boolean supportsTemperature) {
+
+            this(capabilities, supportsTemperature, false);
+        }
+    }
 
     public ModelMetadata loadMetadata(String modelId)
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
 
         if (modelId == null || modelId.isBlank()) {
             throw new IllegalArgumentException("Enter a model ID.");
@@ -81,23 +89,37 @@ public class OpenRouterModelService {
 
             if (targetId.equals(currentId)) {
                 boolean supportsTemperature = false;
+                boolean supportsTopP = false;
+
                 JsonNode parameters = model.path("supported_parameters");
+
                 if (parameters.isArray()) {
                     for (JsonNode parameter : parameters) {
-                        if ("temperature".equals(parameter.asString(""))) supportsTemperature = true;
+                        String name = parameter.asString("");
+
+                        if ("temperature".equals(name)) {
+                            supportsTemperature = true;
+                        }
+
+                        if ("top_p".equals(name)) {
+                            supportsTopP = true;
+                        }
                     }
                 }
-                return new ModelMetadata(parseCapabilities(model), supportsTemperature);
+
+                return new ModelMetadata(
+                        parseCapabilities(model),
+                        supportsTemperature,
+                        supportsTopP);
             }
         }
 
         throw new IllegalArgumentException(
-            "Model not found in the OpenRouter catalog: " + targetId
-        );
+                "Model not found in the OpenRouter catalog: " + targetId);
     }
 
     private ModelCapabilities parseCapabilities(JsonNode model)
-        throws IOException {
+            throws IOException {
 
         JsonNode architecture = model.path("architecture");
         JsonNode inputs = architecture.path("input_modalities");
@@ -129,15 +151,14 @@ public class OpenRouterModelService {
         }
 
         return new ModelCapabilities(
-            chat,
-            vision,
-            toolCalling,
-            contextWindow
-        );
+                chat,
+                vision,
+                toolCalling,
+                contextWindow);
     }
 
     private boolean containsText(JsonNode array, String expected)
-        throws IOException {
+            throws IOException {
 
         if (!array.isArray()) {
             throw new IOException("Invalid model capability format: expected an array.");
@@ -157,15 +178,15 @@ public class OpenRouterModelService {
     }
 
     public record CatalogModel(
-        String modelId,
-        String name,
-        String description,
-        ModelCapabilities capabilities,
-        String capabilityError
-    ) {}
+            String modelId,
+            String name,
+            String description,
+            ModelCapabilities capabilities,
+            String capabilityError) {
+    }
 
     public List<CatalogModel> loadModelCatalog()
-        throws IOException, InterruptedException {
+            throws IOException, InterruptedException {
 
         JsonNode models = fetchModels();
 
@@ -184,8 +205,7 @@ public class OpenRouterModelService {
             }
 
             String name = model.path("name").asString(modelId);
-            String description =
-                model.path("description").asString("");
+            String description = model.path("description").asString("");
 
             ModelCapabilities capabilities = null;
             String capabilityError = null;
@@ -197,12 +217,11 @@ public class OpenRouterModelService {
             }
 
             result.add(new CatalogModel(
-                modelId,
-                name,
-                description,
-                capabilities,
-                capabilityError
-            ));
+                    modelId,
+                    name,
+                    description,
+                    capabilities,
+                    capabilityError));
         }
 
         return result;

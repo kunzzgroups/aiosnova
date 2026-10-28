@@ -20,7 +20,7 @@ export function ToolActionDialog({ action, companyId, onClose, onDone }: { actio
     setBusy(true); setError(null)
     try {
       if (deleting) await deleteTool(companyId, action.tool.id)
-      else await setToolEnabled(companyId, action.tool.id, !disabling)
+      else await setToolEnabled(companyId, action.tool, !disabling)
       onDone(deleting)
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to update tool.') }
     finally { setBusy(false) }

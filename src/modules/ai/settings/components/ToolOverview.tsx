@@ -25,16 +25,18 @@ function ActivityList({ items }: { items: ToolActivity[] }) {
 export function ToolOverview({ tool, onEdit, onAction, onSaved }: Props) {
   const [agentsOpen, setAgentsOpen] = useState(false)
   const [recentOpen, setRecentOpen] = useState(false)
-  const configurationFields=toolConfigurationFields(tool.action).filter(field=>tool.configuration[field.key]!==undefined)
-  const hasConfiguration=Object.keys(tool.configuration).length>0
-  const typeLabel=TOOL_TYPES.find(type=>type.action===tool.action)?.label??'Custom tool'
+  const configurationFields = toolConfigurationFields(tool.action).filter(field => tool.configuration[field.key] !== undefined)
+  const hasConfiguration = Object.keys(tool.configuration).length > 0
+  const typeLabel = TOOL_TYPES.find(type => type.action === tool.action)?.label ?? 'Custom tool'
   return <>
     <header className="ai-tool-identity">
       <Link to="/ai/ai/ai-settings/tools" className="ai-tool-back"><IconArrowLeft /><span>Tools</span></Link>
       <span className="ai-tool-identity-icon" aria-hidden="true"><IconSpark /></span>
       <div className="ai-tool-identity-copy">
         <div className="ai-tool-name"><h2 title={tool.name}>{tool.name}</h2><Popover label={`Information about ${tool.name}`} trigger={<IconInfo />}>
-          <dl className="ai-tool-information"><div><dt>Module</dt><dd>{tool.module}</dd></div><div><dt>Action</dt><dd><code>{tool.action}</code></dd></div><div><dt>Risk</dt><dd><ToolRisk risk={tool.risk} /></dd></div><div><dt>Updated</dt><dd>{new Date(tool.updatedAt).toLocaleString()}</dd></div></dl>
+          <dl className="ai-tool-information"><div><dt>Module</dt><dd>{tool.module}</dd></div><div><dt>Action</dt><dd><code>{tool.action}</code></dd></div><div><dt>Risk</dt><dd><ToolRisk risk={tool.risk} /></dd></div><div><dt>Updated</dt><dd>{tool.updatedAt && Number.isFinite(Date.parse(tool.updatedAt))
+            ? new Date(tool.updatedAt).toLocaleString()
+            : '—'}</dd></div></dl>
         </Popover></div>
         <div className="ai-tool-identity-meta"><span>{tool.module}</span><span aria-hidden="true">·</span><code>{tool.action}</code><ToolRisk risk={tool.risk} /></div>
       </div>
@@ -46,8 +48,8 @@ export function ToolOverview({ tool, onEdit, onAction, onSaved }: Props) {
           <header className="ai-tool-card-header"><h2>Configuration</h2></header>
           <div className="ai-tool-card-body">
             <dl className="ai-tool-config-summary"><div><dt>Timeout</dt><dd>{tool.timeoutSeconds} seconds</dd></div><div><dt>Confirmation</dt><dd>{tool.requiresConfirmation ? 'Required' : 'Not required'}</dd></div></dl>
-            {configurationFields.length?<><div className="ai-tool-advanced-heading"><h3>{typeLabel} settings</h3></div><dl className="ai-tool-parameters">{configurationFields.map(field=><div key={field.key}><dt>{field.label}</dt><dd>{displayConfigurationValue(field,tool.configuration[field.key])}</dd></div>)}</dl></>:null}
-            {hasConfiguration?<details className="ai-tool-json-details"><summary>Advanced JSON</summary><pre className="ai-tool-json-preview">{JSON.stringify(tool.configuration,null,2)}</pre></details>:null}
+            {configurationFields.length ? <><div className="ai-tool-advanced-heading"><h3>{typeLabel} settings</h3></div><dl className="ai-tool-parameters">{configurationFields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{displayConfigurationValue(field, tool.configuration[field.key])}</dd></div>)}</dl></> : null}
+            {hasConfiguration ? <details className="ai-tool-json-details"><summary>Advanced JSON</summary><pre className="ai-tool-json-preview">{JSON.stringify(tool.configuration, null, 2)}</pre></details> : null}
             {tool.status === 'error' ? <p role="status" className="ai-settings-tool-error">This tool has an error. Review its configuration; saving alone does not confirm recovery.</p> : null}
           </div>
         </section>

@@ -35,48 +35,49 @@ import com.aiosnova.ai.knowledge.AiKnowledgeController;
 import com.aiosnova.ai.agent.AiAgentService;
 import com.aiosnova.ai.agent.AiAgentController;
 import com.aiosnova.ai.tool.AiToolManagementConfiguration;
+import com.aiosnova.ai.chat.AiToolChatConfiguration;
 
 @Configuration
 @EnableAutoConfiguration
 @Import({
-    AiConnectionController.class,
-    AiConnectionService.class,
-    AiModelController.class,
-    OpenRouterModelService.class,
-    AiProviderRepository.class,
-    AiProviderController.class,
-    AiApiKeyCrypto.class,
-    AiProviderService.class,
-    AiProviderVerificationService.class,
-    AiChatService.class,
-    AiChatController.class,
-    AiChatMessageValidator.class,
-    AiModelRepository.class,
-    AiModelConfigController.class,
-    AiModelSyncService.class,
-    AiModelStateService.class,
-    AiModelPreferencesService.class,
-    AiModelPreferencesController.class,
-    AiAgentRepository.class,
-    AiMigrationToolsConfiguration.class,
-    AiAgentWriteService.class,
-    AiKnowledgeAccess.class,
-    AiKnowledgeRepository.class,
-    AiKnowledgeService.class,
-    AiKnowledgeController.class,
-    AiAgentService.class,
-    AiAgentController.class,
-    AiToolManagementConfiguration.class,
+        AiConnectionController.class,
+        AiConnectionService.class,
+        AiModelController.class,
+        OpenRouterModelService.class,
+        AiProviderRepository.class,
+        AiProviderController.class,
+        AiApiKeyCrypto.class,
+        AiProviderService.class,
+        AiProviderVerificationService.class,
+        AiChatService.class,
+        AiChatController.class,
+        AiChatMessageValidator.class,
+        AiModelRepository.class,
+        AiModelConfigController.class,
+        AiModelSyncService.class,
+        AiModelStateService.class,
+        AiModelPreferencesService.class,
+        AiModelPreferencesController.class,
+        AiAgentRepository.class,
+        AiMigrationToolsConfiguration.class,
+        AiAgentWriteService.class,
+        AiKnowledgeAccess.class,
+        AiKnowledgeRepository.class,
+        AiKnowledgeService.class,
+        AiKnowledgeController.class,
+        AiAgentService.class,
+        AiAgentController.class,
+        AiToolManagementConfiguration.class,
+        AiToolManagementConfiguration.class,
+        AiToolChatConfiguration.class,
 })
 public class AiStandaloneApplication {
 
     public static void main(String[] args) {
-        SpringApplication app =
-            new SpringApplication(AiStandaloneApplication.class);
+        SpringApplication app = new SpringApplication(AiStandaloneApplication.class);
 
         app.setDefaultProperties(Map.of(
-            "spring.config.name", "application-ai-standalone"
-        ));
+                "spring.config.name", "application-ai-standalone"));
 
         app.run(args);
     }

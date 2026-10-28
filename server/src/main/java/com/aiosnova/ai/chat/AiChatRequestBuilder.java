@@ -123,15 +123,50 @@ final class AiChatRequestBuilder {
                         AiToolRegistry registry,
                         String toolChoice) {
 
+                return buildParameterizedRequest(modelId, messages, apiKey, registry, toolChoice,
+                                new AiToolRequestParameters(temperature, null, 2048));
+        }
+
+        HttpRequest buildForToolSelectionWithParameters(
+                        String modelId, List<Map<String, Object>> messages,
+                        AiToolRequestParameters parameters, String apiKey, AiToolRegistry registry) {
+                requireRegistry(registry);
+                return buildParameterizedRequest(modelId, messages, apiKey, registry, "auto", parameters);
+        }
+
+        HttpRequest buildAfterToolExecutionWithParameters(
+                        String modelId, List<Map<String, Object>> originalMessages,
+                        AiToolRequestParameters parameters, String apiKey, AiToolRegistry registry,
+                        String firstResponseBody, List<AiToolCallExecutor.Result> results) {
+                requireRegistry(registry);
+                var messages = followUpMessages.assemble(originalMessages, firstResponseBody, results);
+                return buildParameterizedRequest(modelId, messages, apiKey, registry, "none", parameters);
+        }
+
+        private void requireRegistry(AiToolRegistry registry) {
+                if (registry == null || registry.definitions().isEmpty()) {
+                        throw new IllegalArgumentException("A non-empty tool registry is required.");
+                }
+        }
+
+        private HttpRequest buildParameterizedRequest(
+                        String modelId, List<Map<String, Object>> messages, String apiKey,
+                        AiToolRegistry registry, String toolChoice, AiToolRequestParameters parameters) {
+                if (parameters == null) {
+                        throw new IllegalArgumentException("Request parameters are required.");
+                }
                 var body = new HashMap<String, Object>();
 
                 body.put("model", modelId);
                 body.put("messages", messages);
                 body.put("stream", false);
-                body.put("max_tokens", 2048);
+                body.put("max_tokens", parameters.maxTokens());
 
-                if (temperature != null) {
-                        body.put("temperature", temperature);
+                if (parameters.temperature() != null) {
+                        body.put("temperature", parameters.temperature());
+                }
+                if (parameters.topP() != null) {
+                        body.put("top_p", parameters.topP());
                 }
 
                 if (registry != null) {
