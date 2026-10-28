@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/stores/authStore'
 import type { AuthUser } from '@/modules/core/auth/types/auth'
+import { ensureMocking, mockingEnabled } from '@/mocks/runtime'
 
 export class ApiError extends Error {
   readonly status: number | undefined
@@ -82,6 +83,8 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  await ensureMocking()
+  options.signal?.throwIfAborted()
   const { method = 'GET', body, auth = false, csrf = false, skipRefresh = false, cache, signal } = options
   const headers = new Headers()
 
@@ -103,14 +106,23 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
-  const response = await fetch(path, {
+  const requestInit: RequestInit = {
     method,
     cache,
     signal,
     credentials: 'include',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  }
+  let response = await fetch(path, requestInit)
+
+  // A suspended worker loses its active-client set. These GET routes belong to
+  // the MSW adapter, so re-enable it and retry the read once if it leaked through.
+  if (mockingEnabled && method === 'GET' && response.status === 404 && /^\/api\/identity\/users(?:\/[^/?]+)?(?:\?|$)/.test(path)) {
+    await ensureMocking(true)
+    signal?.throwIfAborted()
+    response = await fetch(path, requestInit)
+  }
 
   signal?.throwIfAborted()
 

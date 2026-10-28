@@ -246,7 +246,7 @@ export const identityHandlers = [
     await loadSavedDirectory()
     return HttpResponse.json({ items: identityCompanies.filter(company => canAccessCompany(request, company.id)).map(withMemberCount) })
   }),
-  http.post('/api/mock/invitations/:token/activate', async ({ request }) => {
+  http.post('/api/auth/invitations/:token/activate', async ({ request }) => {
     const response = await fetch(bypass(request))
     const result = await response.json()
     if (!response.ok) return HttpResponse.json(result, { status: response.status })
