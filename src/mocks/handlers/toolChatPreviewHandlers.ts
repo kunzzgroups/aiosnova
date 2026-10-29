@@ -18,18 +18,22 @@ export const toolChatLocalSimulationHandlers = [
   )
 }))
 
+function previewAccess(request: Request): Response | undefined {
+  if (!import.meta.env.DEV || import.meta.env.VITE_AI_TOOL_CHAT_PREVIEW !== 'true') {
+    return HttpResponse.json({ message: 'Tool chat preview is disabled.' }, { status: 503 })
+  }
+  if (!/^Bearer \S+$/.test(request.headers.get('Authorization') ?? '')) {
+    return HttpResponse.json({ message: 'Preview authentication is required.' }, { status: 401 })
+  }
+  if (!request.headers.get('X-AI-Tool-Request-Id')?.trim()) {
+    return HttpResponse.json({ message: 'Tool chat request ID is required.' }, { status: 400 })
+  }
+}
+
 export const toolChatPreviewHandlers = [
   http.post('/api/ai/chat/messages/tools', async ({ request }) => {
-    // Never pass this preview endpoint through to Java.
-    if (
-      !import.meta.env.DEV ||
-      import.meta.env.VITE_AI_TOOL_CHAT_PREVIEW !== 'true'
-    ) {
-      return HttpResponse.json(
-        { message: 'Tool chat preview is disabled.' },
-        { status: 503 },
-      )
-    }
+    const rejected = previewAccess(request)
+    if (rejected) return rejected
 
     let payload: unknown
     try {
@@ -100,5 +104,22 @@ export const toolChatPreviewHandlers = [
       modelId: body.modelId,
       reply: '[Preview] The answer is 5.',
     })
+  }),
+  http.post('/api/ai/chat/messages/tools/cancel', async ({ request }) => {
+    const rejected = previewAccess(request)
+    if (rejected) return rejected
+    let payload: unknown
+    try { payload = await request.json() } catch {
+      return HttpResponse.json({ message: 'Invalid cancellation JSON.' }, { status: 400 })
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return HttpResponse.json({ message: 'Invalid cancellation request.' }, { status: 400 })
+    }
+    const body = payload as Record<string, unknown>
+    if (body.companyId !== 'company-j1' ||
+        body.agentId !== '4115e177-5d14-4b54-b6c5-7105609f3166') {
+      return HttpResponse.json({ message: 'Preview Agent or company is not allowed.' }, { status: 403 })
+    }
+    return HttpResponse.json({ message: 'Preview cancellation requested.' }, { status: 202 })
   }),
 ]

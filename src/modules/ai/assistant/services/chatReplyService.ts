@@ -2,6 +2,7 @@ import {
   streamAssistantChat,
   type ChatStreamInput,
 } from './chatStreamService'
+import { sendToolChat, cancelToolChat } from './toolChatService'
 
 export const toolChatPreview =
   import.meta.env.DEV &&
@@ -61,6 +62,26 @@ export async function requestAssistantReply(
   options.signal.throwIfAborted()
   if (toolChatPreview && toolChatLocalSimulation) {
     throw new Error('Enable only one tool chat simulation mode.')
+  }
+
+  if (toolChatPreview) {
+    if (!agentId) throw new Error('Select an Agent for tool chat.')
+    const requestId = crypto.randomUUID()
+    const onAbort = () => {
+      void cancelToolChat(input.companyId, agentId, requestId).catch(() => {
+        console.warn('Could not confirm tool chat cancellation.')
+      })
+    }
+    options.signal.addEventListener('abort', onAbort, { once: true })
+    try {
+      options.signal.throwIfAborted()
+      const reply = await sendToolChat(input, agentId, requestId, options.signal)
+      options.signal.throwIfAborted()
+      options.onText(reply)
+      return reply
+    } finally {
+      options.signal.removeEventListener('abort', onAbort)
+    }
   }
 
   if (!toolChatPreview && !toolChatLocalSimulation) {

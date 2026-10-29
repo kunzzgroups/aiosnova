@@ -24,6 +24,8 @@ type StoredTool = {
   configuration: Record<string, unknown>
   version: number
   agentIds: string[]
+  executionSupport?: string
+  executionSupportReason?: string
 }
 
 function requireCompany(companyId: string) {
@@ -92,6 +94,13 @@ function toTool(
     module: row.module,
     action: row.action,
     executorType: row.executorType,
+    executionSupport:
+      row.executionSupport === 'supported' ||
+      row.executionSupport === 'not_implemented' ||
+      row.executionSupport === 'unsupported_configuration'
+        ? row.executionSupport : undefined,
+    executionSupportReason: typeof row.executionSupportReason === 'string'
+      ? row.executionSupportReason : undefined,
     risk: row.risk,
     status: row.status,
     timeoutSeconds: row.timeoutSeconds,

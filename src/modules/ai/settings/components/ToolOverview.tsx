@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
@@ -23,6 +24,8 @@ function ActivityList({ items }: { items: ToolActivity[] }) {
 }
 
 export function ToolOverview({ tool, onEdit, onAction, onSaved }: Props) {
+  const { t } = useTranslation()
+  const support = tool.executionSupport ?? 'unknown'
   const [agentsOpen, setAgentsOpen] = useState(false)
   const [recentOpen, setRecentOpen] = useState(false)
   const configurationFields = toolConfigurationFields(tool.action).filter(field => tool.configuration[field.key] !== undefined)
@@ -47,7 +50,8 @@ export function ToolOverview({ tool, onEdit, onAction, onSaved }: Props) {
         <section className="console-panel ai-tool-config-card">
           <header className="ai-tool-card-header"><h2>Configuration</h2></header>
           <div className="ai-tool-card-body">
-            <dl className="ai-tool-config-summary"><div><dt>Timeout</dt><dd>{tool.timeoutSeconds} seconds</dd></div><div><dt>Confirmation</dt><dd>{tool.requiresConfirmation ? 'Required' : 'Not required'}</dd></div></dl>
+            <dl className="ai-tool-config-summary"><div><dt>Timeout</dt><dd>{tool.timeoutSeconds} seconds</dd></div><div><dt>Confirmation</dt><dd>{tool.requiresConfirmation ? 'Required' : 'Not required'}</dd></div><div><dt>{t('ai.tools.executionSupport.label')}</dt><dd>{t(`ai.tools.executionSupport.${support}`)}</dd></div></dl>
+            <p className="console-table__muted">{t(`ai.tools.executionSupport.${support}Description`)}</p>
             {configurationFields.length ? <><div className="ai-tool-advanced-heading"><h3>{typeLabel} settings</h3></div><dl className="ai-tool-parameters">{configurationFields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{displayConfigurationValue(field, tool.configuration[field.key])}</dd></div>)}</dl></> : null}
             {hasConfiguration ? <details className="ai-tool-json-details"><summary>Advanced JSON</summary><pre className="ai-tool-json-preview">{JSON.stringify(tool.configuration, null, 2)}</pre></details> : null}
             {tool.status === 'error' ? <p role="status" className="ai-settings-tool-error">This tool has an error. Review its configuration; saving alone does not confirm recovery.</p> : null}

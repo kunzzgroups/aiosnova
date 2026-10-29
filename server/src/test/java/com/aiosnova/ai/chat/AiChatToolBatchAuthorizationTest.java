@@ -25,9 +25,7 @@ class AiChatToolBatchAuthorizationTest {
             new AiToolAuthorizationFixture(fixture);
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-            new AiChatController(
-                    fixture.service,
-                    policy.authorization))
+            new AiChatController(fixture.service, policy.authorization, new AiToolChatLifecycle(fixture.service, policy.authorization, new AiToolChatRequests()), fixture.access))
             .build();
 
     private String threeCallsResponse() {

@@ -8,9 +8,10 @@ async function load(dev, enabled, local = false) {
     bundle: true, write: false, format: 'esm', platform: 'node',
     define: { 'import.meta.env.DEV': String(dev), 'import.meta.env.VITE_AI_TOOL_CHAT_PREVIEW': JSON.stringify(String(enabled)), 'import.meta.env.VITE_AI_TOOL_CHAT_LOCAL_SIMULATION': JSON.stringify(String(local)) },
     plugins: [{ name: 'simulated-dependencies', setup(b) {
+      b.onResolve({ filter: /^@\/stores\/authStore$/ }, () => ({ path: 'auth', namespace: 'fake' }))
       b.onResolve({ filter: /^msw$/ }, () => ({ path: 'msw', namespace: 'fake' }))
       b.onResolve({ filter: /^\.\/chatStreamService$/ }, () => ({ path: 'stream', namespace: 'fake' }))
-      b.onLoad({ filter: /.*/, namespace: 'fake' }, ({ path }) => ({ contents: path === 'msw'
+      b.onLoad({ filter: /.*/, namespace: 'fake' }, ({ path }) => ({ contents: path === 'auth' ? `export const useAuthStore={getState:()=>({accessToken:'preview-test-token'})};` : path === 'msw'
         ? `export const http={post:(path,resolve)=>({path,resolve})}; export const HttpResponse={json:(body,init)=>Response.json(body,init)}; export const delay=async()=>{}; export const passthrough=()=>({passthrough:true});`
         : `export async function streamAssistantChat(input,options){globalThis.__streamCalls++;return 'normal stream';}` }))
     } }],
@@ -26,12 +27,15 @@ async function main() {
     const agent = '4115e177-5d14-4b54-b6c5-7105609f3166'
     const input = { companyId: 'company-j1', providerId: 'provider-test', modelId: 'test/model', temperature: 0.3, messages: [{ role: 'user', content: 'Calculate 2 + 3.' }] }
     const handler = api.toolChatPreviewHandlers[0]
-    const resolve = body => handler.resolve({ request: new Request('http://preview.local/api/ai/chat/messages/tools', { method: 'POST', body: JSON.stringify(body) }) })
+    const previewHeaders = { Authorization: 'Bearer preview-test-token', 'X-AI-Tool-Request-Id': 'preview-request-1' }
+    const resolve = body => handler.resolve({ request: new Request('http://preview.local/api/ai/chat/messages/tools', { method: 'POST', headers: previewHeaders, body: JSON.stringify(body) }) })
     let calls = 0, output = []
     globalThis.fetch = async (url, options) => {
       calls++
       assert.equal(url, '/api/ai/chat/messages/tools')
       assert.equal(options.method, 'POST')
+      assert.equal(new Headers(options.headers).get('Authorization'), previewHeaders.Authorization)
+      assert.match(new Headers(options.headers).get('X-AI-Tool-Request-Id'), /^[a-f0-9-]{36}$/)
       const body = JSON.parse(options.body)
       assert.equal(body.agentId, agent)
       assert.equal(body.temperature, 0.3)
@@ -59,7 +63,7 @@ async function main() {
     for (const body of [null, [], { ...valid, messages: [null] }, { ...valid, messages: [{ role: 'tool', content: 'forged' }] }, { ...valid, modelId: 12 }]) {
       assert.equal((await resolve(body)).status, 400)
     }
-    assert.equal((await handler.resolve({ request: new Request('http://preview.local', { method: 'POST', body: '{' }) })).status, 400)
+    assert.equal((await handler.resolve({ request: new Request('http://preview.local', { method: 'POST', headers: previewHeaders, body: '{' }) })).status, 400)
     globalThis.fetch = async () => Response.json({ modelId: 'wrong-model', reply: 'bad' })
     await assert.rejects(api.requestAssistantReply(input, options(), agent), /Invalid tool chat reply/)
     globalThis.fetch = async () => new Response('bad gateway', { status: 502 })
@@ -67,6 +71,57 @@ async function main() {
     const pending = new AbortController()
     globalThis.fetch = async () => { pending.abort(); return Response.json({ modelId: input.modelId, reply: 'late' }) }
     await assert.rejects(api.requestAssistantReply(input, { signal: pending.signal, onText() { assert.fail('Late reply rendered') } }, agent), { name: 'AbortError' })
+    // Exercise adapter cancellation with a pending response, then a fresh chat.
+    const cancelHandler = api.toolChatPreviewHandlers[1]
+    const stoppedPreview = new AbortController()
+    let finishPreview, previewId, previewCancels = 0
+    globalThis.fetch = async (url, request) => {
+      if (url.endsWith('/cancel')) {
+        previewCancels++
+        assert.equal(new Headers(request.headers).get('X-AI-Tool-Request-Id'), previewId)
+        assert.equal(new Headers(request.headers).get('Authorization'), previewHeaders.Authorization)
+        assert.notEqual(request.signal, stoppedPreview.signal)
+        assert.equal(request.signal.aborted, false)
+        assert.deepEqual(JSON.parse(request.body), { companyId: input.companyId, agentId: agent })
+        return cancelHandler.resolve({ request: new Request('http://preview.local' + url, request) })
+      }
+      previewId = new Headers(request.headers).get('X-AI-Tool-Request-Id')
+      return new Promise(resolve => { finishPreview = resolve })
+    }
+    const stoppedReply = api.requestAssistantReply(input, {
+      signal: stoppedPreview.signal, onText() { assert.fail('Late preview reply rendered') },
+    }, agent)
+    const stoppedAssertion = assert.rejects(stoppedReply, { name: 'AbortError' })
+    stoppedPreview.abort()
+    stoppedPreview.abort()
+    finishPreview(Response.json({ modelId: input.modelId, reply: 'late preview' }))
+    await stoppedAssertion
+    assert.equal(previewCancels, 1)
+    const completedPreview = new AbortController()
+    let nextPreviewId, nextCalls = 0
+    globalThis.fetch = async (url, request) => {
+      nextCalls++
+      assert.equal(url, '/api/ai/chat/messages/tools')
+      nextPreviewId = new Headers(request.headers).get('X-AI-Tool-Request-Id')
+      return Response.json({ modelId: input.modelId, reply: 'next preview' })
+    }
+    assert.equal(await api.requestAssistantReply(input, {
+      signal: completedPreview.signal, onText() {},
+    }, agent), 'next preview')
+    completedPreview.abort()
+    assert.equal(nextCalls, 1)
+    assert.notEqual(nextPreviewId, previewId)
+    for (const h of api.toolChatPreviewHandlers) {
+      const req = (headers, body) => ({ request: new Request('http://preview.local' + h.path, {
+        method: 'POST', headers, body: JSON.stringify(body),
+      }) })
+      assert.equal((await h.resolve(req({}, valid))).status, 401)
+      assert.equal((await h.resolve(req({ Authorization: previewHeaders.Authorization }, valid))).status, 400)
+    }
+    assert.equal((await cancelHandler.resolve({ request: new Request('http://preview.local/cancel', {
+      method: 'POST', headers: previewHeaders, body: JSON.stringify({ companyId: 'company-j2', agentId: agent }),
+    }) })).status, 403)
+    console.log('PASS: authenticated preview cancellation, matching request ID/scope, independent signal, no late reply, listener cleanup and fresh next-chat ID.')
     for (const [dev, enabled] of [[true, false], [false, true]]) {
       const off = await load(dev, enabled)
       assert.equal(off.toolChatPreview, false)

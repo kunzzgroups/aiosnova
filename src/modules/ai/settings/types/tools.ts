@@ -14,5 +14,11 @@ export type AiTool = {
   agentIds?: string[]
   version?: number
   executorType?: string
+  executionSupport?: ToolExecutionSupport
+  executionSupportReason?: string
 }
 export type SaveToolPayload = Pick<AiTool, 'name' | 'description' | 'module' | 'action' | 'risk' | 'timeoutSeconds' | 'requiresConfirmation' | 'configuration'> & { enabled: boolean }
+export type ToolExecutionSupport =
+  | 'supported'
+  | 'not_implemented'
+  | 'unsupported_configuration'

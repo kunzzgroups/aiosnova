@@ -32,6 +32,7 @@ import java.util.HashMap;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -271,6 +272,7 @@ class AiChatToolIntegrationTest {
                         "calculator", calculator)));
 
         final AiChatService service;
+        final AiToolChatAccess access;
         double agentTemperature = 0.7;
         double agentTopP = 1.0;
         int agentMaxTokens = 1024;
@@ -289,6 +291,15 @@ class AiChatToolIntegrationTest {
             }
 
             this.company = company;
+            this.access = (httpRequest, requestedCompany) -> {
+                if (!company.equals(requestedCompany)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.FORBIDDEN, "Company access denied.");
+                }
+                return new AiToolChatOwner(
+                        "company-j1".equals(company) ? "merchant-acme" : "merchant-test",
+                        "user-test");
+            };
             this.providers = new FakeProviders(crypto, company);
             this.models = new FakeModels(company);
 

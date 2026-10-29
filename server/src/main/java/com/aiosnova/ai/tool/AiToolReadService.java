@@ -24,7 +24,9 @@ public class AiToolReadService {
             boolean requiresConfirmation,
             JsonNode configuration,
             long version,
-            List<String> agentIds) {
+            List<String> agentIds,
+            String executionSupport,
+            String executionSupportReason) {
 
         public ToolDetail {
             agentIds = List.copyOf(agentIds);
@@ -111,6 +113,7 @@ public class AiToolReadService {
                     "Stored tool configuration is invalid.");
         }
 
+        var support = AiToolExecutionSupport.inspect(tool);
         return new ToolDetail(
                 tool.id(),
                 tool.companyId(),
@@ -126,6 +129,8 @@ public class AiToolReadService {
                 configuration,
                 tool.version(),
                 repository.findBoundAgentIds(
-                        companyId, tool.id()));
+                        companyId, tool.id()),
+                support.state(),
+                support.reason());
     }
 }

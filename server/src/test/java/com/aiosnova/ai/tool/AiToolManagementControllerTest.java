@@ -20,6 +20,9 @@ class AiToolManagementControllerTest {
     private static final class FakeRepository extends AiToolRepository {
 
         boolean empty;
+        String status = "active";
+        String executorType = "calculator";
+        String configuration = "{}";
 
         FakeRepository() {
             super(new JdbcTemplate());
@@ -48,12 +51,12 @@ class AiToolManagementControllerTest {
                     "Test calculator",
                     "Utility",
                     "calc.run",
-                    "calculator",
+                    executorType,
                     "low",
-                    "active",
+                    status,
                     30,
                     false,
-                    "{}",
+                    configuration,
                     3L));
         }
 
@@ -97,6 +100,8 @@ class AiToolManagementControllerTest {
         assertEquals(1, items.size());
         assertEquals("tool-test", items.get(0).path("id").asString());
         assertEquals(3, items.get(0).path("version").asInt());
+        assertEquals("supported", items.get(0).path("executionSupport").asString());
+        assertFalse(items.get(0).path("executionSupportReason").asString().isBlank());
         assertTrue(items.get(0).path("configuration").isObject());
         assertEquals(
                 "agent-test",
@@ -113,6 +118,44 @@ class AiToolManagementControllerTest {
         assertEquals(200, result.getResponse().getStatus());
         assertEquals("Calculator", body(result).path("name").asString());
         assertEquals("active", body(result).path("status").asString());
+        assertEquals("supported", body(result).path("executionSupport").asString());
+    }
+
+    @Test
+    void disabledToolStillReportsExecutionSupport() throws Exception {
+        repository.status = "disabled";
+        var result = mvc.perform(get("/api/ai/tools/tool-test")
+                .param("companyId", "company-test")).andReturn();
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals("disabled", body(result).path("status").asString());
+        assertEquals("supported", body(result).path("executionSupport").asString());
+        var source = new AiToolDatabaseSource(repository, "merchant-test");
+        assertFalse(source.findTools("company-test").getFirst().enabled());
+    }
+
+    @Test
+    void activeUnknownExecutorDoesNotReportSupported() throws Exception {
+        repository.executorType = "unknown_executor";
+        var result = mvc.perform(get("/api/ai/tools/tool-test")
+                .param("companyId", "company-test")).andReturn();
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals("active", body(result).path("status").asString());
+        assertEquals("not_implemented", body(result).path("executionSupport").asString());
+        assertFalse(new AiToolDatabaseSource(repository, "merchant-test")
+                .findTools("company-test").getFirst().enabled());
+    }
+
+    @Test
+    void unsupportedConfigurationIsReportedAndDenied() throws Exception {
+        repository.configuration = "{\"unexpected\":true}";
+        var result = mvc.perform(get("/api/ai/tools/tool-test")
+                .param("companyId", "company-test")).andReturn();
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals("unsupported_configuration",
+                body(result).path("executionSupport").asString());
+        assertFalse(body(result).path("executionSupportReason").asString().isBlank());
+        assertFalse(new AiToolDatabaseSource(repository, "merchant-test")
+                .findTools("company-test").getFirst().enabled());
     }
 
     @Test

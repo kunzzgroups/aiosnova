@@ -54,9 +54,7 @@ final class AiToolConversationService {
     AiToolConversationService(
             AiChatService.ChatTransport transport,
             AiToolRegistry registry) {
-
-        this(transport, registry, () -> {
-        });
+        this(transport, registry, () -> {});
     }
 
     AiToolConversationService(
@@ -64,17 +62,40 @@ final class AiToolConversationService {
             AiToolRegistry registry,
             Runnable executionGuard) {
 
+        this(
+                transport,
+                registry,
+                executionGuard,
+                new AiToolChatCancellation());
+    }
+
+    AiToolConversationService(
+            AiChatService.ChatTransport transport,
+            AiToolRegistry registry,
+            Runnable executionGuard,
+            AiToolChatCancellation cancellation) {
+
         if (transport == null
                 || registry == null
-                || executionGuard == null) {
+                || executionGuard == null
+                || cancellation == null) {
+
             throw new IllegalArgumentException(
-                    "Transport, registry and execution guard are required.");
+                    "Transport, registry, execution guard "
+                            + "and cancellation are required.");
         }
 
         this.transport = transport;
         this.registry = registry;
         this.executor = new AiToolCallExecutor(registry);
-        this.executionGuard = executionGuard;
+
+        this.executionGuard = () -> {
+            cancellation.check();
+
+            executionGuard.run();
+
+            cancellation.check();
+        };
     }
 
     String chat(
@@ -199,6 +220,7 @@ final class AiToolConversationService {
         executionGuard.run();
 
         var response = transport.send(request);
+        executionGuard.run();
 
         if (response == null || response.statusCode() != 200) {
             throw new Failure(

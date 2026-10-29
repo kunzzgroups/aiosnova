@@ -4,6 +4,10 @@ const { build } = require('esbuild')
 async function main() {
   const result = await build({ stdin: { contents: "export * from './src/modules/ai/agents/services/agentService.ts'", resolveDir: process.cwd() },
     bundle: true, format: 'esm', platform: 'node', write: false, alias: { '@': require('node:path').resolve('src') },
+    plugins: [{name:'offline-runtime',setup(b) {
+      b.onResolve({filter:/mocks\/runtime(?:\.ts)?$/},()=>({path:'runtime',namespace:'offline'}))
+      b.onLoad({filter:/.*/,namespace:'offline'},()=>({contents:'export const mockingEnabled=false; export const ensureMocking=async()=>{};'}))
+    }}],
   })
   const url = 'data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64')
   const api = await import(url)
@@ -47,4 +51,4 @@ async function main() {
   await assert.rejects(api.fetchAgents(created.companyId), /Backend unavailable/)
   console.log('PASS: Agent Java routes, server IDs, cache-free reload, model/versions, no KB overwrite, 409 errors and no Mock fallback.')
 }
-main().catch(error => { console.error(error); process.exitCode = 1 })
+main().catch(error => { console.error(error.message); process.exitCode = 1 })

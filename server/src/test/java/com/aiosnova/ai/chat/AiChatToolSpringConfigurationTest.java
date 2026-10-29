@@ -73,9 +73,10 @@ class AiChatToolSpringConfigurationTest {
         @Bean
         AiChatController controller(
                 AiChatService service,
-                AiToolAuthorizationService authorization) {
+                AiToolAuthorizationService authorization,
+                AiChatToolIntegrationTest.Fixture fixture) {
 
-            return new AiChatController(service, authorization);
+            return new AiChatController(service, authorization, new AiToolChatLifecycle(service, authorization, new AiToolChatRequests()), fixture.access);
         }
     }
 

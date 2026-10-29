@@ -67,9 +67,7 @@ class AiAutoAgentToolControllerTest {
         var policy = new AiToolAuthorizationFixture(fixture);
 
         var mvc = MockMvcBuilders.standaloneSetup(
-                new AiChatController(
-                        fixture.service,
-                        policy.authorization))
+                new AiChatController(fixture.service, policy.authorization, new AiToolChatLifecycle(fixture.service, policy.authorization, new AiToolChatRequests()), fixture.access))
                 .build();
 
         var body = json.writeValueAsString(Map.of(

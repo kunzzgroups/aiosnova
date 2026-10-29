@@ -40,9 +40,7 @@ class AiChatToolDatabaseControllerTest {
                         fixture.calculator)));
 
         return MockMvcBuilders.standaloneSetup(
-                new AiChatController(
-                        fixture.service,
-                        authorization))
+                new AiChatController(fixture.service, authorization, new AiToolChatLifecycle(fixture.service, authorization, new AiToolChatRequests()), fixture.access))
                 .build();
     }
 

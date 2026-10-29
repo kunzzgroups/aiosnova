@@ -4,14 +4,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import tools.jackson.databind.json.JsonMapper;
+
 
 public final class AiToolDatabaseSource
         implements AiToolAuthorizationService.Source {
 
     private final AiToolRepository repository;
     private final String merchantId;
-    private final JsonMapper json = JsonMapper.builder().build();
+
 
     public AiToolDatabaseSource(
             AiToolRepository repository,
@@ -78,33 +78,9 @@ public final class AiToolDatabaseSource
                 .toList();
     }
 
-    private boolean executableCalculator(
-            AiToolRepository.ToolRow tool) {
-
-        if (!"active".equals(tool.status())
-                || !"calc.run".equals(tool.action())
-                || !"calculator".equals(tool.executorType())
-                || !"low".equals(tool.risk())
-                || tool.requiresConfirmation()
-                || tool.timeoutSeconds() != 30) {
-            return false;
-        }
-
-        if (tool.configuration() == null) {
-            return false;
-        }
-
-        try {
-            var configuration = json.readTree(tool.configuration());
-
-            // Calculator currently has no configuration options.
-            return configuration != null
-                    && configuration.isObject()
-                    && configuration.size() == 0;
-
-        } catch (RuntimeException error) {
-            return false;
-        }
+    private boolean executableCalculator(AiToolRepository.ToolRow tool) {
+        return "active".equals(tool.status())
+                && "supported".equals(AiToolExecutionSupport.inspect(tool).state());
     }
 
     private static void requireId(

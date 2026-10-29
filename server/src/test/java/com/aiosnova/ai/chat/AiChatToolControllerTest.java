@@ -25,9 +25,7 @@ class AiChatToolControllerTest {
                 var policy = new AiToolAuthorizationFixture(fixture);
 
                 return MockMvcBuilders.standaloneSetup(
-                                new AiChatController(
-                                                fixture.service,
-                                                policy.authorization))
+                                new AiChatController(fixture.service, policy.authorization, new AiToolChatLifecycle(fixture.service, policy.authorization, new AiToolChatRequests()), fixture.access))
                                 .build();
         }
 

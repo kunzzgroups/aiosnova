@@ -36,6 +36,7 @@ import com.aiosnova.ai.agent.AiAgentService;
 import com.aiosnova.ai.agent.AiAgentController;
 import com.aiosnova.ai.tool.AiToolManagementConfiguration;
 import com.aiosnova.ai.chat.AiToolChatConfiguration;
+import com.aiosnova.ai.chat.AiChatTransportConfiguration;
 
 @Configuration
 @EnableAutoConfiguration
@@ -68,8 +69,8 @@ import com.aiosnova.ai.chat.AiToolChatConfiguration;
         AiAgentService.class,
         AiAgentController.class,
         AiToolManagementConfiguration.class,
-        AiToolManagementConfiguration.class,
         AiToolChatConfiguration.class,
+        AiChatTransportConfiguration.class,
 })
 public class AiStandaloneApplication {
 

@@ -15,6 +15,7 @@ import { ApiError } from '@/services/httpClient'
 import { fetchAssistantModelOptions, type AssistantModelOption } from '@/modules/ai/settings/services/settingsService'
 import { createAgent, deleteAgent, fetchAgent, fetchAgents, updateAgent, fetchAgentKnowledgeBases, type AgentKnowledgeBase } from '../services/agentService'
 import { IconPlus, IconPencil, IconTrash } from '@/components/icons/Icons'
+import { AgentModelSummary, type ModelCheck } from '../components/AgentModelSummary'
 import { TablePanel } from '@/components/ui/TablePanel'
 import { TablePagination } from '@/components/ui/TablePagination'
 import { TableToolbar } from '@/components/ui/TableToolbar'
@@ -81,18 +82,24 @@ export function AgentsPage() {
   const [modelOptions, setModelOptions] = useState<AssistantModelOption[]>([])
   const [modelOptionsCompany, setModelOptionsCompany] = useState('')
   const [modelOptionsError, setModelOptionsError] = useState<string | null>(null)
+  const [modelCheck, setModelCheck] = useState<ModelCheck>({ companyId: '', state: 'loading' })
   const currentModelOptions = modelOptionsCompany === companyId ? modelOptions : []
 
   useEffect(() => {
     let active = true
     setModelOptionsError(null)
+    setModelCheck({ companyId, state: 'loading' })
     setModelOptionsCompany('')
     void fetchAssistantModelOptions(companyId).then(options => {
       if (!active) return
       setModelOptions(options)
       setModelOptionsCompany(companyId)
+      setModelCheck({ companyId, state: 'ready' })
     }).catch(caught => {
-      if (active) setModelOptionsError(caught instanceof Error ? caught.message : 'Unable to load company models.')
+      if (active) {
+        setModelOptionsError(caught instanceof Error ? caught.message : 'Unable to load company models.')
+        setModelCheck({ companyId, state: 'error' })
+      }
     })
     return () => { active = false }
   }, [companyId, formOpen])
@@ -518,15 +525,8 @@ export function AgentsPage() {
                       </td>
                       <td className="console-table__muted">{agent.description || '—'}</td>
                       <td>
-                        {agent.model && (agent.model.binding || agent.model.provider !== 'auto') ? (
-                          <span className="console-chip">
-                            {currentModelOptions.find(option => option.id === agent.model?.binding?.modelConfigId && option.providerId === agent.model.binding.providerId)?.label ?? (agent.model.binding ? 'Bound model unavailable' : 'Legacy configuration: reselect a model')}
-                          </span>
-                        ) : (
-                          <span className="console-chip console-chip--muted">
-                            {t('ai.agents.modelAuto', 'Auto')}
-                          </span>
-                        )}
+                        <AgentModelSummary companyId={companyId} check={modelCheck}
+                          config={agent.model} options={currentModelOptions} />
                       </td>
                       <td>
                         {agent.knowledgeBaseCount > 0 ? (

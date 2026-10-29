@@ -1,18 +1,17 @@
 package com.aiosnova.ai.chat;
 
 import com.aiosnova.ai.tool.AiToolAuthorizationService;
-import com.aiosnova.ai.tool.AiToolRegistry;
 
 import java.util.Map;
-import java.util.Set;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import tools.jackson.databind.ObjectMapper;
 
 import org.springframework.http.ResponseEntity;
@@ -26,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 @RestController
 @RequestMapping("/api/ai/chat")
@@ -34,6 +34,10 @@ public class AiChatController {
     private final AiChatService service;
 
     private final AiToolAuthorizationService toolAuthorization;
+
+    private final AiToolChatLifecycle toolLifecycle;
+
+    private final AiToolChatAccess toolAccess;
 
     public AiChatController(AiChatService service) {
         this(service, null);
@@ -46,11 +50,15 @@ public class AiChatController {
     public AiChatController(
             AiChatService service,
             ObjectProvider<AiToolAuthorizationService> authorization,
+            ObjectProvider<AiToolChatLifecycle> lifecycle,
+            ObjectProvider<AiToolChatAccess> access,
             @Value("${ai.tools.chat.enabled:false}") boolean toolsEnabled) {
 
         this(
                 service,
-                toolsEnabled ? authorization.getObject() : null);
+                toolsEnabled ? authorization.getObject() : null,
+                toolsEnabled ? lifecycle.getObject() : null,
+                toolsEnabled ? access.getIfAvailable() : null);
     }
 
     /**
@@ -61,8 +69,35 @@ public class AiChatController {
             AiChatService service,
             AiToolAuthorizationService toolAuthorization) {
 
+        this(
+                service,
+                toolAuthorization,
+                toolAuthorization == null
+                        ? null
+                        : new AiToolChatLifecycle(
+                                service,
+                                toolAuthorization,
+                                new AiToolChatRequests()));
+    }
+
+    AiChatController(
+            AiChatService service,
+            AiToolAuthorizationService toolAuthorization,
+            AiToolChatLifecycle toolLifecycle) {
+
+        this(service, toolAuthorization, toolLifecycle, null);
+    }
+
+    AiChatController(
+            AiChatService service,
+            AiToolAuthorizationService toolAuthorization,
+            AiToolChatLifecycle toolLifecycle,
+            AiToolChatAccess toolAccess) {
+
         this.service = service;
         this.toolAuthorization = toolAuthorization;
+        this.toolLifecycle = toolLifecycle;
+        this.toolAccess = toolAccess;
     }
 
     public record ChatRequest(
@@ -70,6 +105,61 @@ public class AiChatController {
             String providerId,
             String modelId,
             String message) {
+    }
+
+    public record ToolChatCancelRequest(
+            String companyId,
+            String agentId) {
+    }
+
+    @PostMapping(value = "/messages/tools/cancel", produces = "application/json;charset=UTF-8")
+    public ResponseEntity<Map<String, String>> cancelToolChat(
+            @RequestBody ToolChatCancelRequest request,
+            @RequestHeader(value = "X-AI-Tool-Request-Id", required = false) String requestId,
+            HttpServletRequest httpRequest) {
+
+        if (toolAuthorization == null || toolLifecycle == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Tool chat is not enabled.");
+        }
+
+        if (request == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Cancellation request is required.");
+        }
+
+        if (toolAccess == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Tool chat authentication is not configured.");
+        }
+
+        var owner = toolAccess.requireOwner(
+                httpRequest,
+                request.companyId());
+
+        if (owner == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Tool chat authentication is not configured.");
+        }
+
+        boolean accepted = toolLifecycle.cancel(
+                owner,
+                request.companyId(),
+                request.agentId(),
+                requestId);
+
+        if (!accepted) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "No active tool chat request was found.");
+        }
+
+        return ResponseEntity.accepted().body(
+                Map.of("message", "Tool chat cancellation requested."));
     }
 
     @PostMapping
@@ -110,9 +200,11 @@ public class AiChatController {
 
     @PostMapping(value = "/messages/tools", produces = "application/json;charset=UTF-8")
     public AiChatService.ChatReply chatMessagesWithTools(
-            @RequestBody ToolChatRequest request) {
+            @RequestBody ToolChatRequest request,
+            @RequestHeader(value = "X-AI-Tool-Request-Id", required = false) String requestId,
+            HttpServletRequest httpRequest) {
 
-        if (toolAuthorization == null) {
+        if (toolAuthorization == null || toolLifecycle == null) {
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Tool chat is not enabled.");
@@ -124,10 +216,29 @@ public class AiChatController {
                     "Chat request is required.");
         }
 
-        return service.chatMessagesWithAuthorizedTools(
+        if (toolAccess == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Tool chat authentication is not configured.");
+        }
+        var owner = toolAccess.requireOwner(httpRequest, request.companyId());
+        if (owner == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Tool chat authentication is not configured.");
+        }
+
+        String effectiveRequestId = requestId == null
+                ? UUID.randomUUID().toString()
+                : requestId;
+
+        return toolLifecycle.chat(
+                owner,
                 request.toChatRequest(),
                 request.agentId(),
-                toolAuthorization);
+                effectiveRequestId);
+    }
+
+    public AiChatService.ChatReply chatMessagesWithTools(ToolChatRequest request) {
+        return chatMessagesWithTools(request, null, null);
     }
 
     @ExceptionHandler(ResponseStatusException.class)

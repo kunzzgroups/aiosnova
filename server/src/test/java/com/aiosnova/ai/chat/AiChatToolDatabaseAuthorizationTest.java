@@ -7,11 +7,9 @@ import com.aiosnova.ai.tool.AiToolAuthorizationService;
 import com.aiosnova.ai.tool.AiToolDatabaseSource;
 import com.aiosnova.ai.tool.AiToolRegistry;
 import com.aiosnova.ai.tool.AiToolRepository;
-import com.aiosnova.ai.tool.AiToolRegistry.Registration;
 import com.aiosnova.ai.tool.AiToolRepository.AgentScope;
 import com.aiosnova.ai.tool.AiToolRepository.ToolRow;
 
-import tools.jackson.databind.node.StringNode;
 import tools.jackson.databind.node.StringNode;
 
 import org.junit.jupiter.api.Test;
@@ -98,6 +96,41 @@ class AiChatToolDatabaseAuthorizationTest {
                     false,
                     "{}",
                     0L));
+        }
+
+        @Override
+        public Optional<AgentModelBinding> findAgentModelBinding(
+                String company,
+                String merchant,
+                String agent) {
+
+            return findAgent(company, merchant, agent)
+                    .map(scope -> new AgentModelBinding(
+                            scope.companyId(),
+                            scope.merchantId(),
+                            scope.agentId(),
+                            scope.status(),
+                            "provider-test",
+                            "model-config-test",
+                            0L));
+        }
+
+        @Override
+        public Optional<AgentExecutionParameters> findAgentExecutionParameters(
+                String company,
+                String merchant,
+                String agent) {
+
+            return findAgent(company, merchant, agent)
+                    .map(scope -> new AgentExecutionParameters(
+                            scope.companyId(),
+                            scope.merchantId(),
+                            scope.agentId(),
+                            scope.status(),
+                            0.4,
+                            0.75,
+                            512,
+                            0L));
         }
     }
 
