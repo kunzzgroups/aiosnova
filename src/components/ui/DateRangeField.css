@@ -1,0 +1,80 @@
+@import './DateField.css';
+.ui-date-range { min-width: 0; }
+.ui-date-range__trigger { position: relative; gap: var(--space-2); padding: .25rem .5rem; cursor: default; }
+.ui-date-range__trigger::after { content: ''; position: absolute; left: .5rem; bottom: 0; width: calc((100% - 2rem - var(--space-2) - var(--space-2)) / 2); height: 2px; border-radius: 2px; background: var(--color-brand); pointer-events: none; opacity: 0; transform: translateX(0); transition: transform 450ms cubic-bezier(.4, 0, .2, 1), opacity 150ms ease; }
+.ui-date-range__trigger[data-open='true']::after { opacity: 1; }
+.ui-date-range__trigger[data-active-endpoint='to']::after { transform: translateX(calc(100% + 1rem + var(--space-2) + var(--space-2))); }
+.ui-date-range__trigger:focus-within { border-color: var(--color-border-focus); box-shadow: 0 0 0 3px var(--color-focus-ring); }
+.ui-date-range__endpoint-trigger { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; height: 100%; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: inherit; font-variant-numeric: tabular-nums; text-align: left; cursor: pointer; }
+.ui-date-range__endpoint-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-date-range__endpoint-trigger:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: -2px; }
+.ui-date-range__value--preview { color: var(--color-text-muted); opacity: .65; }
+.ui-date-range__arrow { flex: 0 0 1rem; text-align: center; color: var(--color-text-muted); }
+.ui-date-range__popup { position: fixed; z-index: 100; width: 44rem; max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); color: var(--color-text); box-shadow: var(--shadow-md); }
+.ui-date-range__popup { overflow: visible; container-type: inline-size; }
+.ui-date-range__scroll { max-height: calc(100dvh - 1rem); overflow-y: auto; border-radius: inherit; }
+.ui-date-range__pointer { position: absolute; top: -5px; width: 9px; height: 9px; border-top: 1px solid var(--color-border); border-left: 1px solid var(--color-border); background: var(--color-bg-elevated); transform: translateX(-50%) rotate(45deg); transition: left 450ms cubic-bezier(.4, 0, .2, 1); pointer-events: none; }
+.ui-date-range__pointer[data-above='true'] { top: auto; bottom: -5px; transform: translateX(-50%) rotate(225deg); }
+.ui-date-range__body { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); }
+.ui-date-range__presets { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); padding: var(--space-3); border-right: 1px solid var(--color-border); }
+.ui-date-range__presets .ui-button { min-height: 2rem; padding: var(--space-2); justify-content: flex-start; text-align: left; font-size: var(--text-xs); font-weight: 500; }
+.ui-date-range__presets .ui-button[aria-pressed='true'] { background: var(--color-brand-soft); color: var(--color-brand); }
+.ui-date-range__main { min-width: 0; padding: var(--space-2); }
+.ui-date-range__calendars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
+.ui-date-range__calendars .ui-date-calendar { min-width: 0; padding: var(--space-2) var(--space-3); }
+.ui-date-range__calendars > .ui-date-calendar + .ui-date-calendar { border-left: 1px solid var(--color-border); }
+.ui-date-range__calendars .ui-date-field__header { margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3)) var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); background: transparent; font-size: var(--text-xs); }
+.ui-date-range__calendars .ui-date-field__header .ui-button { width: 1.5rem; min-width: 1.5rem; min-height: 1.5rem; }
+.ui-date-range__calendars > :first-child .ui-date-field__header .ui-button:last-child,
+.ui-date-range__calendars > :last-child .ui-date-field__header .ui-button:first-child { visibility: hidden; }
+.ui-date-range__calendars .ui-date-field__weekdays,
+.ui-date-range__calendars .ui-date-field__days { column-gap: 0; row-gap: var(--space-1); }
+.ui-date-range__calendars .ui-date-field__weekdays { margin-bottom: .75rem; font-size: .65rem; }
+.ui-date-range__calendars .ui-date-field__days { position: relative; isolation: isolate; row-gap: .75rem; }
+.ui-date-range__calendars .ui-date-field__day { aspect-ratio: auto; width: calc(100% - .375rem); justify-self: center; height: 1.5rem; border-radius: var(--radius-sm); font-size: var(--text-xs); }
+.ui-date-range__calendars .ui-date-field__day--in-range { width: 100%; border-radius: 0; }
+.ui-date-range__calendars .ui-date-field__day[data-hover-endpoint='true']:not(.ui-date-field__day--selected) { background: var(--color-brand-soft); color: var(--color-brand); box-shadow: inset 0 0 0 1px var(--color-brand); border-radius: var(--radius-sm); }
+.ui-date-range__calendars .ui-date-field__day--outside:hover { color: var(--color-text-muted); }
+.ui-date-range__calendars .ui-date-field__day[data-range-start],
+.ui-date-range__calendars .ui-date-field__day[data-range-end] { position: relative; }
+.ui-date-range__calendars .ui-date-field__day[data-range-start] { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.ui-date-range__calendars .ui-date-field__day[data-range-end] { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.ui-date-range__calendars .ui-date-field__day[data-range-start]::before,
+.ui-date-range__calendars .ui-date-field__day[data-range-end]::before { content: ''; position: absolute; z-index: -1; top: -1px; bottom: -1px; background: var(--color-brand-soft); pointer-events: none; }
+.ui-date-range__calendars .ui-date-field__day[data-range-start]::before { left: 50%; right: calc(-.1875rem - 1px); }
+.ui-date-range__calendars .ui-date-field__day[data-range-end]::before { left: calc(-.1875rem - 1px); right: 50%; }
+.ui-date-range__calendars .ui-date-field__day--outside { opacity: .45; }
+.ui-date-range__calendars .ui-date-field__day[data-hover-endpoint='true'] { animation: date-range-hover-enter 160ms ease-out; }
+@keyframes date-range-hover-enter {
+  from { opacity: .7; transform: scale(.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+.ui-date-range__calendars .ui-date-field__header strong { white-space: nowrap; }
+
+.ui-date-field__day--in-range { border-radius: 0; background: var(--color-brand-soft); color: var(--color-brand); }
+.ui-date-range__error { margin: var(--space-2) 0 0; color: var(--color-danger); font-size: var(--text-xs); }
+.ui-date-range__footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); padding: var(--space-2); border-top: 1px solid var(--color-border); }
+.ui-date-range__footer .ui-button { min-height: 2rem; padding: .25rem .75rem; font-size: var(--text-xs); }
+@media (prefers-reduced-motion: reduce) {
+  .ui-date-range__trigger::after { transition: none; }
+  .ui-date-range__pointer { transition: none; }
+  .ui-date-range__calendars .ui-date-field__day[data-hover-endpoint='true'] { animation: none; }
+}
+@media (max-width: 820px) {
+  .ui-date-range__body { grid-template-columns: minmax(0, 1fr); }
+  .ui-date-range__presets { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--color-border); }
+}
+@media (max-width: 520px) {
+  .ui-date-range__calendars { grid-template-columns: minmax(0, 1fr); }
+  .ui-date-range__calendars > :last-child { display: none; }
+  .ui-date-range__calendars > :first-child .ui-date-field__header .ui-button:last-child { visibility: visible; }
+}
+@container (max-width: 38rem) {
+  .ui-date-range__body { grid-template-columns: minmax(0, 1fr); }
+  .ui-date-range__presets { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--color-border); }
+}
+@container (max-width: 30rem) {
+  .ui-date-range__calendars { grid-template-columns: minmax(0, 1fr); }
+  .ui-date-range__calendars > :last-child { display: none; }
+  .ui-date-range__calendars > :first-child .ui-date-field__header .ui-button:last-child { visibility: visible; }
+}

@@ -30,6 +30,7 @@ import { OrganizationPage } from '@/modules/core/identity/pages/OrganizationPage
 import { OrganizationRoute } from '@/modules/core/identity/OrganizationRoute'
 import { ModulePlaceholderPage } from '@/pages/ModulePlaceholderPage'
 import { RolesAndAccessPage } from '@/modules/core/identity/pages/RolesAndAccessPage'
+import { ActivityPage } from '@/modules/core/identity/pages/ActivityPage'
 
 export function AppRouter() {
   return (
@@ -105,8 +106,7 @@ export function AppRouter() {
               />
             </Route>
             <Route path="/system/core/roles-and-access" element={<RolesAndAccessPage />} />
-            <Route path="/system/core/activity" element={<ModulePlaceholderPage />} />
-
+            <Route path="/system/core/activity" element={<ActivityPage />} />
             <Route path="*" element={<ModulePlaceholderPage />} />
           </Route>
         </Route>
