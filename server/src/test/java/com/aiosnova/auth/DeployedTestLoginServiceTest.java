@@ -62,7 +62,7 @@ class DeployedTestLoginServiceTest {
             assertEquals("merchant", merchant);
             return actor;
         }
-        @Override public void audit(String merchant, String actorId, String action, String type, String id, Map<String, Object> data) {
+        @Override public void auditMerchant(String merchant, String actorId, String action, String type, String id, Map<String, Object> data) {
             assertEquals("identity.session.deployed_test_login", action);
             assertTrue(data.isEmpty());
             audited = true;

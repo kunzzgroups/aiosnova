@@ -6,10 +6,10 @@ import './DateField.css'
 
 type Props = {
   month: Date; onMonthChange: (date: Date) => void; value: string; onChange: (date: string) => void
-  range?: { from: string; to: string }; preview?: { from: string; to: string }; onPreview?: (date: string | null) => void; today: string; autoFocus?: boolean
+  range?: { from: string; to: string }; preview?: { from: string; to: string }; hoveredDate?: string | null; onPreview?: (date: string | null) => void; today: string; autoFocus?: boolean
 }
 
-export function DateCalendar({ month, onMonthChange, value, onChange, range, preview, onPreview, today, autoFocus = false }: Props) {
+export function DateCalendar({ month, onMonthChange, value, onChange, range, preview, hoveredDate, onPreview, today, autoFocus = false }: Props) {
   const { t, i18n } = useTranslation()
   const initial = value && value.slice(0, 7) === dateKey(month).slice(0, 7) ? value : dateKey(month)
   const [focused, setFocused] = useState(initial)
@@ -63,7 +63,8 @@ export function DateCalendar({ month, onMonthChange, value, onChange, range, pre
       const selected = range ? key === range.from || key === range.to : key === value
       const edge = !outside && (shownRange ? key === shownRange.from || key === shownRange.to : key === value)
       const inside = !outside && shownRange && shownRange.from && shownRange.to && key > shownRange.from && key < shownRange.to
-      return <button type="button" key={key} data-date={key} className={'ui-date-field__day' + (outside ? ' ui-date-field__day--outside' : '') + (edge ? ' ui-date-field__day--selected' : '') + (inside ? ' ui-date-field__day--in-range' : '')}
+      const hasRange = !outside && shownRange && shownRange.from && shownRange.to && shownRange.from < shownRange.to
+      return <button type="button" key={key} data-date={key} data-range-start={hasRange && key === shownRange.from ? true : undefined} data-range-end={hasRange && key === shownRange.to ? true : undefined} data-hover-endpoint={!outside && key === hoveredDate ? true : undefined} className={'ui-date-field__day' + (outside ? ' ui-date-field__day--outside' : '') + (edge ? ' ui-date-field__day--selected' : '') + (inside ? ' ui-date-field__day--in-range' : '')}
         tabIndex={key === tabDate ? 0 : -1} aria-label={new Intl.DateTimeFormat(i18n.language, { dateStyle: 'full' }).format(date)} aria-pressed={selected} aria-current={key === today ? 'date' : undefined}
         onPointerEnter={() => onPreview?.(outside ? null : key)} onKeyDown={event => onKey(event, date)} onClick={() => { setFocused(key); onChange(key) }}>{date.getDate()}</button>
     })}</div>

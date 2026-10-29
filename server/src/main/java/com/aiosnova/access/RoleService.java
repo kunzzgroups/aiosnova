@@ -267,7 +267,7 @@ public class RoleService {
                 Map.of("permissions", afterPermissions));
 
         if (!changes.isEmpty()) {
-            auth.audit(
+            auth.auditMerchant(
                     actor.merchantId(),
                     actor.id(),
                     "identity.role.permissions.updated",
@@ -356,7 +356,7 @@ public class RoleService {
         );
 
         if (!changes.isEmpty()){
-            auth.audit(actor.merchantId(), actor.id(), "identity.user.roles.updated", "user", userId, changes);
+            auth.auditMerchant(actor.merchantId(), actor.id(), "identity.user.roles.updated", "user", userId, changes);
         }
     }
 
@@ -403,7 +403,7 @@ public class RoleService {
         Map<String, Object> changes = AuditChanges.between(Map.of("name", role.name(), "status", role.status(), "permissions", beforePermissions), Map.of());
 
         if (!changes.isEmpty()){
-            auth.audit(actor.merchantId(), actor.id(), "identity.role.deleted", "role", roleId, changes);
+            auth.auditMerchant(actor.merchantId(), actor.id(), "identity.role.deleted", "role", roleId, changes);
         }
     }
 

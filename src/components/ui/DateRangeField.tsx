@@ -20,51 +20,73 @@ export function DateRangeField({ id, label, value, onChange, timeZone }: Props) 
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState<DateRange>(value)
   const [active, setActive] = useState<Endpoint>('from')
+  const [anchor, setAnchor] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [hoveredPreset, setHoveredPreset] = useState<DateRange | undefined>()
   const [preset, setPreset] = useState<RangePreset | null>(null)
   const [month, setMonth] = useState(() => addMonths(parseDay(value.from || zonedDate(new Date(), timeZone)), 0))
   const [position, setPosition] = useState({ left: 0, top: 0 })
+  const [pointer, setPointer] = useState({ left: 24, above: false })
   const today = zonedDate(new Date(), timeZone)
-  const preview = hoveredPreset ?? previewRange(pending, active, hovered)
+  const preview = validRange(pending) ? undefined
+    : hoveredPreset ?? previewRange({ from: anchor ?? '', to: '' }, 'to', hovered)
   const shown = open ? preview ?? pending : value
-  const valid = validRange(pending)
+  const valid = validRange(pending) || (!pending.from && !pending.to)
   const reversed = Boolean(pending.from && pending.to && pending.from > pending.to)
   function close(restore = false) { setOpen(false); if (restore) trigger.current?.querySelector<HTMLButtonElement>('[data-endpoint="' + active + '"]')?.focus() }
   function openPicker(endpoint: Endpoint) {
-    setPending(value); setPreset(null); setActive(endpoint); setHovered(null); setHoveredPreset(undefined)
+    setPending(value); setPreset(null); setActive(validRange(value) ? endpoint : 'from'); setAnchor(null); setHovered(null); setHoveredPreset(undefined)
     setMonth(addMonths(parseDay(value[endpoint] || value.from || today), endpoint === 'to' ? -1 : 0)); setOpen(true)
   }
   function selectDate(date: string) {
     setHovered(null)
+    setHoveredPreset(undefined)
     setPreset(null)
-    setPending(previous => ({ ...previous, [active]: date }))
-    if (active === 'from') setActive('to')
+    if (anchor === null) {
+      setPending({ from: date, to: '' })
+      setAnchor(date)
+      setActive('to')
+    } else {
+      setPending(date < anchor ? { from: date, to: anchor } : { from: anchor, to: date })
+      setAnchor(null)
+      setActive('from')
+    }
   }
   function choosePreset(next: RangePreset) {
     const range = presetRange(next, new Date(), timeZone)
     setHovered(null)
     setHoveredPreset(undefined)
-    setPending(range); setPreset(next); setActive('from'); setMonth(addMonths(parseDay(range.from), 0))
+    setPending(range); setAnchor(null); setPreset(next); setActive('from'); setMonth(addMonths(parseDay(range.from), 0))
   }
   useLayoutEffect(() => {
     if (!open) return
+    const boundary = trigger.current?.closest('.activity-filter-panel')
     function place() {
       const anchor = trigger.current?.getBoundingClientRect()
       const panel = popup.current
       if (!anchor || !panel) return
       const gap = 8
-      const left = Math.max(gap, Math.min(anchor.left, window.innerWidth - panel.offsetWidth - gap))
+      const bounds = boundary?.getBoundingClientRect()
+      const minLeft = Math.max(gap, (bounds?.left ?? 0) + gap)
+      const maxRight = Math.min(window.innerWidth - gap, (bounds?.right ?? window.innerWidth) - gap)
+      panel.style.maxWidth = `${Math.max(1, maxRight - minLeft)}px`
+      const left = Math.max(minLeft, Math.min(anchor.left, maxRight - panel.offsetWidth))
       const top = anchor.bottom + gap + panel.offsetHeight <= window.innerHeight - gap ? anchor.bottom + gap : Math.max(gap, anchor.top - panel.offsetHeight - gap)
+      const endpoint = trigger.current?.querySelector<HTMLButtonElement>('[data-endpoint="' + active + '"]')?.getBoundingClientRect()
+      const pointerLeft = Math.max(16, Math.min((endpoint ? endpoint.left + endpoint.width / 2 : anchor.left + 24) - left, panel.offsetWidth - 16))
+      const above = top < anchor.top
+      setPointer(previous => previous.left === pointerLeft && previous.above === above ? previous : { left: pointerLeft, above })
       setPosition(previous => previous.left === left && previous.top === top ? previous : { left, top })
     }
     place()
     const observer = new ResizeObserver(place)
     if (popup.current) observer.observe(popup.current)
+    if (trigger.current) observer.observe(trigger.current)
+    if (boundary) observer.observe(boundary)
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
     return () => { observer.disconnect(); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true) }
-  }, [open])
+  }, [open, active])
   useEffect(() => {
     if (!open) return
     function outside(event: PointerEvent) {
@@ -75,7 +97,7 @@ export function DateRangeField({ id, label, value, onChange, timeZone }: Props) 
     return () => document.removeEventListener('pointerdown', outside)
   }, [open])
   return <div className="ui-date-range">
-    <div ref={trigger} className="ui-date-field__trigger ui-date-range__trigger" role="group" aria-label={label}
+    <div ref={trigger} className="ui-date-field__trigger ui-date-range__trigger" role="group" aria-label={label} data-open={open} data-active-endpoint={active}
       onKeyDown={event => { if (event.key === 'Escape' && open) { event.preventDefault(); close(true) } }}
       onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node) && !popup.current?.contains(event.relatedTarget as Node)) close() }}>
       {(['from', 'to'] as const).map((endpoint, index) => <ReactFragment key={endpoint}>
@@ -95,19 +117,22 @@ export function DateRangeField({ id, label, value, onChange, timeZone }: Props) 
     {open && createPortal(<div ref={popup} id={popupId} className="ui-date-range__popup" role="dialog" aria-label={label} style={position}
       onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true) } }}
       onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node) && !trigger.current?.contains(event.relatedTarget as Node)) close() }}>
+      <span aria-hidden="true" className="ui-date-range__pointer" data-above={pointer.above} style={{ left: pointer.left }} />
+      <div className="ui-date-range__scroll">
       <div className="ui-date-range__body">
         <nav className="ui-date-range__presets" aria-label={t('dateRange.presets')} onPointerLeave={() => setHoveredPreset(undefined)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setHoveredPreset(undefined) }}>
           {PRESETS.map(item => <Button key={item} variant="ghost" aria-pressed={preset === item} onPointerEnter={() => setHoveredPreset(presetRange(item, new Date(), timeZone))} onFocus={() => setHoveredPreset(presetRange(item, new Date(), timeZone))} onClick={() => choosePreset(item)}>{item === 'today' ? t('dateField.today') : t('dateRange.lastDays', { count: item })}</Button>)}
         </nav>
         <div className="ui-date-range__main">
           <div className="ui-date-range__calendars" onPointerLeave={() => setHovered(null)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setHovered(null) }}>
-            <DateCalendar month={month} onMonthChange={setMonth} value={pending[active].slice(0, 10)} range={pending} preview={preview} onPreview={setHovered} today={today} onChange={selectDate} autoFocus />
-            <DateCalendar month={addMonths(month, 1)} onMonthChange={date => setMonth(addMonths(date, -1))} value={pending[active].slice(0, 10)} range={pending} preview={preview} onPreview={setHovered} today={today} onChange={selectDate} />
+            <DateCalendar month={month} onMonthChange={setMonth} value={pending[active].slice(0, 10)} range={pending} preview={preview} hoveredDate={hoveredPreset ? null : hovered} onPreview={setHovered} today={today} onChange={selectDate} autoFocus />
+            <DateCalendar month={addMonths(month, 1)} onMonthChange={date => setMonth(addMonths(date, -1))} value={pending[active].slice(0, 10)} range={pending} preview={preview} hoveredDate={hoveredPreset ? null : hovered} onPreview={setHovered} today={today} onChange={selectDate} />
           </div>
           {reversed && <p className="ui-date-range__error" role="alert">{t('dateRange.invalid')}</p>}
         </div>
       </div>
-      <footer className="ui-date-range__footer"><Button variant="ghost" onClick={() => { onChange({ from: '', to: '' }); close(true) }}>{t('dateField.clear')}</Button><Button variant="secondary" onClick={() => close(true)}>{t('dateRange.cancel')}</Button><Button disabled={!valid} onClick={() => { onChange(pending); close(true) }}>{t('dateField.apply')}</Button></footer>
+      <footer className="ui-date-range__footer"><Button variant="ghost" onClick={() => { setPending({ from: '', to: '' }); setAnchor(null); setActive('from'); setHovered(null); setHoveredPreset(undefined); setPreset(null) }}>{t('dateField.clear')}</Button><Button variant="secondary" onClick={() => close(true)}>{t('dateRange.cancel')}</Button><Button disabled={!valid} onClick={() => { onChange(pending); close(true) }}>{t('dateField.apply')}</Button></footer>
+      </div>
     </div>, document.body)}
   </div>
 }
