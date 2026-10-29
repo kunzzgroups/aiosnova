@@ -1,5 +1,6 @@
 import { http, passthrough } from 'msw'
 import { setupWorker } from 'msw/browser'
+import { activityHandlers } from '@/mocks/handlers/activityHandlers'
 import { authHandlers } from '@/mocks/handlers/authHandlers'
 import { identityHandlers } from '@/mocks/handlers/identityHandlers'
 import { agentHandlers } from '@/mocks/handlers/agentHandlers'
@@ -37,6 +38,7 @@ export const worker = setupWorker(
   ...backendTacHandlers,
   ...authHandlers,
   ...identityHandlers,
+  ...activityHandlers,
   ...agentHandlers,
   ...knowledgeHandlers,
 )

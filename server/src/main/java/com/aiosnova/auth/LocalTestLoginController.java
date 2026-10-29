@@ -45,7 +45,7 @@ public class LocalTestLoginController {
         var user = repository.user(email, true);
         if (user == null || !"active".equals(user.status())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         var response = sessions.issue(user.id(), request);
-        repository.audit(merchantId, user.id(), "identity.session.local_test_login", "user", user.id(), Map.of());
+        repository.auditMerchant(merchantId, user.id(), "identity.session.local_test_login", "user", user.id(), Map.of());
         return response;
     }
 

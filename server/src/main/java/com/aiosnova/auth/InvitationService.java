@@ -84,7 +84,7 @@ public class InvitationService {
         for (AuthRepository.Company company : companies) {
             repository.assignCompany(UUID.randomUUID().toString(), merchantId, id, company.id());
         }
-        repository.audit(merchantId, actor.id(), "invitation.sent", "invitation", id,
+        repository.auditMerchant(merchantId, actor.id(), "invitation.sent", "invitation", id,
                 AuditChanges.between(Map.of(), Map.of("status", "sent", "companyCodes", companies.stream().map(AuthRepository.Company::code).sorted().toList(),
                         "requireMfa", request.requireMfa(), "departmentId", departmentId, "positionId", positionId)));
         String link = frontendUrl + "/activate?token=" + token;
@@ -148,7 +148,7 @@ public class InvitationService {
         Map<String, Object> changes = new LinkedHashMap<>();
         AuditChanges.add(changes, "status", invite.status(), "accepted");
         AuditChanges.add(changes, "userStatus", previousUserStatus, repository.userById(invite.userId()).status());
-        repository.audit(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation", invite.id(), changes);
+        repository.auditMerchant(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation", invite.id(), changes);
         return account(invite.email());
     }
 

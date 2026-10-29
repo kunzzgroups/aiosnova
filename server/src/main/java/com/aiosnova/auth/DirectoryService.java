@@ -117,7 +117,7 @@ public class DirectoryService {
         AuditChanges.personal(changes, "displayName", before.displayName(), after.displayName());
         AuditChanges.personal(changes, "phone", before.phone(), after.phone());
         AuditChanges.personal(changes, "avatarUrl", before.avatarUrl(), after.avatarUrl());
-        repository.audit(actor.merchantId(), actor.id(), "identity.user.updated", "user", userId, changes);
+        repository.auditMerchant(actor.merchantId(), actor.id(), "identity.user.updated", "user", userId, changes);
         return after;
     }
 
@@ -156,7 +156,7 @@ public class DirectoryService {
             repository.clearEmployeePlacement(actor.merchantId(), target.id());
             assignments.synchronize(actor.merchantId(), target.id(), actor.id());
             repository.deleteEmployee(actor.merchantId(), target.id(), actor.id());
-            repository.audit(actor.merchantId(), actor.id(), "identity.user.deleted", "user", target.id(),
+            repository.auditMerchant(actor.merchantId(), actor.id(), "identity.user.deleted", "user", target.id(),
                     AuditChanges.between(Map.of("deleted", false, "companyCodes", companies), Map.of("deleted", true, "companyCodes", List.of())));
         }
     }

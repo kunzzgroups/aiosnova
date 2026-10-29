@@ -82,7 +82,7 @@ public class OrganizationAssignmentService {
     public void synchronize(String merchantId, String userId, String actorId, Set<String> retainedPlacements) {
         var memberships = placements(merchantId, userId);
         var active = jdbc.queryForList("""
-                SELECT a.id, a.membership_id, a.position_id FROM organization_position_assignments a
+                SELECT a.id, a.company_id, a.membership_id, a.position_id FROM organization_position_assignments a
                 JOIN company_memberships m ON m.merchant_id = a.merchant_id AND m.company_id = a.company_id AND m.id = a.membership_id
                 WHERE a.merchant_id = ? AND m.user_id = ? AND a.status = 'active'
                   AND a.valid_from <= UTC_DATE() AND (a.valid_to IS NULL OR a.valid_to >= UTC_DATE()) FOR UPDATE
@@ -90,7 +90,7 @@ public class OrganizationAssignmentService {
         for (var assignment : active) {
             if (memberships.stream().anyMatch(membership -> membership.get("id").equals(assignment.get("membership_id")) && membership.get("position_id").equals(assignment.get("position_id")))) continue;
             jdbc.update("UPDATE organization_position_assignments SET status = 'ended', valid_to = GREATEST(valid_from, UTC_DATE()), updated_by = ?, version = version + 1 WHERE id = ?", actorId, assignment.get("id"));
-            auth.audit(merchantId, actorId, "identity.position_assignment.ended", "position_assignment", (String) assignment.get("id"),
+            auth.auditCompany(merchantId, actorId, (String) assignment.get("company_id"), "identity.position_assignment.ended", "position_assignment", (String) assignment.get("id"),
                     AuditChanges.between(Map.of("status", "active"), Map.of("status", "ended")));
         }
         for (var membership : memberships) {
@@ -109,9 +109,23 @@ public class OrganizationAssignmentService {
                     VALUES (?, ?, ?, ?, ?, UTC_DATE(), ?, ?)
                     ON DUPLICATE KEY UPDATE status = 'active', valid_to = NULL, updated_by = ?, version = version + 1
                     """, id, merchantId, companyId, membershipId, positionId, actorId, actorId, actorId);
-            String savedId = jdbc.queryForObject("SELECT id FROM organization_position_assignments WHERE merchant_id = ? AND company_id = ? AND membership_id = ? AND position_id = ? AND valid_from = UTC_DATE()", String.class, merchantId, companyId, membershipId, positionId);
-            auth.audit(merchantId, actorId, "identity.position_assignment.created", "position_assignment", savedId,
-                    AuditChanges.between(Map.of(), Map.of("companyId", companyId, "positionId", positionId, "membershipId", membershipId, "status", "active")));
+            String savedId = jdbc.queryForObject(
+                    "SELECT id FROM organization_position_assignments WHERE merchant_id = ? AND company_id = ? AND membership_id = ? AND position_id = ? AND valid_from = UTC_DATE()",
+                    String.class, merchantId, companyId, membershipId, positionId);
+            auth.auditCompany(
+                    merchantId,
+                    actorId,
+                    companyId,
+                    "identity.position_assignment.created",
+                    "position_assignment",
+                    savedId,
+                    AuditChanges.between(
+                            Map.of(),
+                            Map.of(
+                                    "companyId", companyId,
+                                    "positionId", positionId,
+                                    "membershipId", membershipId,
+                                    "status", "active")));
         }
     }
 }

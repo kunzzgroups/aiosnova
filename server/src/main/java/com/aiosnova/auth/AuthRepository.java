@@ -10,6 +10,7 @@ import java.util.UUID;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Repository
 public class AuthRepository {
@@ -442,12 +443,83 @@ public class AuthRepository {
                 + " mfa_verified_at = UTC_TIMESTAMP(6), version = version + 1 WHERE id = ?", id);
     }
 
-    public void audit(String merchantId, String actorId, String action, String resourceType, String resourceId, Map<String, Object> changes) {
-        jdbc.update("""
-                INSERT INTO audit_logs (id, merchant_id, actor_user_id, action, resource_type, resource_id, changes, result)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'success')
-                """, UUID.randomUUID().toString(), merchantId, actorId, action, resourceType, resourceId, json.writeValueAsString(changes));
+    public void auditMerchant(
+        String merchantId,
+        String actorId,
+        String action,
+        String resourceType,
+        String resourceId,
+        Map<String, Object> changes) {
+
+    writeAudit(
+            merchantId, actorId, "merchant", null,
+            action, resourceType, resourceId, changes);
+}
+
+public void auditCompany(
+        String merchantId,
+        String actorId,
+        String companyId,
+        String action,
+        String resourceType,
+        String resourceId,
+        Map<String, Object> changes) {
+
+    if (companyId == null || companyId.isBlank()) {
+        throw new IllegalArgumentException(
+                "Company audit requires companyId");
     }
+
+    writeAudit(
+            merchantId, actorId, "company", companyId,
+            action, resourceType, resourceId, changes);
+}
+
+private void writeAudit(
+        String merchantId,
+        String actorId,
+        String scopeKind,
+        String companyId,
+        String action,
+        String resourceType,
+        String resourceId,
+        Map<String, Object> changes) {
+
+    if (!TransactionSynchronizationManager.isActualTransactionActive()
+            || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+        throw new IllegalStateException(
+                "Success audit requires an active writable transaction");
+    }
+
+    if (merchantId == null || merchantId.isBlank()
+            || actorId == null || actorId.isBlank()
+            || action == null || action.isBlank()
+            || resourceType == null || resourceType.isBlank()
+            || changes == null) {
+        throw new IllegalArgumentException("Invalid audit event");
+    }
+
+    String payload = json.writeValueAsString(changes);
+
+    jdbc.update("""
+            INSERT INTO audit_logs (
+                id, merchant_id, actor_user_id,
+                scope_kind, company_id,
+                action, resource_type, resource_id,
+                changes, result, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'success', UTC_TIMESTAMP(6))
+            """,
+            UUID.randomUUID().toString(),
+            merchantId,
+            actorId,
+            scopeKind,
+            companyId,
+            action,
+            resourceType,
+            resourceId,
+            payload);
+}
 
     private Mfa mfa(ResultSet rs, int row) throws SQLException {
         Long counter = rs.getObject("last_accepted_time_step", Long.class);

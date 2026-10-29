@@ -50,7 +50,7 @@ public class DeployedTestLoginService {
         var actor = repository.actor(merchantId, user.id());
         if (actor == null || !actor.owner() || !"active".equals(actor.status())) return null;
         var response = sessions.issue(user.id(), request);
-        repository.audit(merchantId, user.id(), "identity.session.deployed_test_login", "user", user.id(), Map.of());
+        repository.auditMerchant(merchantId, user.id(), "identity.session.deployed_test_login", "user", user.id(), Map.of());
         return response;
     }
 
