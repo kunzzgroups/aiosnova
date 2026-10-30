@@ -7,6 +7,8 @@ import com.aiosnova.organization.OrganizationRepository.Department;
 import com.aiosnova.organization.OrganizationRepository.Position;
 import com.aiosnova.access.PermissionService;
 import com.aiosnova.audit.AuditChanges;
+import com.aiosnova.audit.AuditLogService;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,14 +31,16 @@ public class OrganizationService {
     private final ObjectMapper json;
     private final OrganizationAssignmentService assignments;
     private final PermissionService permissions;
+    private final AuditLogService auditLog;
 
-    public OrganizationService(OrganizationRepository repository, AuthRepository auth, AuthSecretService secrets, ObjectMapper json, OrganizationAssignmentService assignments, PermissionService permissions) {
+    public OrganizationService(OrganizationRepository repository, AuthRepository auth, AuthSecretService secrets, ObjectMapper json, OrganizationAssignmentService assignments, PermissionService permissions, AuditLogService auditLog) {
         this.repository = repository;
         this.auth = auth;
         this.secrets = secrets;
         this.json = json;
         this.assignments = assignments;
         this.permissions = permissions;
+        this.auditLog = auditLog;
     }
 
     @Transactional(readOnly = true)
@@ -129,7 +133,7 @@ public class OrganizationService {
                 var after = new LinkedHashMap<String,Object>();
                 after.put("departmentId", mapping.departmentId()); after.put("positionId", mapping.positionId());
                 var changes = AuditChanges.between(before, after); changes.put("companyId", companyId);
-                auth.auditCompany(actor.merchantId(), actor.id(),companyId, "identity.user.reassigned", "user", userId, changes);
+                auditLog.recordCompanySuccess(actor.merchantId(), actor.id(),companyId, "identity.user.reassigned", "user", userId, changes);
             }
         }
         if ("retain".equals(request.mode()) && request.employeeMappings() != null && !request.employeeMappings().isEmpty()) fail(HttpStatus.BAD_REQUEST, "org.invalidRequest");
@@ -278,7 +282,7 @@ public class OrganizationService {
         for (int index = branch.size() - 1; index >= 0; index--) {
             Department department = branch.get(index);
             if (repository.delete("organization_departments", actor.merchantId(), companyId, department.id(), department.version(), actor.id()) != 1) fail(HttpStatus.CONFLICT, "org.versionConflict");
-            auth.auditCompany(actor.merchantId(), actor.id(), companyId ,"identity.department.deleted", "department", department.id(), AuditChanges.between(Map.of("deleted", false), Map.of("deleted", true)));
+            auditLog.recordCompanySuccess(actor.merchantId(), actor.id(), companyId ,"identity.department.deleted", "department", department.id(), AuditChanges.between(Map.of("deleted", false), Map.of("deleted", true)));
         }
     }
 
@@ -305,7 +309,7 @@ public class OrganizationService {
             fail(HttpStatus.CONFLICT, "org.hasDependencies");
         }
         if (repository.delete("organization_positions", actor.merchantId(), companyId, id, expected, actor.id()) != 1) fail(HttpStatus.CONFLICT, "org.versionConflict");
-        auth.auditCompany(actor.merchantId(), actor.id(), companyId, "identity.position.deleted", "position", id, AuditChanges.between(Map.of("deleted", false), Map.of("deleted", true)));
+        auditLog.recordCompanySuccess(actor.merchantId(), actor.id(), companyId, "identity.position.deleted", "position", id, AuditChanges.between(Map.of("deleted", false), Map.of("deleted", true)));
     }
 
     private Department saveDepartment(Actor actor, String companyId, String id, Map<String, Object> input) {
@@ -332,7 +336,7 @@ public class OrganizationService {
                 name, "department", status, old == null ? 0 : old.sortOrder(), old == null ? 0 : old.version());
         if (old == null) repository.createDepartment(result, actor.id());
         else if (repository.updateDepartment(result, actor.id()) != 1) fail(HttpStatus.CONFLICT, "org.versionConflict");
-        auth.auditCompany(actor.merchantId(), actor.id(), companyId, old == null ? "identity.department.created" : "identity.department.updated", "department", newId,
+        auditLog.recordCompanySuccess(actor.merchantId(), actor.id(), companyId, old == null ? "identity.department.created" : "identity.department.updated", "department", newId,
                 AuditChanges.between(old == null ? Map.of() : auditFields(old), auditFields(result)));
         return department(actor, companyId, newId);
     }
@@ -385,11 +389,11 @@ public class OrganizationService {
                     Department updated = new Department(d.id(), d.merchantId(), d.companyId(), d.parentId(), managed.contains(d.id()) ? newId : null,
                             d.name(), d.type(), d.status(), d.sortOrder(), d.version());
                     if (repository.updateDepartment(updated, actor.id()) != 1) fail(HttpStatus.CONFLICT, "org.versionConflict");
-                    auth.auditCompany(actor.merchantId(), actor.id(), companyId, "identity.department.updated", "department", d.id(), AuditChanges.between(auditFields(d), auditFields(updated)));
+                    auditLog.recordCompanySuccess(actor.merchantId(), actor.id(), companyId, "identity.department.updated", "department", d.id(), AuditChanges.between(auditFields(d), auditFields(updated)));
                 }
             }
         }
-        auth.auditCompany(actor.merchantId(), actor.id(), companyId, old == null ? "identity.position.created" : "identity.position.updated", "position", newId,
+        auditLog.recordCompanySuccess(actor.merchantId(), actor.id(), companyId, old == null ? "identity.position.created" : "identity.position.updated", "position", newId,
                 AuditChanges.between(old == null ? Map.of() : auditFields(old), auditFields(result)));
         return position(actor, companyId, newId);
     }

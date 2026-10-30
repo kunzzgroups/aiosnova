@@ -2,6 +2,8 @@ package com.aiosnova.organization;
 
 import com.aiosnova.auth.AuthRepository;
 import com.aiosnova.audit.AuditChanges;
+import com.aiosnova.audit.AuditLogService;
+
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
@@ -20,11 +22,13 @@ public class OrganizationAssignmentService {
     private final JdbcTemplate jdbc;
     private final AuthRepository auth;
     private final OrganizationRepository organization;
+    private final AuditLogService auditLog;
 
-    public OrganizationAssignmentService(JdbcTemplate jdbc, AuthRepository auth, OrganizationRepository organization) {
+    public OrganizationAssignmentService(JdbcTemplate jdbc, AuthRepository auth, OrganizationRepository organization, AuditLogService auditLog ) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.organization = organization;
+        this.auditLog = auditLog;
     }
 
     public String validate(String merchantId, String departmentId, String positionId) {
@@ -90,7 +94,7 @@ public class OrganizationAssignmentService {
         for (var assignment : active) {
             if (memberships.stream().anyMatch(membership -> membership.get("id").equals(assignment.get("membership_id")) && membership.get("position_id").equals(assignment.get("position_id")))) continue;
             jdbc.update("UPDATE organization_position_assignments SET status = 'ended', valid_to = GREATEST(valid_from, UTC_DATE()), updated_by = ?, version = version + 1 WHERE id = ?", actorId, assignment.get("id"));
-            auth.auditCompany(merchantId, actorId, (String) assignment.get("company_id"), "identity.position_assignment.ended", "position_assignment", (String) assignment.get("id"),
+            auditLog.recordCompanySuccess(merchantId, actorId, (String) assignment.get("company_id"), "identity.position_assignment.ended", "position_assignment", (String) assignment.get("id"),
                     AuditChanges.between(Map.of("status", "active"), Map.of("status", "ended")));
         }
         for (var membership : memberships) {
@@ -112,7 +116,7 @@ public class OrganizationAssignmentService {
             String savedId = jdbc.queryForObject(
                     "SELECT id FROM organization_position_assignments WHERE merchant_id = ? AND company_id = ? AND membership_id = ? AND position_id = ? AND valid_from = UTC_DATE()",
                     String.class, merchantId, companyId, membershipId, positionId);
-            auth.auditCompany(
+            auditLog.recordCompanySuccess(
                     merchantId,
                     actorId,
                     companyId,
