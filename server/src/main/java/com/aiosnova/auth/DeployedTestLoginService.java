@@ -6,7 +6,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Locale;
-import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -49,8 +48,10 @@ public class DeployedTestLoginService {
         if (user == null) return null;
         var actor = repository.actor(merchantId, user.id());
         if (actor == null || !actor.owner() || !"active".equals(actor.status())) return null;
-        var response = sessions.issue(user.id(), request);
-        repository.auditMerchant(merchantId, user.id(), "identity.session.deployed_test_login", "user", user.id(), Map.of());
+        var response = sessions.issue(
+                user.id(),
+                request,
+                SessionService.LoginMethod.DEPLOYED_TEST);
         return response;
     }
 

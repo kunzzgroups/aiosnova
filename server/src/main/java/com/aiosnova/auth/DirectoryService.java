@@ -13,18 +13,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.aiosnova.audit.AuditLogService;
+
 @Service
 public class DirectoryService {
     private final AuthRepository repository;
     private final com.aiosnova.organization.OrganizationAssignmentService assignments;
     private final RoleService roles;
     private final PermissionService permissions;
+    private final AuditLogService auditLog;
 
-    public DirectoryService(AuthRepository repository, com.aiosnova.organization.OrganizationAssignmentService assignments, RoleService roles, PermissionService permissions) {
+    public DirectoryService(AuthRepository repository, com.aiosnova.organization.OrganizationAssignmentService assignments, RoleService roles, PermissionService permissions, AuditLogService auditLog) {
         this.repository = repository;
         this.assignments = assignments;
         this.roles = roles;
         this.permissions = permissions;
+        this.auditLog = auditLog;
     }
 
     @Transactional(readOnly = true)
@@ -117,7 +121,13 @@ public class DirectoryService {
         AuditChanges.personal(changes, "displayName", before.displayName(), after.displayName());
         AuditChanges.personal(changes, "phone", before.phone(), after.phone());
         AuditChanges.personal(changes, "avatarUrl", before.avatarUrl(), after.avatarUrl());
-        repository.auditMerchant(actor.merchantId(), actor.id(), "identity.user.updated", "user", userId, changes);
+        String action = changes.containsKey("status")
+                ? "identity.user.status.updated"
+                : "identity.user.updated";
+        if (!changes.isEmpty()) {
+            auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), action, "user", userId,
+                    changes);
+        }
         return after;
     }
 
@@ -156,7 +166,7 @@ public class DirectoryService {
             repository.clearEmployeePlacement(actor.merchantId(), target.id());
             assignments.synchronize(actor.merchantId(), target.id(), actor.id());
             repository.deleteEmployee(actor.merchantId(), target.id(), actor.id());
-            repository.auditMerchant(actor.merchantId(), actor.id(), "identity.user.deleted", "user", target.id(),
+            auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.user.deleted", "user", target.id(),
                     AuditChanges.between(Map.of("deleted", false, "companyCodes", companies), Map.of("deleted", true, "companyCodes", List.of())));
         }
     }

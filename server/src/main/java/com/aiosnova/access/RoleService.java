@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.aiosnova.audit.AuditChanges;
+import com.aiosnova.audit.AuditLogService;
 import com.aiosnova.auth.AuthRepository;
 import com.aiosnova.auth.SessionService;
 
@@ -22,11 +23,14 @@ public class RoleService {
     private final RoleRepository repository;
     private final AuthRepository auth;
     private final PermissionService permissions;
+    private final AuditLogService auditLog;
 
-    public RoleService(RoleRepository repository, AuthRepository auth, PermissionService permissions) {
+    public RoleService(RoleRepository repository, AuthRepository auth, PermissionService permissions,
+            AuditLogService auditLog) {
         this.repository = repository;
         this.auth = auth;
         this.permissions = permissions;
+        this.auditLog = auditLog;
     }
 
     @Transactional
@@ -73,15 +77,15 @@ public class RoleService {
             }
         }
 
-        if(!actor.owner()){
-            for (String permissionId : normalizedPermissionIds){
+        if (!actor.owner()) {
+            for (String permissionId : normalizedPermissionIds) {
                 String code = repository.permissionCode(permissionId);
-                if(!permissions.hasPermission(actor, code)){
+                if (!permissions.hasPermission(actor, code)) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN);
                 }
             }
         }
-        
+
         if (repository.roleNameExists(actor.merchantId(), normalizedName)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Role name already exists.");
         }
@@ -95,7 +99,9 @@ public class RoleService {
         for (String permissionId : normalizedPermissionIds) {
             repository.insertRolePermission(UUID.randomUUID().toString(), id, permissionId);
         }
-
+        auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.role.created", "role", id,
+                AuditChanges.between(Map.of(), Map.of("name", normalizedName, "status", normalizedStatus,
+                        "permissionIds", normalizedPermissionIds)));
         return new CreatedRole(id, normalizedName, normalizedStatus, normalizedPermissionIds);
     }
 
@@ -135,6 +141,12 @@ public class RoleService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role name must contains 1-80 characters");
         }
 
+        RoleRepository.RoleSummary before = repository.lockRole(actor.merchantId(), roleId);
+        if (before == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Role not found");
+        }
         try {
             int updated = repository.renameRole(actor.merchantId(), roleId, normalizedName, actor.id());
 
@@ -143,6 +155,12 @@ public class RoleService {
             }
         } catch (DuplicateKeyException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Role name already exists.", ex);
+        }
+        Map<String, Object> changes = AuditChanges.between(Map.of("name", before.name()),
+                Map.of("name", normalizedName));
+        if (!changes.isEmpty()) {
+            auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.role.updated", "role", roleId,
+                    changes);
         }
     }
 
@@ -186,6 +204,11 @@ public class RoleService {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "Role not found");
+        }
+        Map<String, Object> changes = AuditChanges.between(Map.of("status", role.status()), Map.of("status", status));
+        if (!changes.isEmpty()) {
+            auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.role.status.updated", "role",
+                    roleId, changes);
         }
     }
 
@@ -238,21 +261,21 @@ public class RoleService {
             }
         }
         List<String> beforePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
-        if(!actor.owner()){
-            for(String code : beforePermissions){
-                if(!permissions.hasPermission(actor, code)){
+        if (!actor.owner()) {
+            for (String code : beforePermissions) {
+                if (!permissions.hasPermission(actor, code)) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN);
                 }
             }
-            for (String permissionId : permissionIds){
+            for (String permissionId : permissionIds) {
                 String code = repository.permissionCode(permissionId);
-                if(!permissions.hasPermission(actor, code)){
+                if (!permissions.hasPermission(actor, code)) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN);
                 }
             }
         }
         repository.deleteRolePermissions(actor.merchantId(), roleId);
-       
+
         for (String permissionId : permissionIds) {
             repository.insertRolePermission(
                     UUID.randomUUID().toString(),
@@ -267,7 +290,7 @@ public class RoleService {
                 Map.of("permissions", afterPermissions));
 
         if (!changes.isEmpty()) {
-            auth.auditMerchant(
+            auditLog.recordMerchantSuccess(
                     actor.merchantId(),
                     actor.id(),
                     "identity.role.permissions.updated",
@@ -310,104 +333,104 @@ public class RoleService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role IDs must not contain duplicates");
         }
 
-        for (String roleId : roleIds){
+        for (String roleId : roleIds) {
             if (roleId == null || roleId.isBlank()) {
-               throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role ID must not be blank");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role ID must not be blank");
             }
 
             RoleRepository.RoleSummary role = repository.lockRole(actor.merchantId(), roleId);
 
-            if(role == null){
+            if (role == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role not found in current merchant");
             }
         }
         List<String> beforeRoleIds = repository.userRoleIds(actor.merchantId(), userId);
-        if(!actor.owner()){
-            for(String roleId : beforeRoleIds){
+        if (!actor.owner()) {
+            for (String roleId : beforeRoleIds) {
                 List<String> rolePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
 
-                for(String code : rolePermissions){
-                    if(!permissions.hasPermission(actor, code)){
+                for (String code : rolePermissions) {
+                    if (!permissions.hasPermission(actor, code)) {
                         throw new ResponseStatusException(HttpStatus.FORBIDDEN);
                     }
                 }
             }
-            for (String roleId : roleIds){
+            for (String roleId : roleIds) {
                 List<String> rolePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
 
-                for(String code : rolePermissions){
-                    if(!permissions.hasPermission(actor, code)){
+                for (String code : rolePermissions) {
+                    if (!permissions.hasPermission(actor, code)) {
                         throw new ResponseStatusException(HttpStatus.FORBIDDEN);
                     }
                 }
             }
         }
         repository.deleteUserRoles(actor.merchantId(), userId);
-        
-        for(String roleId : roleIds){
+
+        for (String roleId : roleIds) {
             repository.insertUserRole(UUID.randomUUID().toString(), actor.merchantId(), userId, roleId);
         }
 
         List<String> afterRoleIds = repository.userRoleIds(actor.merchantId(), userId);
 
         Map<String, Object> changes = AuditChanges.between(
-            Map.of("roleIds", beforeRoleIds),
-            Map.of("roleIds", afterRoleIds)
-        );
+                Map.of("roleIds", beforeRoleIds),
+                Map.of("roleIds", afterRoleIds));
 
-        if (!changes.isEmpty()){
-            auth.auditMerchant(actor.merchantId(), actor.id(), "identity.user.roles.updated", "user", userId, changes);
+        if (!changes.isEmpty()) {
+            auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.user.roles.updated", "user",
+                    userId, changes);
         }
     }
 
-    public List<String> userRoleIds(SessionService.Actor actor, String userId){
+    public List<String> userRoleIds(SessionService.Actor actor, String userId) {
         if (!actor.owner() && !permissions.hasPermission(actor, "roles.assign")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         AuthRepository.DirectoryUser target = auth.directoryUser(actor.merchantId(), userId);
-        
-        if(target == null){
+
+        if (target == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
         }
         return repository.userRoleIds(actor.merchantId(), userId);
     }
 
     @Transactional
-    public void deleteRole(SessionService.Actor actor, String roleId){
-        if(!actor.owner() && !permissions.hasPermission(actor, "roles.delete")){
+    public void deleteRole(SessionService.Actor actor, String roleId) {
+        if (!actor.owner() && !permissions.hasPermission(actor, "roles.delete")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
         var role = repository.lockRole(actor.merchantId(), roleId);
 
-        if(role == null){
+        if (role == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
 
-        if(!"disabled".equals(role.status())){
+        if (!"disabled".equals(role.status())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT);
         }
 
-        if (role.peopleCount()>0){
+        if (role.peopleCount() > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT);
         }
-        List<String> beforePermissions= repository.rolePermissionCodes(actor.merchantId(), roleId);
-        if(!actor.owner()){
-            for(String code : beforePermissions){
-                if(!permissions.hasPermission(actor, code)){
+        List<String> beforePermissions = repository.rolePermissionCodes(actor.merchantId(), roleId);
+        if (!actor.owner()) {
+            for (String code : beforePermissions) {
+                if (!permissions.hasPermission(actor, code)) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN);
                 }
             }
         }
         repository.deleteRole(actor.merchantId(), roleId);
-        Map<String, Object> changes = AuditChanges.between(Map.of("name", role.name(), "status", role.status(), "permissions", beforePermissions), Map.of());
+        Map<String, Object> changes = AuditChanges.between(
+                Map.of("name", role.name(), "status", role.status(), "permissions", beforePermissions), Map.of());
 
-        if (!changes.isEmpty()){
-            auth.auditMerchant(actor.merchantId(), actor.id(), "identity.role.deleted", "role", roleId, changes);
+        if (!changes.isEmpty()) {
+            auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.role.deleted", "role", roleId,
+                    changes);
         }
     }
-
-
 
     public record RoleListItem(String id, String name, String status, LocalDateTime createdAt, long peopleCount,
             List<String> permissions) {

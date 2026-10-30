@@ -10,6 +10,9 @@ import java.util.UUID;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import com.aiosnova.audit.AuditChanges;
+import com.aiosnova.audit.AuditLogService;
+import com.aiosnova.organization.OrganizationAssignmentService;
+import com.aiosnova.organization.OrganizationService;
 import com.aiosnova.mail.EmailService;
 import com.google.zxing.WriterException;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-@Profile({"local", "prod"})
+@Profile({ "local", "prod" })
 @Transactional(rollbackFor = Exception.class, noRollbackFor = ResponseStatusException.class)
 public class InvitationService {
 
@@ -30,14 +33,16 @@ public class InvitationService {
     private final TotpService totpService;
     private final AuthRepository repository;
     private final AuthSecretService secrets;
-    private final com.aiosnova.organization.OrganizationService organization;
-    private final com.aiosnova.organization.OrganizationAssignmentService assignments;
+    private final OrganizationService organization;
+    private final OrganizationAssignmentService assignments;
     private final SecureRandom random = new SecureRandom();
+    private final AuditLogService auditLog;
 
     public InvitationService(EmailService emailService, TotpService totpService,
-                             AuthRepository repository, AuthSecretService secrets, com.aiosnova.organization.OrganizationService organization, com.aiosnova.organization.OrganizationAssignmentService assignments,
-                             @Value("${app.frontend-url}") String frontendUrl,
-                             @Value("${app.local-merchant-id}") String merchantId) {
+            AuthRepository repository, AuthSecretService secrets, OrganizationService organization,
+            OrganizationAssignmentService assignments, AuditLogService auditLog,
+            @Value("${app.frontend-url}") String frontendUrl,
+            @Value("${app.local-merchant-id}") String merchantId) {
         this.emailService = emailService;
         this.frontendUrl = frontendUrl;
         this.merchantId = merchantId;
@@ -46,13 +51,16 @@ public class InvitationService {
         this.organization = organization;
         this.assignments = assignments;
         this.secrets = secrets;
+        this.auditLog = auditLog;
     }
 
     public SentInvitation send(InvitationRequest request, SessionService.Actor actor) {
         repository.merchantOwner(merchantId);
-        if (!merchantId.equals(actor.merchantId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        if (!merchantId.equals(actor.merchantId()))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         actor = repository.actor(merchantId, actor.id());
-        if (actor == null || !"active".equals(actor.status()) || (!actor.owner() && !actor.manageUsers() && !actor.canInvite())) {
+        if (actor == null || !"active".equals(actor.status())
+                || (!actor.owner() && !actor.manageUsers() && !actor.canInvite())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         List<AuthRepository.Company> companies = repository.accessibleCompanies(actor).stream()
@@ -62,30 +70,41 @@ public class InvitationService {
         }
         String departmentId = request.departmentId() == null ? "" : request.departmentId();
         String positionId = request.positionId() == null ? "" : request.positionId();
-        var catalog = organization.invitationCatalog(actor, request.placementCompanyId() == null ? companies.getFirst().id() : request.placementCompanyId());
-        var department = catalog.departments().stream().filter(item -> item.id().equals(departmentId)).findFirst().orElse(null);
+        var catalog = organization.invitationCatalog(actor,
+                request.placementCompanyId() == null ? companies.getFirst().id() : request.placementCompanyId());
+        var department = catalog.departments().stream().filter(item -> item.id().equals(departmentId)).findFirst()
+                .orElse(null);
         if ((!departmentId.isEmpty() && department == null) || (!positionId.isEmpty()
-                && (department == null || department.positions().stream().noneMatch(item -> item.id().equals(positionId))))) {
+                && (department == null
+                        || department.positions().stream().noneMatch(item -> item.id().equals(positionId))))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
         String email = normalize(request.email());
         AuthRepository.User user = repository.user(email, true);
-        if (user != null && repository.actor(merchantId, user.id()) == null) throw new ResponseStatusException(HttpStatus.CONFLICT);
-        if (user != null && !"invited".equals(user.status())) throw new ResponseStatusException(HttpStatus.CONFLICT);
+        if (user != null && repository.actor(merchantId, user.id()) == null)
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
+        if (user != null && !"invited".equals(user.status()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
         String userId = user == null ? UUID.randomUUID().toString() : user.id();
-        if (user == null) repository.createUser(userId, email, request.fullName(), request.language());
+        if (user == null) {
+            repository.createUser(userId, email, request.fullName(), request.language());
+            auditLog.recordMerchantSuccess(merchantId, actor.id(), "identity.user.created", "user", userId,
+                    AuditChanges.between(Map.of(), Map.of("status", "invited")));
+        }
         repository.saveInvitationPlacement(merchantId, userId, departmentId, positionId, request.requireMfa());
         repository.revokeInvitations(merchantId, userId);
         String token = randomToken("");
         String id = UUID.randomUUID().toString();
         Instant now = Instant.now();
         repository.createInvitation(id, merchantId, userId, actor.id(), email, request.fullName(), request.language(),
-                request.personalMessage(), secrets.tokenHash(token), request.requireMfa(), now, now.plusSeconds(7 * 86400));
+                request.personalMessage(), secrets.tokenHash(token), request.requireMfa(), now,
+                now.plusSeconds(7 * 86400));
         for (AuthRepository.Company company : companies) {
             repository.assignCompany(UUID.randomUUID().toString(), merchantId, id, company.id());
         }
-        repository.auditMerchant(merchantId, actor.id(), "invitation.sent", "invitation", id,
-                AuditChanges.between(Map.of(), Map.of("status", "sent", "companyCodes", companies.stream().map(AuthRepository.Company::code).sorted().toList(),
+        auditLog.recordMerchantSuccess(merchantId, actor.id(), "invitation.sent", "invitation", id,
+                AuditChanges.between(Map.of(), Map.of("status", "sent", "companyCodes",
+                        companies.stream().map(AuthRepository.Company::code).sorted().toList(),
                         "requireMfa", request.requireMfa(), "departmentId", departmentId, "positionId", positionId)));
         String link = frontendUrl + "/activate?token=" + token;
         boolean chinese = "zh-CN".equals(request.language());
@@ -100,7 +119,8 @@ public class InvitationService {
         AuthRepository.Invite invite = requireInvitation(token, false);
         List<AuthRepository.Company> companies = repository.invitationCompanies(invite.merchantId(), invite.id());
         return new Invitation(invite.userId(), invite.email(), invite.fullName(),
-                companies.stream().map(AuthRepository.Company::name).toList(), requiresMfa(invite, companies), invite.expiresAt());
+                companies.stream().map(AuthRepository.Company::name).toList(), requiresMfa(invite, companies),
+                invite.expiresAt());
     }
 
     @Transactional(readOnly = true)
@@ -111,7 +131,8 @@ public class InvitationService {
     public TotpService.Setup startEnrollment(String token) throws WriterException {
         AuthRepository.Invite invite = requireInvitation(token, true);
         List<AuthRepository.Company> companies = repository.invitationCompanies(invite.merchantId(), invite.id());
-        if (!requiresMfa(invite, companies)) throw new ResponseStatusException(HttpStatus.CONFLICT);
+        if (!requiresMfa(invite, companies))
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
         AuthRepository.Mfa enrollment = repository.enrollment(invite.id());
         if (enrollment == null) {
             byte[] secret = totpService.createSecret();
@@ -119,7 +140,8 @@ public class InvitationService {
                     secrets.encrypt(invite.userId(), secret));
             return totpService.setup(secret, invite.email());
         }
-        if (enrollment.attempts() >= 5) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
+        if (enrollment.attempts() >= 5)
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
         return totpService.setup(secrets.decrypt(invite.userId(), enrollment.encryptedSecret()), invite.email());
     }
 
@@ -127,28 +149,45 @@ public class InvitationService {
         repository.merchantOwner(merchantId);
         AuthRepository.Invite invite = requireInvitation(token, true);
         List<AuthRepository.Company> companies = repository.invitationCompanies(invite.merchantId(), invite.id());
-        if (companies.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT);
+        if (companies.isEmpty())
+            throw new ResponseStatusException(HttpStatus.CONFLICT);
         boolean requireMfa = requiresMfa(invite, companies);
         Instant now = Instant.now();
         String previousUserStatus = repository.userById(invite.userId()).status();
         if (requireMfa) {
             AuthRepository.Mfa enrollment = repository.enrollment(invite.id());
-            if (enrollment == null) throw new ResponseStatusException(HttpStatus.CONFLICT);
-            if (enrollment.attempts() >= 5) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
+            if (enrollment == null)
+                throw new ResponseStatusException(HttpStatus.CONFLICT);
+            if (enrollment.attempts() >= 5)
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
             long counter = totpService.verify(secrets.decrypt(invite.userId(), enrollment.encryptedSecret()), code, -1);
             if (counter < 0) {
                 repository.mfaFailure(enrollment.id());
                 throw new ResponseStatusException(enrollment.attempts() + 1 >= 5
-                        ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.UNAUTHORIZED);
+                        ? HttpStatus.TOO_MANY_REQUESTS
+                        : HttpStatus.UNAUTHORIZED);
             }
             repository.enableMfa(enrollment.id(), counter, now);
         }
         repository.activate(invite, companies, now);
+        String currentUserStatus = repository.userById(invite.userId()).status();
         assignments.synchronize(invite.merchantId(), invite.userId(), invite.userId());
         Map<String, Object> changes = new LinkedHashMap<>();
         AuditChanges.add(changes, "status", invite.status(), "accepted");
-        AuditChanges.add(changes, "userStatus", previousUserStatus, repository.userById(invite.userId()).status());
-        repository.auditMerchant(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation", invite.id(), changes);
+        AuditChanges.add(changes, "userStatus", previousUserStatus, currentUserStatus);
+        auditLog.recordMerchantSuccess(invite.merchantId(), invite.userId(), "invitation.accepted", "invitation",
+                invite.id(), changes);
+        if (!previousUserStatus.equals(currentUserStatus)) {
+            auditLog.recordMerchantSuccess(
+                    invite.merchantId(),
+                    invite.userId(),
+                    "identity.user.status.updated",
+                    "user",
+                    invite.userId(),
+                    AuditChanges.between(
+                            Map.of("status", previousUserStatus),
+                            Map.of("status", currentUserStatus)));
+        }
         return account(invite.email());
     }
 
@@ -169,31 +208,68 @@ public class InvitationService {
 
     public String loginMfaTicket(String email) {
         Account account = account(email);
-        if (!account.requireMfa() && !account.mfaEnabled()) return null;
+        if (!account.requireMfa() && !account.mfaEnabled())
+            return null;
         String ticket = randomToken("activation_");
-        repository.createTicket(UUID.randomUUID().toString(), account.userId(), secrets.tokenHash(ticket), Instant.now());
+        repository.createTicket(UUID.randomUUID().toString(), account.userId(), secrets.tokenHash(ticket),
+                Instant.now());
         return ticket;
     }
 
     public Account verifyLoginMfa(String ticket, String code) throws GeneralSecurityException {
         String hash = secrets.tokenHash(ticket);
         AuthRepository.Ticket challenge = repository.ticket(hash, false);
-        if (challenge == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        if (challenge == null)
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         repository.lockUser(challenge.userId());
         challenge = repository.ticket(hash, true);
-        if (!"restricted".equals(challenge.status()) || !Instant.now().isBefore(challenge.expiresAt())) {
+        if (challenge == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
-        if (challenge.attempts() >= 5) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
+        if (!"restricted".equals(challenge.status())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+
+        if (!Instant.now().isBefore(challenge.expiresAt())) {
+            auditLog.recordLoginFailure(
+                    merchantId,
+                    challenge.userId(),
+                    AuditLogService.LoginFailureReason.MFA_TICKET_EXPIRED);
+
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        if (challenge.attempts() >= 5) {
+            auditLog.recordLoginFailure(
+                    merchantId,
+                    challenge.userId(),
+                    AuditLogService.LoginFailureReason.MFA_ATTEMPTS_EXCEEDED);
+
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
+        }
         AuthRepository.User user = repository.userById(challenge.userId());
-        if (!canRequestOtp(user.email())) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        if (!canRequestOtp(user.email()))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         AuthRepository.Mfa credential = repository.credential(user.id());
-        if (credential == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        long counter = totpService.verify(secrets.decrypt(user.id(), credential.encryptedSecret()), code, credential.lastCounter());
+        if (credential == null)
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        long counter = totpService.verify(secrets.decrypt(user.id(), credential.encryptedSecret()), code,
+                credential.lastCounter());
         if (counter < 0) {
             repository.ticketFailure(challenge.id());
-            throw new ResponseStatusException(challenge.attempts() + 1 >= 5
-                    ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.UNAUTHORIZED);
+
+            boolean attemptsExceeded = challenge.attempts() + 1 >= 5;
+
+            auditLog.recordLoginFailure(
+                    merchantId,
+                    user.id(),
+                    attemptsExceeded
+                            ? AuditLogService.LoginFailureReason.MFA_ATTEMPTS_EXCEEDED
+                            : AuditLogService.LoginFailureReason.INVALID_MFA);
+
+            throw new ResponseStatusException(
+                    attemptsExceeded
+                            ? HttpStatus.TOO_MANY_REQUESTS
+                            : HttpStatus.UNAUTHORIZED);
         }
         repository.useMfa(credential.id(), counter);
         repository.consumeTicket(challenge.id());
@@ -203,7 +279,8 @@ public class InvitationService {
     private AuthRepository.Invite requireInvitation(String token, boolean lock) {
         String hash = secrets.tokenHash(token);
         AuthRepository.Invite invite = repository.invitation(hash, false);
-        if (invite == null) throw new ResponseStatusException(HttpStatus.GONE);
+        if (invite == null)
+            throw new ResponseStatusException(HttpStatus.GONE);
         if (lock) {
             repository.lockUser(invite.userId());
             invite = repository.invitation(hash, true);
@@ -233,12 +310,22 @@ public class InvitationService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    public record Account(String userId, String email, String fullName, boolean requireMfa, boolean mfaEnabled) { }
-    public record SentInvitation(String userId) { }
+    public record Account(String userId, String email, String fullName, boolean requireMfa, boolean mfaEnabled) {
+    }
+
+    public record SentInvitation(String userId) {
+    }
+
     public record Directory(List<AuthRepository.DirectoryUser> users,
-                            List<AuthRepository.DirectoryMembership> memberships) { }
+            List<AuthRepository.DirectoryMembership> memberships) {
+    }
+
     public record InvitationRequest(String userId, String email, String fullName, List<String> companyCodes,
-                                    boolean requireMfa, String language, String personalMessage, String departmentId, String positionId, String placementCompanyId) { }
+            boolean requireMfa, String language, String personalMessage, String departmentId, String positionId,
+            String placementCompanyId) {
+    }
+
     public record Invitation(String userId, String email, String fullName, List<String> companies,
-                             boolean requireMfa, Instant expiresAt) { }
+            boolean requireMfa, Instant expiresAt) {
+    }
 }

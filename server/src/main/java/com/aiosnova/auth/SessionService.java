@@ -13,8 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
+import java.util.Map;
 
 import com.aiosnova.access.PermissionService;
+import com.aiosnova.audit.AuditLogService;
 
 @Service
 public class SessionService {
@@ -23,23 +25,27 @@ public class SessionService {
     private final String merchantId;
     private final SecureRandom random = new SecureRandom();
     private final PermissionService permissions;
+    private final AuditLogService auditLog;
 
     public SessionService(AuthRepository repository, AuthSecretService secrets,
-                          @Value("${app.local-merchant-id}") String merchantId, PermissionService permissions) {
+                          @Value("${app.local-merchant-id}") String merchantId, PermissionService permissions, AuditLogService auditLog) {
         this.repository = repository;
         this.secrets = secrets;
         this.merchantId = merchantId;
         this.permissions = permissions;
+        this.auditLog = auditLog;
     }
 
     @Transactional
-    public ResponseEntity<Login> issue(String userId, HttpServletRequest request) {
+    public ResponseEntity<Login> issue(String userId, HttpServletRequest request, LoginMethod loginMethod) {
         String token = token("backend_");
         String csrf = token("");
+        String sessionId = UUID.randomUUID().toString();
         Actor actor = repository.actor(merchantId, userId);
         if (actor == null || !"active".equals(actor.status())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        repository.createSession(UUID.randomUUID().toString(), merchantId, userId,
+        repository.createSession(sessionId, merchantId, userId,
                 secrets.tokenHash(token), secrets.tokenHash(csrf), Instant.now());
+        auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.session.login.succeeded", "session", sessionId, Map.of("loginMethod", loginMethod.name()));
         return ResponseEntity.ok()
                 .header("Set-Cookie", cookie("nova_session", token, true, request, 28800),
                         cookie("aios_csrf", csrf, false, request, 28800))
@@ -63,8 +69,14 @@ public class SessionService {
     @Transactional
     public ResponseEntity<AuthController.MessageResponse> logout(HttpServletRequest request) {
         String token = sessionCookie(request);
-        cookieActor(request, token);
-        repository.revokeSession(secrets.tokenHash(token));
+        Actor actor = cookieActor(request, token);
+        String tokenHash = secrets.tokenHash(token);
+        String sessionId = repository.lockActiveSessionId(actor.merchantId(), actor.id(), tokenHash);
+        if (sessionId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        repository.revokeSession(tokenHash);
+        auditLog.recordMerchantSuccess(actor.merchantId(), actor.id(), "identity.session.logout.succeeded", "session", sessionId, Map.of());
         return ResponseEntity.ok().header("Set-Cookie", cookie("nova_session", "", true, request, 0),
                 cookie("aios_csrf", "", false, request, 0)).body(new AuthController.MessageResponse("Signed out."));
     }
@@ -106,4 +118,5 @@ public class SessionService {
     public record PublicUser(String id, String email, String name, boolean mfaEnabled,
                              boolean profileComplete, boolean isOwner, boolean canManageUsers, List<String> permissions) { }
     public record Login(String accessToken, PublicUser user) { }
+    public enum LoginMethod{OTP, OTP_MFA, LOCAL_TEST, DEPLOYED_TEST}
 }

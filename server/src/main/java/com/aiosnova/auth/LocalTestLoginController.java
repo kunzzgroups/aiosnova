@@ -2,7 +2,6 @@ package com.aiosnova.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -20,17 +19,14 @@ public class LocalTestLoginController {
     private final AuthRepository repository;
     private final SessionService sessions;
     private final String email;
-    private final String merchantId;
     private final String frontendUrl;
 
     public LocalTestLoginController(AuthRepository repository, SessionService sessions,
             @Value("${app.local-test-login.email}") String email,
-            @Value("${app.local-merchant-id}") String merchantId,
             @Value("${app.frontend-url}") String frontendUrl) {
         this.repository = repository;
         this.sessions = sessions;
         this.email = email;
-        this.merchantId = merchantId;
         this.frontendUrl = frontendUrl;
     }
 
@@ -44,8 +40,10 @@ public class LocalTestLoginController {
         }
         var user = repository.user(email, true);
         if (user == null || !"active".equals(user.status())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        var response = sessions.issue(user.id(), request);
-        repository.auditMerchant(merchantId, user.id(), "identity.session.local_test_login", "user", user.id(), Map.of());
+        var response = sessions.issue(
+                user.id(),
+                request,
+                SessionService.LoginMethod.LOCAL_TEST);
         return response;
     }
 
