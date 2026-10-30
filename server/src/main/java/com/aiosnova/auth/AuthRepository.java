@@ -103,6 +103,21 @@ public class AuthRepository {
         jdbc.update("UPDATE auth_sessions SET status = 'revoked', revoked_at = UTC_TIMESTAMP(6) WHERE token_hash = ? AND status = 'active'", hash);
     }
 
+    public String lockActiveSessionId(String merchantId, String userId, String tokenHash){
+        List<String> ids = jdbc.queryForList("""
+                SELECT id
+                    FROM auth_sessions
+                    WHERE merchant_id = ?
+                        AND user_id = ?
+                        AND token_hash = ?
+                        AND status = 'active'
+                        AND expires_at > UTC_TIMESTAMP(6)
+                    FOR UPDATE
+        """, String.class, merchantId, userId, tokenHash);
+        if(ids.isEmpty()) return null;
+        return ids.getFirst();
+    }
+
     public DirectoryUser directoryUser(String merchantId, String userId) {
         return directoryUsers(merchantId, List.of(userId)).stream().findFirst().orElse(null);
     }
@@ -444,36 +459,41 @@ public class AuthRepository {
     }
 
     public void auditMerchant(
-        String merchantId,
-        String actorId,
-        String action,
-        String resourceType,
-        String resourceId,
-        Map<String, Object> changes) {
+            String merchantId,
+            String actorId,
+            String action,
+            String resourceType,
+            String resourceId,
+            Map<String, Object> changes) {
 
-    writeAudit(
-            merchantId, actorId, "merchant", null,
-            action, resourceType, resourceId, changes);
-}
-
-public void auditCompany(
-        String merchantId,
-        String actorId,
-        String companyId,
-        String action,
-        String resourceType,
-        String resourceId,
-        Map<String, Object> changes) {
-
-    if (companyId == null || companyId.isBlank()) {
-        throw new IllegalArgumentException(
-                "Company audit requires companyId");
+        writeAudit(
+                merchantId, actorId, "merchant", null,
+                action, resourceType, resourceId, changes, "success");
     }
 
-    writeAudit(
-            merchantId, actorId, "company", companyId,
-            action, resourceType, resourceId, changes);
-}
+    public void auditLoginFailure(String merchantId, String targetUserId, String reason){
+        writeAudit(merchantId, null, "merchant", null, "identity.session.login.failed", "user", targetUserId, Map.of("reason", reason), "failure");
+    }
+
+
+    public void auditCompany(
+            String merchantId,
+            String actorId,
+            String companyId,
+            String action,
+            String resourceType,
+            String resourceId,
+            Map<String, Object> changes) {
+
+        if (companyId == null || companyId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Company audit requires companyId");
+        }
+
+        writeAudit(
+                merchantId, actorId, "company", companyId,
+                action, resourceType, resourceId, changes, "success");
+    }
 
 private void writeAudit(
         String merchantId,
@@ -483,20 +503,26 @@ private void writeAudit(
         String action,
         String resourceType,
         String resourceId,
-        Map<String, Object> changes) {
+        Map<String, Object> changes,
+        String result) {
 
     if (!TransactionSynchronizationManager.isActualTransactionActive()
             || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
         throw new IllegalStateException(
-                "Success audit requires an active writable transaction");
+                "Audit requires an active writable transaction");
     }
 
     if (merchantId == null || merchantId.isBlank()
-            || actorId == null || actorId.isBlank()
+            || ("success".equals(result) && actorId == null)
+            || (actorId != null && actorId.isBlank())
             || action == null || action.isBlank()
             || resourceType == null || resourceType.isBlank()
             || changes == null) {
         throw new IllegalArgumentException("Invalid audit event");
+    }
+    
+    if(!"success".equals(result) && !"failure".equals(result)){
+        throw new IllegalArgumentException("Invalid audit result");
     }
 
     String payload = json.writeValueAsString(changes);
@@ -508,7 +534,7 @@ private void writeAudit(
                 action, resource_type, resource_id,
                 changes, result, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'success', UTC_TIMESTAMP(6))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))
             """,
             UUID.randomUUID().toString(),
             merchantId,
@@ -518,7 +544,8 @@ private void writeAudit(
             action,
             resourceType,
             resourceId,
-            payload);
+            payload,
+            result);
 }
 
     private Mfa mfa(ResultSet rs, int row) throws SQLException {

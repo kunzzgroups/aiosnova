@@ -107,13 +107,13 @@ public class AuthController {
 
         String ticket = invitationService.loginMfaTicket(request.email());
         if (ticket != null) return ResponseEntity.ok(new MfaRequiredResponse("mfa_required", ticket));
-        return sessions.issue(invitationService.account(request.email()).userId(), httpRequest);
+        return sessions.issue(invitationService.account(request.email()).userId(), httpRequest, SessionService.LoginMethod.OTP);
     }
 
     @PostMapping("/mfa/verify")
     public ResponseEntity<SessionService.Login> verifyMfa(@Valid @RequestBody MfaVerifyRequest request, HttpServletRequest httpRequest)
             throws GeneralSecurityException {
-        return sessions.issue(invitationService.verifyLoginMfa(request.mfaTicket(), request.code()).userId(), httpRequest);
+        return sessions.issue(invitationService.verifyLoginMfa(request.mfaTicket(), request.code()).userId(), httpRequest, SessionService.LoginMethod.OTP_MFA);
     }
 
     @PostMapping("/refresh")

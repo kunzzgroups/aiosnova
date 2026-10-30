@@ -6,6 +6,9 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
+
+import com.aiosnova.audit.AuditLogService;
+import com.aiosnova.audit.AuditLogService.LoginFailureReason;
 import com.aiosnova.mail.EmailService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -24,16 +27,22 @@ public class TacService {
     private final AuthSecretService secrets;
     private final InvitationService invitationService;
     private final SecureRandom random = new SecureRandom();
+    private final AuditLogService auditLog;
+    private final String merchantId;
 
     public TacService(EmailService emailService, TacRepository repository, AuthRepository accounts,
                       AuthSecretService secrets, InvitationService invitationService,
-                      @Value("${auth.tac.resend-cooldown-seconds}") int resendCooldownSeconds) {
+                      @Value("${auth.tac.resend-cooldown-seconds}") int resendCooldownSeconds,
+                      AuditLogService auditLog,
+                      @Value("${app.local-merchant-id}") String merchantId) {
         this.emailService = emailService;
         this.repository = repository;
         this.accounts = accounts;
         this.secrets = secrets;
         this.invitationService = invitationService;
         this.resendCooldownSeconds = resendCooldownSeconds;
+        this.auditLog = auditLog;
+        this.merchantId = merchantId;
     }
 
     public SendResult send(String email) {
@@ -61,15 +70,27 @@ public class TacService {
         if (!invitationService.canRequestOtp(recipient)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         AuthRepository.User user = accounts.user(recipient, true);
         TacRepository.Challenge challenge = repository.latest(user.id());
-        if (challenge == null || challenge.consumed() || !Instant.now().isBefore(challenge.expiresAt())) {
+        if (challenge == null || challenge.consumed()
+                || !Instant.now().isBefore(challenge.expiresAt())) {
+            auditLog.recordLoginFailure(merchantId, user.id(), LoginFailureReason.OTP_EXPIRED);
             return VerifyResult.EXPIRED;
         }
-        if (challenge.attempts() >= challenge.maximum()) return VerifyResult.ATTEMPTS_EXCEEDED;
+        if (challenge.attempts() >= challenge.maximum()){
+            auditLog.recordLoginFailure(merchantId, user.id(), LoginFailureReason.OTP_ATTEMPTS_EXCEEDED);
+            return VerifyResult.ATTEMPTS_EXCEEDED;
+        } 
         if (!MessageDigest.isEqual(challenge.hash().getBytes(StandardCharsets.US_ASCII),
                 secrets.otpHash(challenge.id(), code).getBytes(StandardCharsets.US_ASCII))) {
             repository.failure(challenge.id());
-            return challenge.attempts() + 1 >= challenge.maximum()
-                    ? VerifyResult.ATTEMPTS_EXCEEDED : VerifyResult.INVALID;
+
+            boolean attemptsExceeded = challenge.attempts() + 1 >= challenge.maximum();
+
+            auditLog.recordLoginFailure(merchantId, user.id(),
+                    attemptsExceeded ? LoginFailureReason.OTP_ATTEMPTS_EXCEEDED : LoginFailureReason.INVALID_OTP);
+
+            return attemptsExceeded
+                    ? VerifyResult.ATTEMPTS_EXCEEDED
+                    : VerifyResult.INVALID;
         }
         repository.consume(challenge.id());
         return VerifyResult.VERIFIED;

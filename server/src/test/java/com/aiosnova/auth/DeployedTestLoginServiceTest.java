@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
-import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +34,8 @@ class DeployedTestLoginServiceTest {
                 true, "owner@example.com", "", expiry, "merchant"));
     }
 
-    @Test void onlyActiveDatabaseOwnerGetsSessionAndAudit() throws Exception {
+    @Test
+    void onlyActiveDatabaseOwnerGetsSessionWithCorrectLoginMethod() throws Exception {
         var repository = new FakeRepository();
         var sessions = new FakeSessions();
         var service = new DeployedTestLoginService(repository, sessions, true, "owner@example.com", hash(),
@@ -50,30 +50,33 @@ class DeployedTestLoginServiceTest {
         repository.actor = new SessionService.Actor("user", "merchant", "active", true, true, true);
         assertNotNull(service.tryLogin("owner@example.com", "582943", null));
         assertEquals(1, sessions.issued);
-        assertTrue(repository.audited);
+        assertEquals(
+                SessionService.LoginMethod.DEPLOYED_TEST,
+                sessions.lastLoginMethod);
     }
 
     private static class FakeRepository extends AuthRepository {
         SessionService.Actor actor;
-        boolean audited;
         FakeRepository() { super(null, null); }
         @Override public User user(String email, boolean lock) { return new User("user", email, "Owner", "active"); }
         @Override public SessionService.Actor actor(String merchant, String user) {
             assertEquals("merchant", merchant);
             return actor;
         }
-        @Override public void auditMerchant(String merchant, String actorId, String action, String type, String id, Map<String, Object> data) {
-            assertEquals("identity.session.deployed_test_login", action);
-            assertTrue(data.isEmpty());
-            audited = true;
-        }
     }
 
     private static class FakeSessions extends SessionService {
         int issued;
-        FakeSessions() { super(null, null, "merchant", null); }
-        @Override public ResponseEntity<Login> issue(String user, HttpServletRequest request) {
+        SessionService.LoginMethod lastLoginMethod;
+        FakeSessions() { super(null, null, "merchant", null, null); }
+        
+        @Override
+        public ResponseEntity<Login> issue(
+                String user,
+                HttpServletRequest request,
+                SessionService.LoginMethod loginMethod) {
             issued++;
+            this.lastLoginMethod = loginMethod;
             return ResponseEntity.ok().build();
         }
     }
