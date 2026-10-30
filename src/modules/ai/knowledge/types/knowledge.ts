@@ -32,6 +32,7 @@ import type { AssignmentSource } from '@/modules/ai/shared/assignment'
 export type KnowledgeBaseStatus =
   | 'ready'
   | 'processing'
+  | 'stored_only'
   | 'testing'
   | 'paused'
   | 'failed'
@@ -50,12 +51,13 @@ export type KnowledgeManualMode = 'active' | 'paused' | 'testing'
 export type KnowledgeItemDisplayStatus =
   | 'ready'
   | 'processing'
+  | 'stored_only'
   | 'testing'
   | 'paused'
   | 'failed'
 
 /** Ingestion state of a single document. */
-export type KnowledgeDocumentStatus = 'ready' | 'processing' | 'failed'
+export type KnowledgeDocumentStatus = 'ready' | 'processing' | 'failed' | 'stored_only'
 
 /** Mirrors `SourceKind` in the assistant, so both screens agree. */
 export type KnowledgeDocumentKind = 'file' | 'record'
@@ -184,6 +186,7 @@ export function nextKnowledgeManualMode(
 export function getDocumentDisplayStatus(
   document: Pick<KnowledgeDocument, 'status' | 'mode'>,
 ): KnowledgeItemDisplayStatus {
+  if (document.status === 'stored_only') return 'stored_only'
   if (document.status === 'failed') return 'failed'
   if (document.status === 'processing') return 'processing'
   const mode = normalizedKnowledgeMode(document.mode)
@@ -222,6 +225,7 @@ function rollUpStatuses(
   // System health always wins over user intent.
   if (statuses.some((status) => status === 'failed')) return 'failed'
   if (statuses.some((status) => status === 'processing')) return 'processing'
+  if (statuses.some((status) => status === 'stored_only')) return 'stored_only'
 
   // Then expose the strongest manual state.
   if (statuses.some((status) => status === 'testing')) return 'testing'

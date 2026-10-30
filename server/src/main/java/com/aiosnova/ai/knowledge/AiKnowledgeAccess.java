@@ -27,6 +27,7 @@ public class AiKnowledgeAccess {
         return new Permissions(read, write, "admin".equals(roles.get(company)), write, company.equals(overseer) && "admin".equals(roles.get(company)));
     }
     public void read(String company) { if (merchantId.isBlank() || !permissions(company).canRead()) denied(); }
+    public Set<String> readableCompanies() { return Set.copyOf(roles.keySet()); }
     public void write(String company) { read(company); if (!permissions(company).canWrite()) denied(); }
     public void admin(String company) { read(company); if (!permissions(company).canPromote()) denied(); }
     public void recipients(Collection<String> companies) { if (!roles.keySet().containsAll(companies)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Template recipient is not an authorized company in this server scope."); }

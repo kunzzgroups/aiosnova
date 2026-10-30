@@ -50,8 +50,9 @@ export function ToolOverview({ tool, onEdit, onAction, onSaved }: Props) {
         <section className="console-panel ai-tool-config-card">
           <header className="ai-tool-card-header"><h2>Configuration</h2></header>
           <div className="ai-tool-card-body">
-            <dl className="ai-tool-config-summary"><div><dt>Timeout</dt><dd>{tool.timeoutSeconds} seconds</dd></div><div><dt>Confirmation</dt><dd>{tool.requiresConfirmation ? 'Required' : 'Not required'}</dd></div><div><dt>{t('ai.tools.executionSupport.label')}</dt><dd>{t(`ai.tools.executionSupport.${support}`)}</dd></div></dl>
-            <p className="console-table__muted">{t(`ai.tools.executionSupport.${support}Description`)}</p>
+            <dl className="ai-tool-config-summary"><div><dt>Timeout</dt><dd>{tool.timeoutSeconds} seconds</dd></div><div><dt>Confirmation</dt><dd>{tool.requiresConfirmation ? 'Required' : 'Not required'}</dd></div><div><dt>{t('ai.tools.executionSupport.label')}</dt><dd className="ai-tool-support-value">{t(`ai.tools.executionSupport.${support}`)}<Popover label={t('ai.tools.executionSupport.label')} trigger={<IconInfo />}>
+              <p>{t(`ai.tools.executionSupport.${support}Description`)}</p>
+            </Popover></dd></div></dl>
             {configurationFields.length ? <><div className="ai-tool-advanced-heading"><h3>{typeLabel} settings</h3></div><dl className="ai-tool-parameters">{configurationFields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{displayConfigurationValue(field, tool.configuration[field.key])}</dd></div>)}</dl></> : null}
             {hasConfiguration ? <details className="ai-tool-json-details"><summary>Advanced JSON</summary><pre className="ai-tool-json-preview">{JSON.stringify(tool.configuration, null, 2)}</pre></details> : null}
             {tool.status === 'error' ? <p role="status" className="ai-settings-tool-error">This tool has an error. Review its configuration; saving alone does not confirm recovery.</p> : null}
@@ -60,7 +61,7 @@ export function ToolOverview({ tool, onEdit, onAction, onSaved }: Props) {
         <div className="ai-settings-tool-detail-rail">
           <section className="console-panel ai-tool-agents-card">
             <header className="ai-tool-card-header"><h2>Assigned Agents</h2><Button variant="secondary" onClick={() => setAgentsOpen(true)}>Manage agents</Button></header>
-            <div className="ai-tool-card-body">{tool.agents.length ? <ul className="ai-settings-tool-agents">{tool.agents.map(name => <li key={name}><span className="ai-settings-provider-mark" aria-hidden="true">{name.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</span><div><strong>{name}</strong><span>Uses {tool.name}</span></div></li>)}</ul> : <p className="console-table__muted">No agents assigned.</p>}</div>
+            <div className="ai-tool-card-body">{tool.agents.length ? <ul className="ai-settings-tool-agents">{tool.agents.map(name => <li key={name}><span className="ai-settings-provider-mark" aria-hidden="true">{name.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</span><div><strong title={name}>{name}</strong></div></li>)}</ul> : <p className="console-table__muted">No agents assigned.</p>}</div>
           </section>
           <section className="console-panel ai-tool-activity-card">
             <header className="ai-tool-card-header"><h2>Recent Activity</h2><Button variant="secondary" onClick={() => setRecentOpen(true)}>View recent</Button></header>

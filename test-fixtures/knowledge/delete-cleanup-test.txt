@@ -1,0 +1,2 @@
+deletecleanupmarker acceptance
+This document is only for deletion cleanup testing.

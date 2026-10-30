@@ -7,7 +7,11 @@ async function main() {
     export * from './src/modules/ai/knowledge/services/templateService.ts';
     export { useCompanyStore } from './src/stores/companyStore.ts';
     export { useAuthStore } from './src/stores/authStore.ts';`, resolveDir: process.cwd() },
-    alias: { '@': require('node:path').resolve('src') }, bundle: true, format: 'esm', platform: 'node', write: false })
+    alias: { '@': require('node:path').resolve('src') }, bundle: true, format: 'esm', platform: 'node', write: false,
+    plugins: [{name:'offline-runtime',setup(b) {
+      b.onResolve({filter:/mocks\/runtime(?:\.ts)?$/},()=>({path:'runtime',namespace:'offline'}))
+      b.onLoad({filter:/.*/,namespace:'offline'},()=>({contents:'export const mockingEnabled=false; export const ensureMocking=async()=>{};'}))
+    }}] })
   const api = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'))
   api.useAuthStore.setState({ accessToken: 'test-session' })
   api.useCompanyStore.setState({ companyId: 'company-j1' })

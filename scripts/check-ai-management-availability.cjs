@@ -48,7 +48,8 @@ async function main() {
       assert.equal(tool.status,'disabled')
       const html=renderTool(tool)
       assert(html.includes(api.en['ai.tools.executionSupport.'+(known?state:'unknown')]))
-      assert(html.includes(api.en['ai.tools.executionSupport.'+(known?state:'unknown')+'Description']))
+      assert(html.includes(api.en['ai.tools.executionSupport.'+(known?state:'unknown')]))
+      assert(html.includes(api.en['ai.tools.executionSupport.label']))
       assert(!html.includes('Server reason')) // Display localised fixed descriptions.
     }
     globalThis.__availabilityApi=async()=>({...row,executionSupport:'supported'})

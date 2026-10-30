@@ -8,6 +8,8 @@ import { knowledgeHandlers } from '@/mocks/handlers/knowledgeHandlers'
 import { toolChatPreviewHandlers, toolChatLocalSimulationHandlers } from '@/mocks/handlers/toolChatPreviewHandlers'
 
 const backendTacHandlers = [
+  http.post('/api/ai/knowledge/search', () => passthrough()),
+  http.patch('/api/ai/knowledge/documents/:id', () => passthrough()),
   http.get('/api/identity/directory', () => passthrough()),
   http.get('/api/identity/organizations/:id/removal-impact', () => passthrough()),
   http.post('/api/identity/organizations/:id/remove', () => passthrough()),
@@ -61,6 +63,9 @@ const backendTacHandlers = [
   http.put('/api/ai/tools/:id', () => passthrough()),
   http.patch('/api/ai/tools/:id/enabled', () => passthrough()),
   http.put('/api/ai/tools/:id/agents', () => passthrough()),
+  http.get('/api/ai/mcp/servers', () => passthrough()),
+  http.get('/api/ai/mcp/servers/:id', () => passthrough()),
+  http.get('/api/ai/mcp/servers/:id/tools', () => passthrough()),
 ]
 export const worker = setupWorker(
   ...toolChatLocalSimulationHandlers,

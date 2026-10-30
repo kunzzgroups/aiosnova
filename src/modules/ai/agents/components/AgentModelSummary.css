@@ -1,0 +1,3 @@
+.ai-agent-model-summary { min-width:0; max-width:100%; }
+.ai-agent-model-summary__name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ai-agent-model-summary .console-table__muted { color:var(--color-text-muted); font-size:var(--text-xs); white-space:normal; overflow-wrap:anywhere; margin-top:.25rem; }

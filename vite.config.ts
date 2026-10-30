@@ -40,6 +40,7 @@ export default defineConfig({
       '/api/ai/model-preferences': 'http://127.0.0.1:8081',
       '/api/identity/permissions': 'http://localhost:8080',
       '/api/ai/tools': 'http://127.0.0.1:8081',
+      '/api/ai/mcp': 'http://127.0.0.1:8081',
       '/api/ai/tool-chat-simulation': {
         target: 'http://127.0.0.1:8082',
         rewrite: path => path.replace(

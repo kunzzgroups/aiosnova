@@ -1,4 +1,7 @@
 export const ai: Record<string, string> = {
+  'ai.knowledge.renameDocument': '修改文档名称',
+  'ai.knowledge.renameConflict': '文档已更新，请关闭编辑器并刷新后重试。',
+  'ai.knowledge.renameFailed': '无法修改文档名称。',
   'ai.tools.executionSupport.label': "执行支持",
   'ai.tools.executionSupport.supported': "已支持",
   'ai.tools.executionSupport.not_implemented': "尚未实现",
@@ -11,7 +14,7 @@ export const ai: Record<string, string> = {
   'ai.agents.modelAvailability.boundLabel': "已绑定模型",
   'ai.agents.modelAvailability.checking': "正在检查模型配置…",
   'ai.agents.modelAvailability.checkFailed': "无法检查模型配置。",
-  'ai.agents.modelAvailability.bound': "绑定的模型配置可选用。",
+  'ai.agents.modelAvailability.bound': "可用",
   'ai.agents.modelAvailability.unavailable': "绑定的模型不可用，请检查配置。",
   'ai.agents.modelAvailability.legacy': "请重新选择并保存数据库模型。",
   'ai.agents.modelAvailability.auto': "跟随 Assistant 当前选择。",
@@ -229,6 +232,7 @@ export const ai: Record<string, string> = {
   'ai.knowledge.agentCountNone': '暂无智能体使用',
 
   // 知识库状态
+  'ai.knowledge.statusStoredOnly': '仅存储',
   'ai.knowledge.statusReady': '就绪',
   'ai.knowledge.statusProcessing': '处理中',
   'ai.knowledge.statusFailed': '失败',

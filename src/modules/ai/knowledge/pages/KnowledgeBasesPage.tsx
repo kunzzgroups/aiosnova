@@ -52,6 +52,7 @@ const TEMPLATE_FORM_ID = 'template-adopt-form'
 const STATUS_LABEL_KEY: Record<KnowledgeBaseStatus, string> = {
   ready: 'ai.knowledge.statusReady',
   processing: 'ai.knowledge.statusProcessing',
+  stored_only: 'ai.knowledge.statusStoredOnly',
   testing: 'ai.knowledge.statusTesting',
   paused: 'ai.knowledge.statusPaused',
   failed: 'ai.knowledge.statusFailed',
@@ -60,6 +61,7 @@ const STATUS_LABEL_KEY: Record<KnowledgeBaseStatus, string> = {
 const STATUS_LABEL_FALLBACK: Record<KnowledgeBaseStatus, string> = {
   ready: 'Ready',
   processing: 'Processing',
+  stored_only: 'Stored only',
   testing: 'Testing',
   paused: 'Paused',
   failed: 'Failed',
@@ -74,7 +76,7 @@ type KnowledgeContentItem = {
   id: string
   name: string
   description: string
-  status: 'ready' | 'processing' | 'failed'
+  status: 'ready' | 'processing' | 'failed' | 'stored_only'
   mode: KnowledgeManualMode
   meta: string
 }
@@ -304,6 +306,21 @@ export function KnowledgeBasesPage() {
       cancelled = true
     }
   }, [selectedBaseId, companyId, t])
+  useEffect(() => {
+    if (!selectedBaseId || !detail?.documents.some(document => document.status === 'processing')) return
+    let cancelled = false
+    let busy = false
+    const timer = window.setInterval(() => {
+      if (busy) return
+      busy = true
+      void fetchKnowledgeBase(selectedBaseId, companyId).then(result => {
+        if (cancelled) return
+        setDetail(result)
+        setBases(previous => previous.map(base => base.id === result.base.id ? result.base : base))
+      }).catch(() => { /* Retain visible content on transient failures. */ }).finally(() => { busy = false })
+    }, 3000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [selectedBaseId, companyId, detail?.documents.some(document => document.status === 'processing')])
   const selectedBase = useMemo(
     () => visibleBases.find((base) => base.id === selectedBaseId) ?? null,
     [visibleBases, selectedBaseId],

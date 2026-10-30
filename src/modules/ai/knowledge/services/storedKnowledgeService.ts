@@ -91,3 +91,13 @@ export const updateKnowledgeDataSourceMode = (id: string, value: KnowledgeManual
 export async function updateKnowledgeDocumentStatus(_id: string, _status: 'processing' | 'ready' | 'failed'): Promise<KnowledgeDocument | null> { throw new ApiError('Indexing status is managed by the backend ingestion process.', 409) }
 export async function updateKnowledgeSkillStatus(_id: string, _status: 'draft' | 'ready' | 'failed'): Promise<KnowledgeSkill | null> { throw new ApiError('Execution status is managed by the backend.', 409) }
 export async function updateKnowledgeDataSourceStatus(_id: string, _status: 'connected' | 'disconnected' | 'error'): Promise<KnowledgeDataSource | null> { throw new ApiError('Connection health is managed by the backend connector.', 409) }
+
+export async function renameKnowledgeDocument(id: string, title: string, companyId: string, version: number): Promise<KnowledgeDocument> {
+  assertActiveCompany(companyId)
+  const saved = await knowledgeRequest<KnowledgeDocument>('/documents/' + item(id), { method: 'PATCH', body: { companyId, title, version } })
+  rememberVersion(companyId, 'documents', saved)
+  return saved
+}
+export function documentUploadTitle(name: string, fileCount: number, filename: string): string {
+  return fileCount === 1 ? name.trim() || filename : filename
+}

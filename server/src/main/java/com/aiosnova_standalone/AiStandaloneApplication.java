@@ -37,10 +37,12 @@ import com.aiosnova.ai.agent.AiAgentController;
 import com.aiosnova.ai.tool.AiToolManagementConfiguration;
 import com.aiosnova.ai.chat.AiToolChatConfiguration;
 import com.aiosnova.ai.chat.AiChatTransportConfiguration;
+import com.aiosnova.ai.mcp.AiMcpManagementConfiguration;
 
 @Configuration
 @EnableAutoConfiguration
 @Import({
+        com.aiosnova.ai.knowledge.AiKnowledgeProcessingConfiguration.class,
         AiConnectionController.class,
         AiConnectionService.class,
         AiModelController.class,
@@ -69,6 +71,7 @@ import com.aiosnova.ai.chat.AiChatTransportConfiguration;
         AiAgentService.class,
         AiAgentController.class,
         AiToolManagementConfiguration.class,
+        AiMcpManagementConfiguration.class,
         AiToolChatConfiguration.class,
         AiChatTransportConfiguration.class,
 })

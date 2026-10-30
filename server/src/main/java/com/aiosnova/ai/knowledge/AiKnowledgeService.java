@@ -17,7 +17,11 @@ public class AiKnowledgeService {
     private final AiKnowledgeRepository db;
     private final AiKnowledgeAccess access;
     private final ObjectMapper json = new ObjectMapper();
-    public AiKnowledgeService(AiKnowledgeRepository db, AiKnowledgeAccess access) { this.db = db; this.access = access; }
+    private final AiKnowledgeProcessingRepository processing;
+    public AiKnowledgeService(AiKnowledgeRepository db, AiKnowledgeAccess access,
+            AiKnowledgeProcessingRepository processing) {
+        this.db = db; this.access = access; this.processing = processing;
+    }
     static Map<String,Object> map(Object... pairs) {
         var result = new LinkedHashMap<String,Object>(); for (int i=0;i<pairs.length;i+=2) result.put((String)pairs[i], pairs[i+1]); return result;
     }
@@ -84,6 +88,7 @@ public class AiKnowledgeService {
     }
     private String display(Map<String,Object> row,String entity) {
         String status=s(row,"status");
+        if (status.equals("stored_only")) return "stored_only";
         if (status.equals("failed") || status.equals("error")) return "failed";
         if (status.equals("processing") || status.equals("draft") || status.equals("disconnected")) return "processing";
         String mode=s(row,"mode"); return mode.equals("paused") || mode.equals("testing") ? mode : "ready";
@@ -93,7 +98,7 @@ public class AiKnowledgeService {
         var content=kind.equals("skill") ? skills : kind.equals("data") ? sources : docs;
         var statuses=content.stream().map(item->display(item,kind)).toList();
         String status="empty";
-        if (!statuses.isEmpty()) { status="ready"; for(String candidate:List.of("failed","processing","testing","paused")) if(statuses.contains(candidate)){status=candidate;break;} }
+        if (!statuses.isEmpty()) { status="ready"; for(String candidate:List.of("failed","processing","stored_only","testing","paused")) if(statuses.contains(candidate)){status=candidate;break;} }
         var agents=db.baseAgents(company,id);
         return map("id",id,"merchantId",row.get("merchant_id"),"companyId",company,"allowedCompanyIds",List.of(company),
                 "name",row.get("name"),"description",row.get("description"),"category",row.get("category"),"kind",kind,
@@ -162,6 +167,7 @@ public class AiKnowledgeService {
         if(bytes!=null) {
             String file=nowId(); db.file(new AiKnowledgeRepository.StoredFile(file,company,filename,mime,bytes),id,null);
             db.update("documents",company,id,map("file_url",fileUrl(company,file),"mime_type",mime,"size_bytes",(long)bytes.length));
+            processing.enqueue(company, file);
         }
         db.setDocumentAgents(company,id,agents);touch(company,baseId);return documentDto(db.find("documents",company,id,false));
     }
@@ -186,6 +192,15 @@ public class AiKnowledgeService {
         var saved=addContent(entity,company,baseId,body);
         if(bytes!=null)db.contentFile(new AiKnowledgeRepository.StoredFile(nowId(),company,filename,mime,bytes),entity,s(saved,"id"));
         return saved;
+    }
+    public Map<String,Object> renameDocument(String company,String id,JsonNode body) {
+        var row=content("documents",company,id,true);
+        if(!body.hasNonNull("version")) bad("Document version is required.");
+        version(row,body);
+        String title=text(body,"title",null,512);
+        db.update("documents",company,id,map("title",title));
+        touch(company,s(row,"knowledge_base_id"));
+        return documentDto(db.find("documents",company,id,false));
     }
     public void deleteContent(String entity,String company,String id,JsonNode body) {
         var row=content(entity,company,id,true);version(row,body);db.delete(entity,company,id);touch(company,s(row,"knowledge_base_id"));
@@ -275,7 +290,7 @@ public class AiKnowledgeService {
         for(var item:documents) {
             var doc=newDocument(company,baseId,text(item,"title",null,512),text(item,"type",null,16),item.hasNonNull("fileId")?"file":text(item,"kind","record",16),false);
             String docId=s(doc,"id");var fields=map("mode",choice(text(item,"mode","active",16),"active","paused","testing"));
-            if(item.hasNonNull("fileId")) { String file=cloneFile(owner,item.path("fileId").asString(),company,docId,null);var stored=db.file(company,file);fields.putAll(map("file_url",fileUrl(company,file),"size_bytes",(long)stored.content().length,"mime_type",stored.mimeType())); }
+            if(item.hasNonNull("fileId")) { String file=cloneFile(owner,item.path("fileId").asString(),company,docId,null);var stored=db.file(company,file);fields.putAll(map("file_url",fileUrl(company,file),"size_bytes",(long)stored.content().length,"mime_type",stored.mimeType())); processing.enqueue(company,file); }
             db.update("documents",company,docId,fields);
         }
         for(var item:skills)adoptContent("skills",company,baseId,owner,item);

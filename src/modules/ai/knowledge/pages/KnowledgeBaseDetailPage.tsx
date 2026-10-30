@@ -27,7 +27,7 @@ import { TablePanel } from '@/components/ui/TablePanel'
 import { TableToolbar } from '@/components/ui/TableToolbar'
 import { TablePagination } from '@/components/ui/TablePagination'
 import { SidebarSelect } from '@/components/navigation/SidebarSelect'
-import { IconFolder, IconPaperclip, IconPlus, IconTrash } from '@/components/icons/Icons'
+import { IconFolder, IconPaperclip, IconPlus, IconTrash, IconPencil } from '@/components/icons/Icons'
 import { FileDropZone } from '@/components/ui/FileDropZone'
 import { useCompanyStore } from '@/stores/companyStore'
 import {
@@ -40,6 +40,8 @@ import type { AgentListItem } from '@/modules/ai/agents/types/agent'
 import { ApiError } from '@/services/httpClient'
 import {
   addKnowledgeDocument,
+  renameKnowledgeDocument,
+  documentUploadTitle,
   deleteKnowledgeDocument,
   deleteKnowledgeSkill,
   deleteKnowledgeDataSource,
@@ -78,6 +80,7 @@ const ADD_FORM_ID = 'knowledge-source-form'
 const STATUS_LABEL_KEY: Record<KnowledgeItemDisplayStatus, string> = {
   ready: 'ai.knowledge.statusReady',
   processing: 'ai.knowledge.statusProcessing',
+  stored_only: 'ai.knowledge.statusStoredOnly',
   testing: 'ai.knowledge.statusTesting',
   paused: 'ai.knowledge.statusPaused',
   failed: 'ai.knowledge.statusFailed',
@@ -86,6 +89,7 @@ const STATUS_LABEL_KEY: Record<KnowledgeItemDisplayStatus, string> = {
 const STATUS_LABEL_FALLBACK: Record<KnowledgeItemDisplayStatus, string> = {
   ready: 'Ready',
   processing: 'Processing',
+  stored_only: 'Stored only',
   testing: 'Testing',
   paused: 'Paused',
   failed: 'Failed',
@@ -197,6 +201,16 @@ export function KnowledgeBaseDetailPage() {
   const [isDeletingDocument, setIsDeletingDocument] = useState(false)
   const [isDeletingSkill, setIsDeletingSkill] = useState(false)
   const [isDeletingDataSource, setIsDeletingDataSource] = useState(false)
+  const [renaming, setRenaming] = useState<KnowledgeDocument | null>(null)
+  const [renameTitle, setRenameTitle] = useState('')
+  const [renameBusy, setRenameBusy] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const renameScope = useRef(0)
+  useEffect(() => {
+    renameScope.current++
+    setRenaming(null); setRenameError(null); setRenameBusy(false)
+    return () => { renameScope.current++ }
+  }, [baseId, activeCompanyId])
   const [docTitle, setDocTitle] = useState('')
   const [docType, setDocType] = useState<KnowledgeDocumentType>('policy')
   const [docFile, setDocFile] = useState<File[]>([])
@@ -209,7 +223,7 @@ export function KnowledgeBaseDetailPage() {
   const [dsFile, setDsFile] = useState<File[]>([])
   const [dsConfig, setDsConfig] = useState<KeyValuePair[]>([])
   useEffect(() => {
-    setAddOpen(false); setPendingDeleteDocument(null); setPendingDeleteSkill(null); setPendingDeleteDataSource(null)
+    setRenaming(null); setRenameError(null); setAddOpen(false); setPendingDeleteDocument(null); setPendingDeleteSkill(null); setPendingDeleteDataSource(null)
   }, [activeCompanyId])
   const highlightDocumentId = searchParams.get('highlight')
   const load = useCallback(async () => {
@@ -231,6 +245,19 @@ export function KnowledgeBaseDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
+  useEffect(() => {
+    if (!detail?.documents.some(document => document.status === 'processing')) return
+    let cancelled = false
+    let busy = false
+    const timer = window.setInterval(() => {
+      if (busy) return
+      busy = true
+      void fetchKnowledgeBase(baseId, activeCompanyId ?? '').then(result => {
+        if (!cancelled) setDetail(result)
+      }).catch(() => { /* Keep current content; normal reload still reports errors. */ }).finally(() => { busy = false })
+    }, 3000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [baseId, activeCompanyId, detail?.documents.some(document => document.status === 'processing')])
   useEffect(() => {
     if (!activeCompanyId) {
       setAgents([])
@@ -1161,7 +1188,7 @@ export function KnowledgeBaseDetailPage() {
         if (docFile.length > 0) {
           for (const file of docFile) {
             await addKnowledgeDocument(baseId, {
-              title: file.name,
+              title: documentUploadTitle(docTitle, docFile.length, file.name),
               type: docType,
               agentIds: inheritAgents ? null : docAgentIds,
               file,
@@ -1465,7 +1492,7 @@ export function KnowledgeBaseDetailPage() {
                               href={document.fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              download={document.title}
+                              download
                             >
                               {t('ai.knowledge.download')}
                             </a>
@@ -1537,6 +1564,7 @@ export function KnowledgeBaseDetailPage() {
                         </td>
                         <td className="console-table__actions identity-table__actions">
                           <div className="identity-inline-actions identity-directory-actions">
+                            {canWriteKnowledge ? <IconButton label={t('ai.knowledge.renameDocument')} disabled={renameBusy || isDeletingDocument} onClick={() => { setRenaming(document); setRenameTitle(document.title); setRenameError(null) }}><IconPencil /></IconButton> : null}
                             <IconButton
                               label={t(
                                 'ai.knowledge.deleteDocument',
@@ -2466,6 +2494,27 @@ export function KnowledgeBaseDetailPage() {
         }}
       />
 
+      <Drawer open={renaming !== null} title={t('ai.knowledge.renameDocument')} closeLabel={t('ai.knowledge.cancel', 'Cancel')} busy={renameBusy}
+        onClose={() => { if (!renameBusy) setRenaming(null) }}
+        footer={<><Button form="rename-knowledge-document" type="submit" disabled={renameBusy || !renameTitle.trim() || renaming?.version === undefined}>{t('ai.knowledge.save', 'Save')}</Button><Button variant="secondary" disabled={renameBusy} onClick={() => setRenaming(null)}>{t('ai.knowledge.cancel', 'Cancel')}</Button></>}>
+        <form id="rename-knowledge-document" onSubmit={event => {
+          event.preventDefault()
+          if (!renaming || renameBusy || !activeCompanyId || renaming.version === undefined) return
+          const company = activeCompanyId
+          const scope = renameScope.current
+          setRenameBusy(true); setRenameError(null)
+          void renameKnowledgeDocument(renaming.id, renameTitle.trim(), company, renaming.version).then(async () => {
+            if (useCompanyStore.getState().companyId !== company || renameScope.current !== scope) return
+            setRenaming(null); await load()
+          }).catch(error => {
+            if (useCompanyStore.getState().companyId === company && renameScope.current === scope) setRenameError(error instanceof ApiError && error.status === 409 ? t('ai.knowledge.renameConflict') : t('ai.knowledge.renameFailed'))
+          }).finally(() => { if (renameScope.current === scope) setRenameBusy(false) })
+        }}>
+          <FormField htmlFor="knowledge-document-title" label={t('ai.knowledge.name', 'Name')}><TextField id="knowledge-document-title" value={renameTitle} maxLength={512} disabled={renameBusy} onChange={event => setRenameTitle(event.target.value)} /></FormField>
+          {renameError ? <p role="alert">{renameError}</p> : null}
+        </form>
+      </Drawer>
+
       <Drawer
         open={addOpen}
         title={t('ai.knowledge.addSourceTitle')}
@@ -2535,7 +2584,7 @@ export function KnowledgeBaseDetailPage() {
                   multiple
                   maxSizeBytes={10 * 1024 * 1024}
                   maxFiles={20}
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.tif,.tiff,.bmp"
                   hint={t('common.fileDropHint', 'PDF, DOCX, XLSX, PNG, JPG, TXT up to 10 MB')}
                 />
               </div>

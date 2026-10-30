@@ -5,19 +5,16 @@
  * linked to. Given a question, it scans the agent's linked bases for
  * matching documents and returns them as evidence.
  *
- * Reads the stored Agent/Knowledge catalog. Matching here remains a metadata
- * keyword match; unindexed documents are excluded. Vector retrieval belongs to
- * the ingestion/search backend.
+ * Requests indexed text from Java. Company, active Agent and document-level
+ * assignment rules are enforced by the server; metadata is not used as evidence.
  *
  * Permission: the caller passes the ACTIVE company. Only ACTIVE agents owned
  * by that company are searched, and only bases visible from that company are
  * considered.
  */
 
-import type { AssistantSource, SourceType } from '../types/assistant'
-import { documentIsRetrievable } from '@/modules/ai/knowledge/types/knowledge'
-import { fetchAgent } from '@/modules/ai/agents/services/agentService'
-import { fetchKnowledgeBases, fetchKnowledgeBase } from '@/modules/ai/knowledge/services/knowledgeService'
+import type { AssistantSource } from '../types/assistant'
+import { knowledgeRequest } from '@/modules/ai/knowledge/services/knowledgeApi'
 
 export type RetrieveEvidencePayload = {
   agentId: string
@@ -39,54 +36,13 @@ export async function retrieveEvidence(
     return { sources: [], scanned: 0, matched: 0, scope: '' }
   }
 
-  const { agent } = await fetchAgent(payload.agentId, payload.activeCompanyId)
-  if (agent.companyId !== payload.activeCompanyId || agent.status !== 'active') {
-    return { sources: [], scanned: 0, matched: 0, scope: '' }
-  }
-  const assignedBaseIds = new Set(agent.knowledgeBaseIds)
-  const { items } = await fetchKnowledgeBases(payload.activeCompanyId)
-  const bases = items.filter(base => assignedBaseIds.has(base.id))
-  const baseById = new Map(bases.map(base => [base.id, base]))
-  const details = await Promise.all(bases.map(base => fetchKnowledgeBase(base.id, payload.activeCompanyId)))
-  // Stored catalog metadata is not an indexed document. Never cite unprocessed uploads.
-  const documents = details.flatMap(detail => detail.documents.filter(doc =>
-    documentIsRetrievable(doc) && doc.chunkCount > 0 && Boolean(doc.lastIndexedAt) &&
-    detail.effective.find(link => link.documentId === doc.id)?.agentIds.includes(agent.id),
-  ))
-
-  // Score by keyword overlap with the question. Match against BOTH the
-  // document title (weight 2) and the base name (weight 1).
-  const tokens = tokenize(payload.question)
-  const scored = documents
-    .map((doc) => ({
-      doc,
-      score: scoreDocument(doc, baseById.get(doc.baseId), tokens),
-    }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8)
-
-  const sources: AssistantSource[] = scored.map(({ doc, score }) => {
-    const base = baseById.get(doc.baseId)
-    return {
-      id: doc.id,
-      type: toSourceType(doc.type),
-      title: doc.title,
-      origin: base ? base.name : doc.baseId,
-      snippet: buildSnippet(base?.name),
-      kind: doc.kind,
-      relevance: Math.min(100, Math.round(score * 20)),
-      baseId: doc.baseId,
-      documentId: doc.id,
-    }
+  return knowledgeRequest<RetrieveEvidenceResult>('/search', {
+    method: 'POST', body: {
+      companyId: payload.activeCompanyId,
+      agentId: payload.agentId,
+      question: payload.question,
+    },
   })
-
-  return {
-    sources,
-    scanned: documents.length,
-    matched: scored.length,
-    scope: bases.map((base) => base.name).join(', '),
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -234,38 +190,4 @@ function tokenize(text: string): string[] {
         .filter((token) => !RETRIEVAL_STOP_WORDS.has(token)),
     ),
   )
-}
-
-function scoreDocument(
-  doc: { title: string },
-  base: { name: string } | undefined,
-  tokens: string[],
-): number {
-  if (tokens.length === 0) return 0
-  const title = doc.title.toLowerCase()
-  const baseName = base ? base.name.toLowerCase() : ''
-  let score = 0
-
-  for (const token of tokens) {
-    if (title.includes(token)) {
-      score += 2
-    } else if (baseName.includes(token)) {
-      score += 1
-    }
-  }
-
-  return score
-}
-
-function toSourceType(value: string): SourceType {
-  if (value === 'contract') return 'contract'
-  if (value === 'invoice') return 'invoice'
-  if (value === 'record') return 'record'
-  return 'policy'
-}
-
-function buildSnippet(baseName?: string): string {
-  return baseName
-    ? `Matched from ${baseName} by document title or knowledge-base metadata.`
-    : 'Matched by document title or knowledge-base metadata.'
 }

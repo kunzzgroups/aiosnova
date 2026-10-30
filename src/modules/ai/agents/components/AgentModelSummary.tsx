@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { AgentModelConfig } from '../types/agent'
 import type { AssistantModelOption } from '../../settings/services/settingsService'
+import './AgentModelSummary.css'
 
 export type ModelCheck = {
   companyId: string
@@ -33,13 +34,15 @@ export function AgentModelSummary(props: Props) {
   const selected = state === 'bound' ? props.options.find(option =>
     option.id === props.config?.binding?.modelConfigId &&
     option.providerId === props.config?.binding?.providerId) : undefined
-  return <>
-    <span className={specific ? 'console-chip' : 'console-chip console-chip--muted'}>
-      {specific ? selected?.label ?? t('ai.agents.modelAvailability.boundLabel')
+  const provider = selected?.label.startsWith(`${selected.name} (`)
+    ? selected.label.slice(selected.name.length + 2, -1) : undefined
+  return <div className="ai-agent-model-summary">
+    <span className="ai-agent-model-summary__name" title={selected?.label}>
+      {specific ? selected?.name ?? t('ai.agents.modelAvailability.boundLabel')
         : t('ai.agents.modelAuto', 'Auto')}
     </span>
     <div className="console-table__muted">
-      {t(`ai.agents.modelAvailability.${state}`)}
+      {provider ? <span title={provider}>{provider} · </span> : null}{t(`ai.agents.modelAvailability.${state}`)}
     </div>
-  </>
+  </div>
 }

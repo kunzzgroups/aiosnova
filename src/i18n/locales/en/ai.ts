@@ -1,4 +1,7 @@
 export const ai: Record<string, string> = {
+  'ai.knowledge.renameDocument': 'Rename document',
+  'ai.knowledge.renameConflict': 'This document changed. Close the editor and reload before trying again.',
+  'ai.knowledge.renameFailed': 'Unable to rename the document.',
   'ai.tools.executionSupport.label': "Execution support",
   'ai.tools.executionSupport.supported': "Supported",
   'ai.tools.executionSupport.not_implemented': "Not implemented",
@@ -11,7 +14,7 @@ export const ai: Record<string, string> = {
   'ai.agents.modelAvailability.boundLabel': "Bound model",
   'ai.agents.modelAvailability.checking': "Checking model configuration…",
   'ai.agents.modelAvailability.checkFailed': "Unable to check model configuration.",
-  'ai.agents.modelAvailability.bound': "Bound model configuration is available.",
+  'ai.agents.modelAvailability.bound': "Available",
   'ai.agents.modelAvailability.unavailable': "Bound model unavailable. Review its configuration.",
   'ai.agents.modelAvailability.legacy': "Reselect and save a database model.",
   'ai.agents.modelAvailability.auto': "Follows Assistant selection.",
@@ -253,6 +256,7 @@ export const ai: Record<string, string> = {
   'ai.knowledge.emptyFiltered': 'No knowledge bases are linked to this agent.',
   'ai.knowledge.filteredByAgent': 'Filtered by agent: {{name}}',
 
+  'ai.knowledge.statusStoredOnly': 'Stored only',
   'ai.knowledge.statusReady': 'Ready',
   'ai.knowledge.statusProcessing': 'Processing',
   'ai.knowledge.statusFailed': 'Failed',

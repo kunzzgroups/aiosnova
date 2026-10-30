@@ -63,6 +63,9 @@ public class AiKnowledgeController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(file.name(),StandardCharsets.UTF_8).build().toString())
                 .header("X-Content-Type-Options","nosniff").header(HttpHeaders.CACHE_CONTROL,"no-store").body(file.content());
     }
+    @PatchMapping("/documents/{id}") public Map<String,Object> renameDocument(@PathVariable String id,@RequestBody JsonNode body) {
+        return service.renameDocument(company(body),id,body);
+    }
     private JsonNode version(Long version) { var body=json.createObjectNode();if(version!=null)body.put("version",version);return body; }
     @ExceptionHandler(ResponseStatusException.class) public ResponseEntity<Map<String,String>> error(ResponseStatusException error) { return ResponseEntity.status(error.getStatusCode()).body(Map.of("message",Objects.requireNonNullElse(error.getReason(),"Knowledge request failed."))); }
     @ExceptionHandler(MaxUploadSizeExceededException.class) public ResponseEntity<Map<String,String>> tooLarge() { return ResponseEntity.status(413).body(Map.of("message","File exceeds the upload limit (10 MB).")); }
